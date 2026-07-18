@@ -397,6 +397,19 @@ export interface TimelineEntry {
   source_id: string;
 }
 
+export interface SupervisorDashboardTherapistRow {
+  professional_id: string;
+  professional_name: string;
+  assigned_patients_count: number;
+  completed_sessions_count: number;
+  no_show_count: number;
+  session_completion_pct: number | null;
+  active_objectives_count: number;
+  treatment_plan_adherence_pct: number | null;
+  low_adherence_alert: boolean;
+  no_recent_registration_alert: boolean;
+}
+
 export interface BillingStatus {
   subscription_plan: PlanId | null;
   subscription_status: string;

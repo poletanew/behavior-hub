@@ -17,6 +17,7 @@ from app.api.v1 import (
     resources,
     session_templates,
     sessions,
+    supervisor_dashboard,
     timeline,
     trainings,
     treatment_plans,
@@ -42,3 +43,4 @@ api_router.include_router(deleted_data.router)
 api_router.include_router(notifications.router)
 api_router.include_router(rbac.router)
 api_router.include_router(audit_logs.router)
+api_router.include_router(supervisor_dashboard.router)

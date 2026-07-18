@@ -43,6 +43,10 @@ Este repositório está sendo construído **por fases**, seguindo o roadmap da S
   mostra a intensidade de treino por área (Comunicação, Social, Autonomia, Motor, etc.) nos últimos
   30 dias corridos, sempre recalculado ao vivo a partir das tentativas reais — sem cache manual e
   independente dos filtros de período do restante do relatório.
+- **Fase 4a (bloco 4) — Dashboard para Supervisor (Seção 29.4)**: painel consolidado por equipe
+  (visível apenas a administradores de clínica e supervisores) com percentual de sessões completas
+  por terapeuta, adesão ao plano de tratamento (reaproveitando os alertas de "sem coleta" já
+  existentes) e alertas automáticos de baixa adesão ou ausência de registro recente.
 
 ## Stack (Seção 4 do PRD)
 
@@ -251,13 +255,28 @@ dados).
 36. Ao salvar uma nova tentativa, o heatmap reflete a mudança imediatamente na próxima vez que a
     página de Reports é carregada — não existe um valor em cache desatualizado.
 
+### Fase 4a (bloco 4) — Dashboard para Supervisor
+
+37. Como administrador de clínica ou supervisor, acesse **Painel de Supervisão** no menu lateral
+    (não aparece para profissionais comuns nem para contas individuais, que não têm uma "equipe").
+    A tabela lista cada terapeuta ativo da clínica com: pacientes atribuídos, sessões completas,
+    faltas, percentual de sessões completas, objetivos ativos, percentual de adesão ao plano de
+    tratamento e os alertas de **Baixa adesão** / **Sem registro recente**, quando aplicável.
+38. A adesão ao plano de tratamento reaproveita o mesmo alerta de "sem coleta" da Seção 29.1: um
+    objetivo ativo com um alerta de sem-coleta ativo conta contra a adesão do terapeuta responsável
+    pelo paciente. Quando a adesão cai abaixo de 70%, o terapeuta é marcado com "Baixa adesão".
+39. "Sem registro recente" aparece quando o terapeuta tem pacientes atribuídos mas nenhum
+    atendimento registrado dentro da janela configurável de "sem coleta" da clínica (14 dias por
+    padrão, mesma configuração da Seção 29.1) — permitindo intervenção proativa da coordenação
+    clínica antes que o problema apareça só no relatório do paciente.
+
 ### Rodando os testes automatizados do backend
 
 ```bash
 docker compose exec backend pytest -q
 ```
 
-(ou localmente, sem Docker — ver `backend/README.md`). 162 testes cobrem, entre outros:
+(ou localmente, sem Docker — ver `backend/README.md`). 170 testes cobrem, entre outros:
 
 - **AC-01**: conta nova inicia com zero pacientes/sessões/dashboard.
 - **AC-02** / **AC-03**: limite de 3 pacientes e bloqueio de foto no plano Free.
@@ -311,6 +330,12 @@ docker compose exec backend pytest -q
   tentativas com mais de 30 dias, recálculo imediato ao salvar uma nova tentativa, e independência
   total dos filtros de período do restante do relatório (o heatmap nunca muda quando o usuário altera
   "De/Até", "Treino" ou "Área" dos outros gráficos).
+- Dashboard para Supervisor: acesso restrito a administrador de clínica e supervisor (profissional
+  comum e conta individual recebem 403), cálculo correto de percentual de sessões completas por
+  terapeuta, adesão de 100% quando não há alerta de sem-coleta ativo, adesão de 0% e os dois alertas
+  automáticos corretos quando um alerta de sem-coleta está ativo para o único objetivo do terapeuta,
+  nenhum alerta falso para terapeuta sem paciente atribuído, e isolamento de tenant (terapeutas de
+  uma clínica nunca aparecem no painel de outra).
 
 ## O que **não** está nesta fase
 
@@ -319,10 +344,10 @@ docker compose exec backend pytest -q
   (baseado em regras, não em um modelo de linguagem), claramente rotulado como tal, com a mesma
   estrutura de edição/aprovação/versionamento que a IA real usará depois. Quando você definir o
   provedor (Anthropic, OpenAI, etc.) e me passar a chave, trocamos só essa peça.
-- Seguindo o roadmap (Seção 31.1 do PRD): a Fase 3 está completa. Os dashboards de Supervisor e de
-  Gestor ainda não foram implementados — próximos blocos da Fase 4a. A Fase 4b (sugestões geradas por
-  IA, módulo de avaliações VB-MAPP/ABLLS-R, Biblioteca Inteligente) e a Fase 5 (Family Portal, ML
-  preditivo) continuam para depois.
+- Seguindo o roadmap (Seção 31.1 do PRD): a Fase 3 está completa. O dashboard de Gestor ainda não
+  foi implementado — próximo bloco da Fase 4a. A Fase 4b (sugestões geradas por IA, módulo de
+  avaliações VB-MAPP/ABLLS-R, Biblioteca Inteligente) e a Fase 5 (Family Portal, ML preditivo)
+  continuam para depois.
 - **Timeline Clínica**: a linha do tempo é montada a partir de fontes já existentes (atendimentos,
   log de auditoria de objetivos/atribuições, resumos de relatório) em vez de um novo modelo dedicado
   de "evento" — evita duplicar armazenamento e manter tudo sincronizado. Como consequência,

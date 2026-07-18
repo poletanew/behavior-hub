@@ -21,6 +21,7 @@ import AuditLogPage from "./pages/AuditLogPage";
 import PatientImportPage from "./pages/PatientImportPage";
 import AgendaPage from "./pages/AgendaPage";
 import SecurityPage from "./pages/SecurityPage";
+import SupervisorDashboardPage from "./pages/SupervisorDashboardPage";
 import PlansPage from "./pages/PlansPage";
 
 export default function App() {
@@ -54,6 +55,7 @@ export default function App() {
         <Route path="/audit-log" element={<AuditLogPage />} />
         <Route path="/patients/import" element={<PatientImportPage />} />
         <Route path="/security" element={<SecurityPage />} />
+        <Route path="/supervisor-dashboard" element={<SupervisorDashboardPage />} />
         <Route path="/plans" element={<PlansPage />} />
       </Route>
 

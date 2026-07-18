@@ -243,6 +243,32 @@ Diferente dos demais gráficos de Reports, a janela do heatmap é sempre "hoje m
 (`get_report_data` busca as linhas do heatmap com sua própria chamada a `_fetch_rows`, independente
 da consulta filtrada usada pelos outros gráficos).
 
+## Nota sobre Dashboard para Supervisor (Fase 4a bloco 4 — Seção 29.4)
+
+`app/services/supervisor_dashboard_service.py` reaproveita deliberadamente duas peças de
+infraestrutura já existentes em vez de introduzir novos conceitos:
+
+- **Percentual de sessões completas por terapeuta** usa exatamente a mesma fórmula de
+  `appointment_service.attendance_rate` (completas / (completas + faltas)), só que agrupada por
+  `professional_id` em vez de por paciente — mantendo as duas métricas de "taxa de comparecimento"
+  consistentes entre si.
+- **Adesão ao plano de tratamento** é definida como a fração dos objetivos ativos (não
+  iniciado/em andamento, não excluídos) de pacientes atribuídos ao terapeuta que **não** têm um
+  alerta de "sem coleta" (`ClinicalAlertType.NO_COLLECTION`) ativo no momento — reaproveitando o
+  mecanismo de alertas já construído na Seção 29.1 em vez de duplicar a lógica de "há quanto tempo
+  não é registrada uma tentativa". Isso também significa que a adesão só reflete a realidade depois
+  que os alertas tiverem sido recalculados (em tempo real a cada tentativa salva, ou pela varredura
+  diária) — mesma limitação já documentada para os próprios alertas.
+- O alerta de **baixa adesão** dispara quando essa adesão cai abaixo de 70% (`LOW_ADHERENCE_THRESHOLD_PCT`,
+  um valor fixo nesta fase — diferente dos limiares de alerta clínico, este não é configurável por
+  clínica, já que o PRD não pede isso explicitamente para o dashboard do supervisor).
+- O alerta de **ausência de registro** reaproveita o mesmo `no_collection_days` configurável por
+  clínica (`ClinicPermissionSettings`) já usado pelos alertas clínicos: dispara quando o terapeuta
+  tem pelo menos um paciente atribuído mas nenhum atendimento registrado dentro dessa janela.
+
+O acesso é restrito a `CLINIC_ADMIN` e `SUPERVISOR` de uma clínica (contas individuais não têm uma
+"equipe" e recebem 403), mesmo padrão de gate já usado por `rbac_service`/`ClinicPermissionSettings`.
+
 ## Estrutura
 
 - `app/models/` — entidades SQLAlchemy (Seção 18/27 do PRD).

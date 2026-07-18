@@ -83,6 +83,18 @@ export default function Layout() {
           >
             Importar Pacientes
           </NavLink>
+          {canSeeClinicSettings && (
+            <NavLink
+              to="/supervisor-dashboard"
+              className={({ isActive }) =>
+                `block rounded-btn px-3 py-2 text-sm font-medium transition-colors ${
+                  isActive ? "bg-brand-turquoise text-white" : "text-slate-200 hover:bg-white/10"
+                }`
+              }
+            >
+              Painel de Supervisão
+            </NavLink>
+          )}
           {canSeeAuditLog && (
             <NavLink
               to="/audit-log"
