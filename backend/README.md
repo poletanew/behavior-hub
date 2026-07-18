@@ -269,6 +269,29 @@ infraestrutura já existentes em vez de introduzir novos conceitos:
 O acesso é restrito a `CLINIC_ADMIN` e `SUPERVISOR` de uma clínica (contas individuais não têm uma
 "equipe" e recebem 403), mesmo padrão de gate já usado por `rbac_service`/`ClinicPermissionSettings`.
 
+## Nota sobre Dashboard para Gestor (Fase 4a bloco 5 — Seção 29.5, fecha a Fase 4a)
+
+`app/services/manager_dashboard_service.py` é restrito somente a `CLINIC_ADMIN` (nem supervisor, nem
+profissional, nem conta individual) — é uma visão de negócio da clínica, distinta do painel de
+equipe do bloco anterior. Todos os indicadores são somas/contagens diretas sobre `Patient`,
+`User`, `ClinicalSession` e `Appointment` já existentes, filtráveis por período (padrão: do dia 1 do
+mês corrente até hoje).
+
+**Horas clínicas** soma apenas a duração (`scheduled_end - scheduled_start`) de `Appointment`s com
+status `completed` — porque `ClinicalSession` não tem um campo de duração próprio (só
+`occurred_at`, um instante). Uma sessão registrada sem vínculo com um compromisso da Agenda conta
+para `sessions_count` mas não contribui `clinical_hours`, porque não há como derivar sua duração sem
+inventar um valor. **Taxa de ocupação** é `completas / (completas + faltas + canceladas)` dentro do
+período — mesmo raciocínio de "outcome conhecido" já usado por `attendance_rate` e pelo dashboard do
+supervisor, apenas agregado por clínica em vez de por paciente/terapeuta.
+
+**Indicadores de receita e taxa de faturamento** (pedidos pela Seção 29.5) foram deliberadamente
+**não implementados**: o produto não tem um módulo de cobrança por paciente/sessão — a única
+integração de pagamento existente é o Stripe da assinatura SaaS que a clínica paga ao Behavior Hub
+(Seção 8), que não é "receita operacional da clínica". Sem um dado real de faturamento por sessão
+armazenado em algum lugar, qualquer número aqui seria inventado; a decisão foi omitir esses dois
+indicadores e documentar a lacuna explicitamente, em vez de preencher com um placeholder.
+
 ## Estrutura
 
 - `app/models/` — entidades SQLAlchemy (Seção 18/27 do PRD).

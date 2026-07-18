@@ -47,6 +47,11 @@ Este repositório está sendo construído **por fases**, seguindo o roadmap da S
   (visível apenas a administradores de clínica e supervisores) com percentual de sessões completas
   por terapeuta, adesão ao plano de tratamento (reaproveitando os alertas de "sem coleta" já
   existentes) e alertas automáticos de baixa adesão ou ausência de registro recente.
+- **Fase 4a (bloco 5) — Dashboard para Gestor (Seção 29.5)**: visão de negócio da clínica (visível
+  apenas ao administrador da clínica) com pacientes ativos, profissionais ativos, sessões realizadas,
+  horas clínicas registradas e taxa de ocupação, filtráveis por período (mês corrente por padrão) —
+  **fecha o roadmap da Fase 4a — Inteligência Clínica básica**. Indicadores de receita/faturamento
+  não estão incluídos por não haver um módulo de cobrança por paciente (ver nota de escopo abaixo).
 
 ## Stack (Seção 4 do PRD)
 
@@ -270,13 +275,27 @@ dados).
     padrão, mesma configuração da Seção 29.1) — permitindo intervenção proativa da coordenação
     clínica antes que o problema apareça só no relatório do paciente.
 
+### Fase 4a (bloco 5) — Dashboard para Gestor
+
+40. Como administrador de clínica, acesse **Painel de Gestão** no menu lateral (não aparece para
+    supervisores, profissionais nem contas individuais — é uma visão de negócio, não clínica). Por
+    padrão mostra o mês corrente; ajuste "De/Até" e clique em Aplicar para outro período.
+41. Os cinco indicadores — pacientes ativos, profissionais ativos, sessões realizadas, horas
+    clínicas e taxa de ocupação — são somas/contagens diretas dos mesmos dados operacionais já
+    usados no resto do sistema (pacientes, atendimentos, agenda), sem nenhuma planilha ou tabela
+    paralela.
+42. Horas clínicas soma apenas a duração de atendimentos vinculados a um compromisso da Agenda com
+    status "realizada" (a duração vem do horário agendado); um atendimento registrado sem
+    compromisso associado conta para "sessões realizadas" mas não tem duração conhecida, então não
+    entra na soma de horas.
+
 ### Rodando os testes automatizados do backend
 
 ```bash
 docker compose exec backend pytest -q
 ```
 
-(ou localmente, sem Docker — ver `backend/README.md`). 170 testes cobrem, entre outros:
+(ou localmente, sem Docker — ver `backend/README.md`). 178 testes cobrem, entre outros:
 
 - **AC-01**: conta nova inicia com zero pacientes/sessões/dashboard.
 - **AC-02** / **AC-03**: limite de 3 pacientes e bloqueio de foto no plano Free.
@@ -336,6 +355,11 @@ docker compose exec backend pytest -q
   automáticos corretos quando um alerta de sem-coleta está ativo para o único objetivo do terapeuta,
   nenhum alerta falso para terapeuta sem paciente atribuído, e isolamento de tenant (terapeutas de
   uma clínica nunca aparecem no painel de outra).
+- Dashboard para Gestor: acesso restrito ao administrador de clínica (supervisor, profissional e
+  conta individual recebem 403), contagem correta de pacientes/profissionais ativos (excluindo
+  excluídos e inativos), sessões e horas clínicas somadas apenas dentro do período informado, taxa
+  de ocupação calculada corretamente (completas / (completas + faltas + canceladas)), período padrão
+  igual ao mês corrente quando nenhum filtro é informado, e isolamento de tenant.
 
 ## O que **não** está nesta fase
 
@@ -344,10 +368,17 @@ docker compose exec backend pytest -q
   (baseado em regras, não em um modelo de linguagem), claramente rotulado como tal, com a mesma
   estrutura de edição/aprovação/versionamento que a IA real usará depois. Quando você definir o
   provedor (Anthropic, OpenAI, etc.) e me passar a chave, trocamos só essa peça.
-- Seguindo o roadmap (Seção 31.1 do PRD): a Fase 3 está completa. O dashboard de Gestor ainda não
-  foi implementado — próximo bloco da Fase 4a. A Fase 4b (sugestões geradas por IA, módulo de
-  avaliações VB-MAPP/ABLLS-R, Biblioteca Inteligente) e a Fase 5 (Family Portal, ML preditivo)
-  continuam para depois.
+- Seguindo o roadmap (Seção 31.1 do PRD): **a Fase 4a — Inteligência Clínica básica está completa**
+  (Fase 1, 2 e 3 também). A Fase 4b (sugestões geradas por IA, módulo de avaliações VB-MAPP/ABLLS-R,
+  Biblioteca Inteligente) e a Fase 5 (Family Portal, ML preditivo) continuam para depois.
+- **Dashboard para Gestor**: não inclui indicadores de receita ou taxa de faturamento (Seção 29.5
+  os pede). O Behavior Hub não tem — e nunca teve no escopo definido até aqui — um módulo de
+  cobrança por paciente/sessão; a única integração de pagamento existente (Stripe) é a assinatura
+  SaaS que a própria clínica paga ao Behavior Hub (Seção 8, já coberta na Fase 3 e visível na página
+  Planos), não uma receita operacional da clínica. Calcular "receita" a partir de dados que o
+  sistema não coleta seria inventar números — por isso o painel traz só os indicadores realmente
+  derivados dos dados operacionais (pacientes, sessões, horas, ocupação) e deixa explícita a
+  ausência dos financeiros, em vez de preenchê-los com um valor fictício.
 - **Timeline Clínica**: a linha do tempo é montada a partir de fontes já existentes (atendimentos,
   log de auditoria de objetivos/atribuições, resumos de relatório) em vez de um novo modelo dedicado
   de "evento" — evita duplicar armazenamento e manter tudo sincronizado. Como consequência,

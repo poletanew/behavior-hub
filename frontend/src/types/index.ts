@@ -410,6 +410,16 @@ export interface SupervisorDashboardTherapistRow {
   no_recent_registration_alert: boolean;
 }
 
+export interface ManagerDashboardData {
+  period_start: string;
+  period_end: string;
+  active_patients_count: number;
+  active_professionals_count: number;
+  sessions_count: number;
+  clinical_hours: number;
+  occupancy_rate_pct: number | null;
+}
+
 export interface BillingStatus {
   subscription_plan: PlanId | null;
   subscription_status: string;

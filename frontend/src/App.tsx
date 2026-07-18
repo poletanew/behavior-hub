@@ -22,6 +22,7 @@ import PatientImportPage from "./pages/PatientImportPage";
 import AgendaPage from "./pages/AgendaPage";
 import SecurityPage from "./pages/SecurityPage";
 import SupervisorDashboardPage from "./pages/SupervisorDashboardPage";
+import ManagerDashboardPage from "./pages/ManagerDashboardPage";
 import PlansPage from "./pages/PlansPage";
 
 export default function App() {
@@ -56,6 +57,7 @@ export default function App() {
         <Route path="/patients/import" element={<PatientImportPage />} />
         <Route path="/security" element={<SecurityPage />} />
         <Route path="/supervisor-dashboard" element={<SupervisorDashboardPage />} />
+        <Route path="/manager-dashboard" element={<ManagerDashboardPage />} />
         <Route path="/plans" element={<PlansPage />} />
       </Route>
 
