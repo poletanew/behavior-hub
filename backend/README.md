@@ -201,6 +201,29 @@ coleta" depende só da passagem do tempo — por isso `app/tasks/clinical_alerts
 via Celery beat, varrendo todos os pacientes ativos, como rede de segurança complementar (não
 substitui o recálculo em tempo real; apenas cobre o caso em que nenhuma tentativa nova é salva).
 
+## Nota sobre Timeline Clínica (Fase 4a bloco 2 — Seção 29.2/AC-18)
+
+`app/services/timeline_service.py` monta a linha do tempo de um paciente agregando de fontes já
+existentes em vez de introduzir uma nova tabela de "eventos" dedicada: sessões clínicas diretamente,
+`AuditLog` filtrado por `entity_type`/`entity_id` para o ciclo de vida de objetivos
+(`objective_created/updated/deleted/restored`) e mudanças de atribuição de profissional, e
+`ReportSummary` para relatórios gerados. Essa escolha evita duplicar armazenamento e o risco de os
+dois ficarem dessincronizados, já que o `AuditLog` é preenchido por praticamente todo serviço desde a
+Fase 1.
+
+`_objective_entries` inspeciona o `before`/`after` de cada evento `objective_updated` do audit log
+para distinguir uma atualização genérica de um marco clinicamente relevante: quando
+`before.status != "mastered"` e `after.status == "mastered"`, o evento emitido é
+`objective_mastered` **no lugar de** (não além de) `objective_updated` — testado explicitamente em
+`test_timeline_objective_mastered_is_a_distinct_milestone`, que garante que o evento genérico não
+aparece duplicado para essa mesma mudança.
+
+Para satisfazer o AC-18 (ordem cronológica sem duplicatas), a lista final é ordenada por
+`(occurred_at, str(id))` — um desempate estável mesmo quando eventos de fontes diferentes caem no
+mesmo timestamp. Avaliações formais (Seção 30) e intercorrências/notas livres ainda não têm um
+modelo próprio no sistema, então não aparecem na timeline por enquanto; entram quando esses módulos
+forem implementados (Fase 4b/5).
+
 ## Estrutura
 
 - `app/models/` — entidades SQLAlchemy (Seção 18/27 do PRD).

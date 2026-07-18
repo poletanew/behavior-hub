@@ -34,6 +34,11 @@ Este repositório está sendo construído **por fases**, seguindo o roadmap da S
   limiares configuráveis por clínica no plano Enterprise, recálculo em tempo real a cada tentativa
   salva, varredura diária para o alerta de "sem coleta", e notificação ao supervisor/profissional
   vinculado. Início da **Fase 4 — Inteligência Clínica** (Seção 29 do PRD).
+- **Fase 4a (bloco 2) — Timeline Clínica (Seção 29.2, AC-18)**: linha do tempo única por paciente,
+  consolidando atendimentos, ciclo de vida de objetivos (criado/atualizado/excluído/restaurado, com
+  "objetivo dominado" tratado como marco distinto), vínculo/desvínculo de profissional e geração de
+  relatórios — ordenada cronologicamente e sem duplicatas, com link de volta para o registro de
+  origem quando aplicável.
 
 ## Stack (Seção 4 do PRD)
 
@@ -217,13 +222,25 @@ dados).
     verdadeira (por exemplo, um atendimento novo resolve o alerta de "sem coleta") — não é preciso
     apagar ou dispensar manualmente.
 
+### Fase 4a (bloco 2) — Timeline Clínica
+
+31. Na página de um paciente, clique em **Timeline** (ao lado de "Plano de Tratamento" e "Reports").
+    A tela mostra, da mais recente para a mais antiga, todos os eventos já registrados: atendimentos,
+    criação/atualização/exclusão/restauração de objetivos, vínculo e desvínculo de profissional, e
+    geração de relatórios.
+32. Quando um objetivo muda de status para **Dominado**, a timeline mostra um "Marco de evolução"
+    (badge amarelo) em vez do evento genérico de atualização — destacando visualmente o marco clínico
+    em meio às demais edições do plano de tratamento.
+33. Cada evento com um registro de origem correspondente (atendimento, plano de tratamento, relatório)
+    é clicável e leva direto para a tela de origem.
+
 ### Rodando os testes automatizados do backend
 
 ```bash
 docker compose exec backend pytest -q
 ```
 
-(ou localmente, sem Docker — ver `backend/README.md`). 149 testes cobrem, entre outros:
+(ou localmente, sem Docker — ver `backend/README.md`). 157 testes cobrem, entre outros:
 
 - **AC-01**: conta nova inicia com zero pacientes/sessões/dashboard.
 - **AC-02** / **AC-03**: limite de 3 pacientes e bloqueio de foto no plano Free.
@@ -266,6 +283,12 @@ docker compose exec backend pytest -q
   objetivo), resolução automática quando a condição deixa de ser verdadeira, notificação ao
   administrador/supervisor/profissional atribuído, isolamento de tenant, e a exigência de plano
   Enterprise para configurar os limiares.
+- Timeline Clínica: paciente novo começa com timeline vazia, atendimento e ciclo de vida completo de
+  objetivo (criado/atualizado/excluído/restaurado) aparecem como eventos, "objetivo dominado" é um
+  marco distinto do evento genérico de atualização (o evento genérico correspondente não aparece
+  duplicado), vínculo/desvínculo de profissional e geração de relatório aparecem com o rótulo
+  correto, ordenação cronológica sem duplicatas mesmo com eventos de fontes diferentes na mesma
+  janela de tempo (AC-18), e isolamento de tenant.
 
 ## O que **não** está nesta fase
 
@@ -274,10 +297,15 @@ docker compose exec backend pytest -q
   (baseado em regras, não em um modelo de linguagem), claramente rotulado como tal, com a mesma
   estrutura de edição/aprovação/versionamento que a IA real usará depois. Quando você definir o
   provedor (Anthropic, OpenAI, etc.) e me passar a chave, trocamos só essa peça.
-- Seguindo o roadmap (Seção 31.1 do PRD): a Fase 3 está completa. Timeline clínica, heatmaps de
-  habilidades e os dashboards de Supervisor/Gestor ainda não foram implementados — próximos blocos
-  da Fase 4a. A Fase 4b (sugestões geradas por IA, módulo de avaliações VB-MAPP/ABLLS-R, Biblioteca
-  Inteligente) e a Fase 5 (Family Portal, ML preditivo) continuam para depois.
+- Seguindo o roadmap (Seção 31.1 do PRD): a Fase 3 está completa. Heatmaps de habilidades e os
+  dashboards de Supervisor/Gestor ainda não foram implementados — próximos blocos da Fase 4a. A
+  Fase 4b (sugestões geradas por IA, módulo de avaliações VB-MAPP/ABLLS-R, Biblioteca Inteligente) e
+  a Fase 5 (Family Portal, ML preditivo) continuam para depois.
+- **Timeline Clínica**: a linha do tempo é montada a partir de fontes já existentes (atendimentos,
+  log de auditoria de objetivos/atribuições, resumos de relatório) em vez de um novo modelo dedicado
+  de "evento" — evita duplicar armazenamento e manter tudo sincronizado. Como consequência,
+  avaliações formais (Seção 30, ainda não implementada) e intercorrências/notas livres não aparecem
+  na timeline ainda; entram quando esses módulos existirem.
 - A importação de pacientes usa detecção automática de colunas por alias (cobrindo os cabeçalhos em
   português do próprio exemplo do PRD) em vez de uma UI de remapeamento manual coluna-a-coluna —
   uma simplificação de escopo deliberada, documentada em `csv_import_service.py`.

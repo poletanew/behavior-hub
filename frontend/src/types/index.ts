@@ -378,6 +378,15 @@ export interface ClinicalAlert {
   resolved_at: string | null;
 }
 
+export interface TimelineEntry {
+  id: string;
+  event_type: string;
+  occurred_at: string;
+  label: string;
+  source_type: "session" | "objective" | "patient" | "report_summary";
+  source_id: string;
+}
+
 export interface BillingStatus {
   subscription_plan: PlanId | null;
   subscription_status: string;

@@ -13,6 +13,7 @@ import InvitationsPage from "./pages/InvitationsPage";
 import AcceptInvitationPage from "./pages/AcceptInvitationPage";
 import TreatmentPlanPage from "./pages/TreatmentPlanPage";
 import ReportsPage from "./pages/ReportsPage";
+import TimelinePage from "./pages/TimelinePage";
 import ResourcesPage from "./pages/ResourcesPage";
 import DeletedDataPage from "./pages/DeletedDataPage";
 import ClinicSettingsPage from "./pages/ClinicSettingsPage";
@@ -41,6 +42,7 @@ export default function App() {
         <Route path="/patients/:patientId" element={<PatientDetailPage />} />
         <Route path="/patients/:patientId/treatment-plan" element={<TreatmentPlanPage />} />
         <Route path="/patients/:patientId/reports" element={<ReportsPage />} />
+        <Route path="/patients/:patientId/timeline" element={<TimelinePage />} />
         <Route path="/agenda" element={<AgendaPage />} />
         <Route path="/sessions" element={<SessionsPage />} />
         <Route path="/sessions/:sessionId" element={<SessionDetailPage />} />
