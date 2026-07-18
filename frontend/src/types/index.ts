@@ -286,6 +286,13 @@ export interface ClinicPermissionSettings {
   admins_can_edit_any_objective_area: boolean;
   supervisors_can_restore_deleted_data: boolean;
   supervisors_can_generate_invitations: boolean;
+  no_collection_days: number;
+  regression_window_sessions: number;
+  regression_drop_pp: number;
+  stagnation_session_count: number;
+  stagnation_band_pp: number;
+  fading_session_count: number;
+  fading_independence_pct: number;
 }
 
 export interface AuditLogEntry {
@@ -356,6 +363,20 @@ export interface AttendanceRate {
 }
 
 export type PlanId = "free" | "basic" | "premium" | "enterprise";
+
+export type ClinicalAlertType = "no_collection" | "regression" | "stagnation" | "fading_candidate";
+
+export interface ClinicalAlert {
+  id: string;
+  patient_id: string;
+  objective_id: string;
+  objective_title: string;
+  alert_type: ClinicalAlertType;
+  message: string;
+  detail: Record<string, unknown> | null;
+  triggered_at: string;
+  resolved_at: string | null;
+}
 
 export interface BillingStatus {
   subscription_plan: PlanId | null;

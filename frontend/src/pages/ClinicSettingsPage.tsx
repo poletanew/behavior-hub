@@ -1,9 +1,62 @@
 import { useEffect, useState } from "react";
 import { apiRequest, ApiError } from "../api/client";
 import { useAuth } from "../context/AuthContext";
-import { ClinicPermissionSettings } from "../types";
+import { BillingStatus, ClinicPermissionSettings } from "../types";
 
-const TOGGLES: { key: keyof ClinicPermissionSettings; label: string; help: string }[] = [
+type NumberSettingKey = {
+  [K in keyof ClinicPermissionSettings]: ClinicPermissionSettings[K] extends number ? K : never;
+}[keyof ClinicPermissionSettings];
+
+type BooleanSettingKey = {
+  [K in keyof ClinicPermissionSettings]: ClinicPermissionSettings[K] extends boolean ? K : never;
+}[keyof ClinicPermissionSettings];
+
+const THRESHOLD_FIELDS: { key: NumberSettingKey; label: string; help: string; suffix: string }[] = [
+  {
+    key: "no_collection_days",
+    label: "Dias sem coleta para alertar",
+    help: "Nenhuma tentativa registrada para o objetivo há mais desse número de dias.",
+    suffix: "dias",
+  },
+  {
+    key: "regression_window_sessions",
+    label: "Janela de sessões para regressão",
+    help: "Quantas sessões compõem a média móvel recente e a anterior.",
+    suffix: "sessões",
+  },
+  {
+    key: "regression_drop_pp",
+    label: "Queda mínima para alertar regressão",
+    help: "Queda na média móvel de percentual de acerto, em pontos percentuais.",
+    suffix: "p.p.",
+  },
+  {
+    key: "stagnation_session_count",
+    label: "Sessões consecutivas para estagnação",
+    help: "Quantas sessões consecutivas sem variação relevante disparam o alerta.",
+    suffix: "sessões",
+  },
+  {
+    key: "stagnation_band_pp",
+    label: "Variação máxima para estagnação",
+    help: "Variação (máximo − mínimo) de percentual de acerto tolerada nessas sessões.",
+    suffix: "p.p.",
+  },
+  {
+    key: "fading_session_count",
+    label: "Sessões consecutivas para candidato a fading",
+    help: "Quantas sessões consecutivas de alta independência sugerem reduzir a ajuda.",
+    suffix: "sessões",
+  },
+  {
+    key: "fading_independence_pct",
+    label: "Independência mínima para candidato a fading",
+    help: "Percentual de independência mínimo nessas sessões.",
+    suffix: "%",
+  },
+];
+
+const TOGGLES: { key: BooleanSettingKey; label: string; help: string }[] = [
   {
     key: "professionals_can_create_patients",
     label: "Profissionais podem cadastrar pacientes",
@@ -40,9 +93,14 @@ export default function ClinicSettingsPage() {
   const { user } = useAuth();
   const isAdmin = user?.user_type === "clinic_admin";
   const [settings, setSettings] = useState<ClinicPermissionSettings | null>(null);
+  const [billingStatus, setBillingStatus] = useState<BillingStatus | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [thresholdError, setThresholdError] = useState<string | null>(null);
+  const [thresholdMessage, setThresholdMessage] = useState<string | null>(null);
+
+  const isEnterprise = billingStatus?.subscription_plan === "enterprise" && billingStatus.has_paid_access;
 
   function load() {
     setLoading(true);
@@ -50,11 +108,35 @@ export default function ClinicSettingsPage() {
       .then(setSettings)
       .catch(() => setError("Não foi possível carregar as configurações."))
       .finally(() => setLoading(false));
+    apiRequest<BillingStatus>("/billing/status").then(setBillingStatus);
   }
 
   useEffect(load, []);
 
-  async function handleToggle(key: keyof ClinicPermissionSettings, value: boolean) {
+  async function handleThresholdSave(key: NumberSettingKey, value: number) {
+    if (!settings) return;
+    setThresholdError(null);
+    setThresholdMessage(null);
+    const previous = settings;
+    setSettings({ ...settings, [key]: value });
+    try {
+      const updated = await apiRequest<ClinicPermissionSettings>("/clinic/alert-thresholds", {
+        method: "PATCH",
+        body: { [key]: value },
+      });
+      setSettings(updated);
+      setThresholdMessage("Limiar atualizado.");
+    } catch (err) {
+      setSettings(previous);
+      if (err instanceof ApiError && err.status === 403) {
+        setThresholdError("Limiares de alertas clínicos são configuráveis apenas no plano Enterprise.");
+      } else {
+        setThresholdError("Não foi possível salvar o limiar.");
+      }
+    }
+  }
+
+  async function handleToggle(key: BooleanSettingKey, value: boolean) {
     if (!settings) return;
     setError(null);
     const previous = settings;
@@ -113,6 +195,46 @@ export default function ClinicSettingsPage() {
                 <div className="w-11 h-6 bg-slate-300 peer-checked:bg-brand-turquoise rounded-full peer-disabled:opacity-50 transition-colors" />
                 <div className="absolute left-1 top-1 w-4 h-4 bg-white rounded-full transition-transform peer-checked:translate-x-5" />
               </label>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <h2 className="text-lg font-semibold text-brand-navy mt-8 mb-2">Alertas Clínicos Inteligentes</h2>
+      <p className="text-sm text-neutralState mb-4">
+        Limiares das regras automáticas de sem coleta, regressão, estagnação e candidato a fading
+        (Seção 29.1 do PRD). Configuráveis apenas no plano Enterprise; os demais planos usam o padrão
+        de fábrica.
+      </p>
+
+      {!isEnterprise && (
+        <div className="bg-brand-grayLight border border-brand-blueLight rounded-card p-4 mb-4 text-sm">
+          Estes limiares só podem ser alterados no plano Enterprise. Sua clínica está usando os
+          valores padrão de fábrica.
+        </div>
+      )}
+      {thresholdError && <p className="text-danger text-sm mb-4">{thresholdError}</p>}
+      {thresholdMessage && <p className="text-success text-sm mb-4">{thresholdMessage}</p>}
+
+      {settings && (
+        <div className="bg-white rounded-card shadow-sm divide-y divide-slate-100 max-w-2xl">
+          {THRESHOLD_FIELDS.map((field) => (
+            <div key={field.key} className="flex items-center justify-between gap-4 px-6 py-4">
+              <div>
+                <div className="font-medium text-sm">{field.label}</div>
+                <div className="text-xs text-neutralState mt-1">{field.help}</div>
+              </div>
+              <div className="flex items-center gap-2 shrink-0">
+                <input
+                  type="number"
+                  min={1}
+                  value={settings[field.key] as number}
+                  disabled={!isAdmin || !isEnterprise}
+                  onChange={(e) => handleThresholdSave(field.key, Number(e.target.value))}
+                  className="w-20 h-9 rounded-btn border border-slate-300 px-2 text-sm disabled:opacity-50"
+                />
+                <span className="text-xs text-neutralState">{field.suffix}</span>
+              </div>
             </div>
           ))}
         </div>

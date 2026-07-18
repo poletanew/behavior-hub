@@ -11,6 +11,13 @@ class ClinicPermissionSettingsResponse(BaseModel):
     admins_can_edit_any_objective_area: bool
     supervisors_can_restore_deleted_data: bool
     supervisors_can_generate_invitations: bool
+    no_collection_days: int
+    regression_window_sessions: int
+    regression_drop_pp: int
+    stagnation_session_count: int
+    stagnation_band_pp: int
+    fading_session_count: int
+    fading_independence_pct: int
 
     class Config:
         from_attributes = True

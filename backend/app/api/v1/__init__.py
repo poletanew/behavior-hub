@@ -5,6 +5,7 @@ from app.api.v1 import (
     audit_logs,
     auth,
     billing,
+    clinical_alerts,
     dashboard,
     deleted_data,
     invitations,
@@ -24,6 +25,7 @@ api_router = APIRouter(prefix="/v1")
 api_router.include_router(auth.router)
 api_router.include_router(billing.router)
 api_router.include_router(appointments.router)
+api_router.include_router(clinical_alerts.router)
 api_router.include_router(invitations.router)
 api_router.include_router(patients.router)
 api_router.include_router(professionals.router)

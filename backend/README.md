@@ -174,6 +174,33 @@ síncrono já oferece uma resiliência razoável para uma implantação de inst�
 com uma fila verdadeiramente assíncrona é um item razoável para quando o produto precisar de
 desacoplamento real (múltiplas instâncias, picos de carga de webhook, etc.).
 
+## Nota sobre Alertas Clínicos Inteligentes (Fase 4a bloco 1 — Seção 29.1/29.9)
+
+`app/services/clinical_alert_service.py` implementa as quatro regras computáveis da Seção 29.1,
+literalmente conforme especificadas (obrigatórias como critério de aceite antes do desenvolvimento —
+AC-15/AC-16): `_evaluate_regression` (média móvel de N sessões cai X pontos percentuais — testado
+reproduzindo o próprio exemplo do PRD), `_evaluate_stagnation`, `_evaluate_no_collection` e
+`_evaluate_fading_candidate`. Os limiares (`no_collection_days`, `regression_drop_pp`, etc.) vivem em
+`ClinicPermissionSettings` — mesma tabela do RBAC configurável, já que ambos são "configurações por
+clínica" — com valores padrão de fábrica e edição restrita ao plano Enterprise
+(`update_thresholds`).
+
+A série histórica por objetivo (`_objective_session_series`) depende de `ObjectiveTraining` (o
+vínculo objetivo↔treino já existente desde a Fase 2): sem pelo menos um treino vinculado, um
+objetivo nunca gera alertas — não há como derivar tentativas por objetivo sem esse vínculo
+estrutural. `ClinicalAlert` usa um índice único parcial (`resolved_at IS NULL`) para garantir que
+nunca existam dois alertas ativos do mesmo tipo para o mesmo objetivo — chamadas repetidas de
+`recompute_alerts_for_objective` apenas atualizam o `detail` do alerta já ativo, sem duplicar nem
+notificar de novo; quando a condição deixa de ser verdadeira, o alerta é marcado como resolvido (não
+apagado, preservando histórico).
+
+Regressão/estagnação/fading são recalculados em tempo real a cada tentativa salva
+(`session_service.add_trial/update_trial/delete_trial` chamam
+`clinical_alert_service.recompute_alerts_for_training` depois de cada commit). O alerta de "sem
+coleta" depende só da passagem do tempo — por isso `app/tasks/clinical_alerts.py` roda diariamente
+via Celery beat, varrendo todos os pacientes ativos, como rede de segurança complementar (não
+substitui o recálculo em tempo real; apenas cobre o caso em que nenhuma tentativa nova é salva).
+
 ## Estrutura
 
 - `app/models/` — entidades SQLAlchemy (Seção 18/27 do PRD).

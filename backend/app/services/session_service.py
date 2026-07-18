@@ -9,7 +9,7 @@ from app.models.session import ClinicalSession, SessionTraining, Trial
 from app.models.training import Training
 from app.models.user import User
 from app.schemas.session import SessionCreateRequest, TrialCreateRequest, TrialUpdateRequest
-from app.services import appointment_service, audit_service, patient_service, rbac_service
+from app.services import appointment_service, audit_service, clinical_alert_service, patient_service, rbac_service
 from app.services.calculations import accuracy_pct, independence_pct
 from app.services.plan_service import current_plan
 
@@ -119,6 +119,14 @@ def _get_session_training_or_404(db: DbSession, user: User, session_training_id:
     return session_training
 
 
+def _recompute_alerts_after_trial_change(db: DbSession, session_training: SessionTraining) -> None:
+    """Seção 19.2/29.1 — TrialCreated/Updated/Deleted recalcula os alertas
+    clínicos dos objetivos vinculados a este treino, em tempo real (AC-16)."""
+    session = db.get(ClinicalSession, session_training.session_id)
+    if session is not None:
+        clinical_alert_service.recompute_alerts_for_training(db, session.patient_id, session_training.training_id)
+
+
 def add_trial(
     db: DbSession, user: User, session_training_id: uuid.UUID, payload: TrialCreateRequest
 ) -> Trial:
@@ -153,6 +161,7 @@ def add_trial(
     )
     db.commit()
     db.refresh(trial)
+    _recompute_alerts_after_trial_change(db, session_training)
     return trial
 
 
@@ -162,7 +171,7 @@ def update_trial(
     trial = db.get(Trial, trial_id)
     if trial is None or trial.deleted_at is not None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Trial not found")
-    _get_session_training_or_404(db, user, trial.session_training_id)
+    session_training = _get_session_training_or_404(db, user, trial.session_training_id)
 
     before = {"result": trial.result.value, "prompt_level": trial.prompt_level.value}
     for field, value in payload.model_dump(exclude_unset=True).items():
@@ -179,6 +188,7 @@ def update_trial(
     )
     db.commit()
     db.refresh(trial)
+    _recompute_alerts_after_trial_change(db, session_training)
     return trial
 
 
@@ -187,7 +197,7 @@ def delete_trial(db: DbSession, user: User, trial_id: uuid.UUID) -> None:
     trial = db.get(Trial, trial_id)
     if trial is None or trial.deleted_at is not None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Trial not found")
-    _get_session_training_or_404(db, user, trial.session_training_id)
+    session_training = _get_session_training_or_404(db, user, trial.session_training_id)
 
     trial.deleted_at = datetime.datetime.now(datetime.timezone.utc)
     trial.deleted_by = user.id
@@ -199,6 +209,7 @@ def delete_trial(db: DbSession, user: User, trial_id: uuid.UUID) -> None:
         entity_id=trial.id,
     )
     db.commit()
+    _recompute_alerts_after_trial_change(db, session_training)
 
 
 def get_training_progress(db: DbSession, user: User, session_training_id: uuid.UUID) -> dict:

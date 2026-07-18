@@ -28,6 +28,12 @@ Este repositório está sendo construído **por fases**, seguindo o roadmap da S
   ainda não tem uma conta/chaves do Stripe, toda a integração está pronta e testada com o SDK do
   Stripe mockado, mas roda em modo "não configurado" até você cadastrar `STRIPE_SECRET_KEY`,
   `STRIPE_WEBHOOK_SECRET` e os Price IDs de cada plano (ver seção de configuração abaixo).
+- **Fase 4a (bloco 1) — Alertas Clínicos Inteligentes (Seção 29.1/29.9, AC-15/AC-16)**: as quatro
+  regras computáveis do PRD (sem coleta há 14 dias, regressão de 20 pontos percentuais na média
+  móvel de 3 sessões, estagnação por 5 sessões, candidato a fading com independência ≥80%), com
+  limiares configuráveis por clínica no plano Enterprise, recálculo em tempo real a cada tentativa
+  salva, varredura diária para o alerta de "sem coleta", e notificação ao supervisor/profissional
+  vinculado. Início da **Fase 4 — Inteligência Clínica** (Seção 29 do PRD).
 
 ## Stack (Seção 4 do PRD)
 
@@ -192,13 +198,32 @@ dados).
     atualiza automaticamente o plano/status aqui via webhook — nenhuma mudança de código é
     necessária, só a configuração.
 
+### Fase 4a (bloco 1) — Alertas Clínicos Inteligentes
+
+27. Na página de um paciente, cadastre um objetivo no **Plano de Tratamento** vinculado a um treino da
+    Training Library. Registre pelo menos 3 atendimentos com bom desempenho (a maioria das tentativas
+    corretas) e depois mais 3 atendimentos com desempenho bem pior (a maioria incorreta) para o mesmo
+    treino — ao salvar a última tentativa, um alerta de **Regressão** aparece na página do paciente
+    (queda ≥20 pontos percentuais na média móvel de 3 sessões — Seção 29.1/AC-16).
+28. Registre 5 atendimentos seguidos com percentual de acerto praticamente igual (variação de até 5
+    pontos percentuais) para gerar um alerta de **Estagnação**; ou 3 atendimentos com tentativas
+    sempre marcadas como "Independente" (percentual de independência ≥80%) para gerar um alerta de
+    **Candidato a fading**.
+29. Como administrador, acesse **Configurações** e role até "Alertas Clínicos Inteligentes": os
+    limiares aparecem, mas só ficam editáveis no plano Enterprise (nos demais planos, mostram o padrão
+    de fábrica com uma mensagem explicando a restrição).
+30. Um alerta novo gera uma notificação (sino no cabeçalho) para o administrador, supervisores e
+    profissionais atribuídos ao paciente. Um alerta permanece "ativo" até a condição deixar de ser
+    verdadeira (por exemplo, um atendimento novo resolve o alerta de "sem coleta") — não é preciso
+    apagar ou dispensar manualmente.
+
 ### Rodando os testes automatizados do backend
 
 ```bash
 docker compose exec backend pytest -q
 ```
 
-(ou localmente, sem Docker — ver `backend/README.md`). 136 testes cobrem, entre outros:
+(ou localmente, sem Docker — ver `backend/README.md`). 149 testes cobrem, entre outros:
 
 - **AC-01**: conta nova inicia com zero pacientes/sessões/dashboard.
 - **AC-02** / **AC-03**: limite de 3 pacientes e bloqueio de foto no plano Free.
@@ -235,6 +260,12 @@ docker compose exec backend pytest -q
   de assinatura inválida, e a regra "nunca confiar apenas no frontend" (plano pago só concede acesso
   quando a assinatura está de fato ativa/em trial — uma assinatura em atraso ou cancelada volta a
   valer como Free mesmo que o rótulo do plano ainda não tenha sido atualizado).
+- Alertas Clínicos Inteligentes: as 4 regras da Seção 29.1 (AC-15/AC-16 reproduzindo o exemplo exato
+  de queda de 20 pontos percentuais), objetivo dominado nunca gera estagnação, objetivo descontinuado
+  resolve todos os alertas ativos, deduplicação (nunca dois alertas ativos do mesmo tipo para o mesmo
+  objetivo), resolução automática quando a condição deixa de ser verdadeira, notificação ao
+  administrador/supervisor/profissional atribuído, isolamento de tenant, e a exigência de plano
+  Enterprise para configurar os limiares.
 
 ## O que **não** está nesta fase
 
@@ -243,8 +274,10 @@ docker compose exec backend pytest -q
   (baseado em regras, não em um modelo de linguagem), claramente rotulado como tal, com a mesma
   estrutura de edição/aprovação/versionamento que a IA real usará depois. Quando você definir o
   provedor (Anthropic, OpenAI, etc.) e me passar a chave, trocamos só essa peça.
-- Seguindo o roadmap (Seção 31.1 do PRD): com Stripe implementado, a Fase 3 está completa. Timeline
-  clínica, heatmaps e alertas inteligentes continuam previstos para a **Fase 4**.
+- Seguindo o roadmap (Seção 31.1 do PRD): a Fase 3 está completa. Timeline clínica, heatmaps de
+  habilidades e os dashboards de Supervisor/Gestor ainda não foram implementados — próximos blocos
+  da Fase 4a. A Fase 4b (sugestões geradas por IA, módulo de avaliações VB-MAPP/ABLLS-R, Biblioteca
+  Inteligente) e a Fase 5 (Family Portal, ML preditivo) continuam para depois.
 - A importação de pacientes usa detecção automática de colunas por alias (cobrindo os cabeçalhos em
   português do próprio exemplo do PRD) em vez de uma UI de remapeamento manual coluna-a-coluna —
   uma simplificação de escopo deliberada, documentada em `csv_import_service.py`.
@@ -266,6 +299,14 @@ docker compose exec backend pytest -q
   manual da chave. A exigência de 2FA para administradores Enterprise já está implementada e
   testável (inclusive com um banner de aviso no app), e agora passa a valer na prática assim que uma
   clínica migrar de fato para o plano Enterprise via Stripe.
+- **Alertas Clínicos Inteligentes**: só disparam para objetivos com pelo menos um treino vinculado
+  (`ObjectiveTraining`) — sem esse vínculo estrutural não há como derivar uma série histórica de
+  tentativas por objetivo. A interpretação adotada para "estagnação dentro de uma faixa de ±5 pontos
+  percentuais" foi variação (máximo − mínimo) ≤ 5pp entre as sessões, já que o PRD formaliza a fórmula
+  exata apenas para regressão (Seção 29.1); a fórmula de regressão em si segue literalmente o texto e
+  o exemplo do PRD (AC-16). O recálculo em tempo real cobre
+  regressão/estagnação/fading a cada tentativa salva; o alerta de "sem coleta" depende
+  necessariamente da varredura diária via Celery, já que não há evento de tentativa para dispará-lo.
 - **Stripe/Planos**: como você ainda não tem uma conta Stripe, não há chaves reais configuradas neste
   ambiente — `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET` e os Price IDs de cada plano continuam
   vazios até você criá-los (veja a seção de configuração acima). Toda a integração (customer,
