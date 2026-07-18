@@ -118,6 +118,27 @@ in-app ao profissional para compromissos nas próximas 24h — envio por e-mail 
 ao responsável (Seção 32.2: "quando aplicável") dependem de um provedor de e-mail e de uma conta de
 responsável/Family Portal que ainda não existem no produto; mesma lacuna já documentada para convites.
 
+## Nota sobre Autenticação de Dois Fatores (Fase 3 — Seção 32.8)
+
+`app/services/two_factor_service.py` usa `pyotp` (TOTP/RFC 6238). `POST /auth/2fa/setup` gera e já
+persiste um `totp_secret` no usuário (ainda com `is_2fa_enabled=False`); só `POST /auth/2fa/enable`
+com um código válido efetivamente liga o 2FA — isso evita marcar a conta como protegida antes de o
+usuário provar posse do segredo. `POST /auth/2fa/disable` exige a senha atual como confirmação.
+
+O login em duas etapas usa um terceiro `TokenType.TWO_FACTOR` (`app/core/security.py`), de vida curta
+(5 minutos): `POST /auth/login` retorna esse token em vez de access/refresh quando
+`user.is_2fa_enabled` é verdadeiro; `POST /auth/2fa/verify-login` troca o token + código TOTP pelos
+tokens reais. `LoginResponse` (schema único para as duas formas de resposta) mantém o cliente HTTP
+simples sem precisar de dois endpoints de login diferentes.
+
+`two_factor_service.requires_2fa_setup` implementa a regra "obrigatória para administradores de
+clínica no plano Enterprise, opcional para os demais" — hoje testável diretamente (setando
+`clinic.subscription_plan` em teste), mas só reflete um cenário real de produção quando a integração
+Stripe (próxima etapa da Fase 3) permitir que uma clínica esteja de fato no plano Enterprise. O
+fallback por e-mail citado na Seção 32.8 não foi implementado (mesma lacuna do provedor de e-mail já
+documentada para convites e lembretes de agenda); a tela de configuração mostra a chave em texto para
+entrada manual no aplicativo autenticador, sem gerar uma imagem de QR code.
+
 ## Estrutura
 
 - `app/models/` — entidades SQLAlchemy (Seção 18/27 do PRD).

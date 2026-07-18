@@ -1,7 +1,7 @@
 import datetime
 import uuid
 
-from sqlalchemy import DateTime, ForeignKey, String
+from sqlalchemy import Boolean, DateTime, ForeignKey, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base, TimestampMixin, UUIDPrimaryKeyMixin
@@ -17,6 +17,10 @@ class User(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     user_type: Mapped[UserType] = mapped_column(nullable=False)
     specialty: Mapped[Specialty | None] = mapped_column(nullable=True)
     status: Mapped[UserStatus] = mapped_column(default=UserStatus.ACTIVE, nullable=False)
+
+    # Seção 32.8 — Autenticação de Dois Fatores (TOTP).
+    totp_secret: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    is_2fa_enabled: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 
     # Tenant isolation (Seção 6.2 / 17): a user belongs either to a clinic OR is an
     # individual tenant (clinic_id is NULL). Every clinical query must filter by this.

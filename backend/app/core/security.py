@@ -15,6 +15,7 @@ pwd_context = CryptContext(schemes=["argon2"], deprecated="auto")
 class TokenType(str, Enum):
     ACCESS = "access"
     REFRESH = "refresh"
+    TWO_FACTOR = "two_factor"
 
 
 def hash_password(password: str) -> str:
@@ -29,6 +30,8 @@ def create_token(subject: str, token_type: TokenType, extra_claims: dict | None 
     now = datetime.now(timezone.utc)
     if token_type == TokenType.ACCESS:
         expire = now + timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+    elif token_type == TokenType.TWO_FACTOR:
+        expire = now + timedelta(minutes=5)
     else:
         expire = now + timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS)
 

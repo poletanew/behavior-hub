@@ -1,4 +1,6 @@
+import { useEffect, useState } from "react";
 import { NavLink, Outlet } from "react-router-dom";
+import { apiRequest } from "../api/client";
 import { useAuth } from "../context/AuthContext";
 import NotificationBell from "./NotificationBell";
 
@@ -16,6 +18,13 @@ export default function Layout() {
   const isAdmin = user?.user_type === "clinic_admin" || user?.user_type === "individual";
   const canSeeClinicSettings = user?.user_type === "clinic_admin" || user?.user_type === "supervisor";
   const canSeeAuditLog = user?.user_type === "clinic_admin" || user?.user_type === "individual";
+  const [requires2fa, setRequires2fa] = useState(false);
+
+  useEffect(() => {
+    apiRequest<{ is_2fa_enabled: boolean; required: boolean }>("/auth/2fa/status")
+      .then((s) => setRequires2fa(s.required))
+      .catch(() => setRequires2fa(false));
+  }, [user?.id]);
 
   return (
     <div className="flex min-h-screen">
@@ -98,6 +107,16 @@ export default function Layout() {
               Configurações
             </NavLink>
           )}
+          <NavLink
+            to="/security"
+            className={({ isActive }) =>
+              `block rounded-btn px-3 py-2 text-sm font-medium transition-colors ${
+                isActive ? "bg-brand-turquoise text-white" : "text-slate-200 hover:bg-white/10"
+              }`
+            }
+          >
+            Segurança
+          </NavLink>
         </nav>
         <div className="px-4 py-4 border-t border-white/10 text-sm">
           <div className="font-medium">{user?.name}</div>
@@ -111,6 +130,16 @@ export default function Layout() {
         </div>
       </aside>
       <main className="flex-1">
+        {requires2fa && (
+          <div className="bg-danger text-white text-sm px-8 py-2 flex items-center justify-between">
+            <span>
+              Seu plano Enterprise exige autenticação de dois fatores para administradores da clínica.
+            </span>
+            <NavLink to="/security" className="underline font-medium shrink-0 ml-4">
+              Ativar agora
+            </NavLink>
+          </div>
+        )}
         <div className="flex justify-end px-8 pt-4">
           <NotificationBell />
         </div>

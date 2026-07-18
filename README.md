@@ -19,7 +19,10 @@ Este repositório está sendo construído **por fases**, seguindo o roadmap da S
   de registrar um atendimento já realizado), status agendada/confirmada/realizada/cancelada/não
   compareceu, bloqueio de conflito de horário por profissional, exportação de agenda em .ics,
   faltas/cancelamentos com motivo, alerta por faltas consecutivas e taxa de comparecimento por
-  paciente. 2FA e Stripe/planos pagos ficam para as próximas etapas da Fase 3.
+  paciente.
+- **Fase 3 — Autenticação de Dois Fatores (Seção 32.8)**: 2FA via aplicativo autenticador (TOTP),
+  obrigatória para administradores de clínica no plano Enterprise e opcional para os demais perfis.
+  Stripe/planos pagos fica para a próxima (e última) etapa da Fase 3.
 
 ## Stack (Seção 4 do PRD)
 
@@ -147,13 +150,25 @@ dados).
     exportação (unidirecional); importar de volta fica para uma fase futura, conforme o próprio PRD
     já prevê.
 
+### Fase 3 — Autenticação de Dois Fatores (2FA)
+
+22. Acesse **Segurança** no menu lateral e clique em **Ativar autenticação de dois fatores**. Adicione
+    a chave exibida em um aplicativo autenticador (Google Authenticator, Authy, 1Password — use
+    "inserir chave manualmente", já que não há leitura de QR code nesta etapa) e digite o código de 6
+    dígitos gerado para confirmar. Tente confirmar com um código errado primeiro — o sistema rejeita
+    antes de aceitar o código correto.
+23. Saia da conta e faça login novamente: em vez de entrar direto, você verá uma tela de
+    "Verificação em duas etapas" pedindo o código do aplicativo. Um código errado é rejeitado; o
+    código correto do momento libera o acesso normalmente.
+24. Volte em **Segurança** e use **Desativar 2FA** — a desativação exige confirmar sua senha atual.
+
 ### Rodando os testes automatizados do backend
 
 ```bash
 docker compose exec backend pytest -q
 ```
 
-(ou localmente, sem Docker — ver `backend/README.md`). 112 testes cobrem, entre outros:
+(ou localmente, sem Docker — ver `backend/README.md`). 121 testes cobrem, entre outros:
 
 - **AC-01**: conta nova inicia com zero pacientes/sessões/dashboard.
 - **AC-02** / **AC-03**: limite de 3 pacientes e bloqueio de foto no plano Free.
@@ -180,6 +195,9 @@ docker compose exec backend pytest -q
   compareceu), motivo obrigatório em cancelamento/falta, alerta de faltas consecutivas restrito ao
   tenant certo, vínculo automático entre sessão criada e compromisso agendado, isolamento de tenant e
   de profissional/paciente atribuído, exportação `.ics` e cálculo de taxa de comparecimento.
+- 2FA: fluxo completo de setup/ativação/desativação, rejeição de código inválido em cada etapa,
+  desafio de segunda etapa no login apenas quando habilitado, e a flag de exigência para
+  administrador de clínica Enterprise.
 
 ## O que **não** está nesta fase
 
@@ -188,9 +206,9 @@ docker compose exec backend pytest -q
   (baseado em regras, não em um modelo de linguagem), claramente rotulado como tal, com a mesma
   estrutura de edição/aprovação/versionamento que a IA real usará depois. Quando você definir o
   provedor (Anthropic, OpenAI, etc.) e me passar a chave, trocamos só essa peça.
-- Seguindo o roadmap (Seção 31.1 do PRD), dentro da própria Fase 3: Stripe/planos pagos e 2FA ainda
-  não foram implementados (próximas etapas, por escolha sua de fazer um bloco por vez). Timeline
-  clínica, heatmaps e alertas inteligentes continuam previstos para a **Fase 4**.
+- Seguindo o roadmap (Seção 31.1 do PRD), dentro da própria Fase 3: Stripe/planos pagos ainda não foi
+  implementado (próxima e última etapa da Fase 3). Timeline clínica, heatmaps e alertas inteligentes
+  continuam previstos para a **Fase 4**.
 - A importação de pacientes usa detecção automática de colunas por alias (cobrindo os cabeçalhos em
   português do próprio exemplo do PRD) em vez de uma UI de remapeamento manual coluna-a-coluna —
   uma simplificação de escopo deliberada, documentada em `csv_import_service.py`.
@@ -204,6 +222,14 @@ docker compose exec backend pytest -q
   Portal/conta de responsável, nenhum dos dois ainda existentes no produto — mesma lacuna já
   documentada para convites e 2FA. O limiar de "faltas consecutivas" que dispara o alerta ao
   supervisor foi fixado em 2 (o PRD não especifica um número).
+- **2FA**: implementado apenas via aplicativo autenticador (TOTP), que é a "primeira opção" pedida
+  pela Seção 32.8. O fallback por e-mail citado no PRD não foi implementado — depende da mesma
+  decisão de provedor de e-mail já registrada para convites e lembretes de agenda. A tela de
+  configuração mostra a chave em texto para entrada manual no aplicativo (sem gerar uma imagem de QR
+  code), uma simplificação de UI razoável já que todo aplicativo autenticador comum aceita entrada
+  manual da chave. A exigência de 2FA para administradores Enterprise já está implementada e
+  testável (inclusive com um banner de aviso no app), mas só passa a valer na prática quando a
+  integração com Stripe (próxima etapa) permitir que uma clínica esteja de fato no plano Enterprise.
 
 Consulte `backend/README.md` para observações sobre a curadoria da Training Library e o limite de
 tamanho de arquivo dos Recursos Terapêuticos (Seção 34 — pendente de confirmação do PO).

@@ -124,6 +124,27 @@ def issue_tokens(user: User) -> tuple[str, str]:
     return access, refresh
 
 
+def issue_two_factor_challenge(user: User) -> str:
+    """Seção 32.8 — token de curta duração (5 min) usado apenas para provar que a
+    senha já foi validada, trocado por tokens reais em /auth/2fa/verify-login."""
+    return create_token(str(user.id), TokenType.TWO_FACTOR)
+
+
+def resolve_two_factor_challenge(db: Session, two_factor_token: str) -> User:
+    try:
+        payload = decode_token(two_factor_token)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid or expired code") from exc
+
+    if payload.get("type") != TokenType.TWO_FACTOR.value:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token type")
+
+    user = db.get(User, uuid.UUID(payload["sub"]))
+    if user is None or user.status != UserStatus.ACTIVE or not user.is_2fa_enabled:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid or expired code")
+    return user
+
+
 def refresh_access_token(db: Session, refresh_token: str) -> tuple[str, str]:
     try:
         payload = decode_token(refresh_token)

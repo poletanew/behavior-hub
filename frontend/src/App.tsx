@@ -19,6 +19,7 @@ import ClinicSettingsPage from "./pages/ClinicSettingsPage";
 import AuditLogPage from "./pages/AuditLogPage";
 import PatientImportPage from "./pages/PatientImportPage";
 import AgendaPage from "./pages/AgendaPage";
+import SecurityPage from "./pages/SecurityPage";
 
 export default function App() {
   return (
@@ -49,6 +50,7 @@ export default function App() {
         <Route path="/clinic-settings" element={<ClinicSettingsPage />} />
         <Route path="/audit-log" element={<AuditLogPage />} />
         <Route path="/patients/import" element={<PatientImportPage />} />
+        <Route path="/security" element={<SecurityPage />} />
       </Route>
 
       <Route path="/" element={<Navigate to="/dashboard" replace />} />

@@ -36,6 +36,19 @@ class TokenResponse(BaseModel):
     token_type: str = "bearer"
 
 
+class LoginResponse(BaseModel):
+    """Seção 32.8 — quando o usuário tem 2FA habilitado, o login não libera tokens
+    de acesso diretamente: retorna um two_factor_token de curta duração que deve
+    ser trocado por tokens reais em /auth/2fa/verify-login."""
+
+    requires_2fa: bool = False
+    two_factor_token: str | None = None
+    access_token: str | None = None
+    refresh_token: str | None = None
+    token_type: str = "bearer"
+    requires_2fa_setup: bool = False
+
+
 class RefreshRequest(BaseModel):
     refresh_token: str
 
