@@ -1,7 +1,17 @@
 import { FormEvent, useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { apiRequest, ApiError } from "../api/client";
-import { DuplicateCandidate, Objective, ObjectivePriority, ObjectiveStatus, Patient, TreatmentArea, TreatmentPlan } from "../types";
+import {
+  DuplicateCandidate,
+  Objective,
+  ObjectiveComment,
+  ObjectivePriority,
+  ObjectiveStatus,
+  Patient,
+  TreatmentArea,
+  TreatmentPlan,
+  User,
+} from "../types";
 
 const AREA_LABELS: Record<TreatmentArea, string> = {
   psicologia: "Psicologia",
@@ -32,8 +42,31 @@ const STATUS_COLORS: Record<ObjectiveStatus, string> = {
 
 const PRIORITY_LABELS: Record<ObjectivePriority, string> = { low: "Baixa", medium: "Média", high: "Alta" };
 
-function ObjectiveCard({ objective, onChanged }: { objective: Objective; onChanged: () => void }) {
+function ObjectiveCard({
+  objective,
+  onChanged,
+  professionals,
+}: {
+  objective: Objective;
+  onChanged: () => void;
+  professionals: User[];
+}) {
   const [expanded, setExpanded] = useState(false);
+  const [comments, setComments] = useState<ObjectiveComment[]>([]);
+  const [commentBody, setCommentBody] = useState("");
+  const [mentionedUserId, setMentionedUserId] = useState("");
+
+  function loadComments() {
+    apiRequest<ObjectiveComment[]>(`/objectives/${objective.id}/comments`).then(setComments);
+  }
+
+  useEffect(() => {
+    if (expanded) loadComments();
+  }, [expanded]);
+
+  function professionalName(userId: string): string {
+    return professionals.find((p) => p.id === userId)?.name || "Profissional";
+  }
 
   async function updateStatus(status: ObjectiveStatus) {
     await apiRequest(`/objectives/${objective.id}`, { method: "PATCH", body: { status } });
@@ -44,6 +77,17 @@ function ObjectiveCard({ objective, onChanged }: { objective: Objective; onChang
     if (!confirm("Excluir este objetivo? O histórico será mantido.")) return;
     await apiRequest(`/objectives/${objective.id}`, { method: "DELETE" });
     onChanged();
+  }
+
+  async function submitComment(e: FormEvent) {
+    e.preventDefault();
+    await apiRequest(`/objectives/${objective.id}/comments`, {
+      method: "POST",
+      body: { body: commentBody, mentioned_user_id: mentionedUserId || null },
+    });
+    setCommentBody("");
+    setMentionedUserId("");
+    loadComments();
   }
 
   return (
@@ -91,6 +135,45 @@ function ObjectiveCard({ objective, onChanged }: { objective: Objective; onChang
               Excluir
             </button>
           </div>
+
+          <div className="pt-3 border-t border-slate-100 mt-2">
+            <div className="font-medium text-xs uppercase text-neutralState mb-2">Comentários</div>
+            <ul className="space-y-2 mb-3">
+              {comments.map((comment) => (
+                <li key={comment.id} className="bg-slate-50 rounded-btn px-3 py-2 text-xs">
+                  <div className="font-medium">{professionalName(comment.author_id)}</div>
+                  <div>{comment.body}</div>
+                </li>
+              ))}
+              {comments.length === 0 && <li className="text-xs text-neutralState">Nenhum comentário ainda.</li>}
+            </ul>
+            <form onSubmit={submitComment} className="space-y-2">
+              <textarea
+                required
+                value={commentBody}
+                onChange={(e) => setCommentBody(e.target.value)}
+                placeholder="Escreva um comentário..."
+                className="w-full text-xs rounded-btn border border-slate-300 px-2 py-1.5"
+              />
+              <div className="flex gap-2">
+                <select
+                  value={mentionedUserId}
+                  onChange={(e) => setMentionedUserId(e.target.value)}
+                  className="h-8 text-xs rounded-btn border border-slate-300 px-2 flex-1"
+                >
+                  <option value="">Mencionar (@) um profissional — opcional</option>
+                  {professionals.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      @{p.name}
+                    </option>
+                  ))}
+                </select>
+                <button type="submit" className="h-8 rounded-btn bg-brand-turquoise text-white px-3 text-xs font-medium">
+                  Comentar
+                </button>
+              </div>
+            </form>
+          </div>
         </div>
       )}
     </div>
@@ -113,6 +196,11 @@ export default function TreatmentPlanPage() {
   const [priority, setPriority] = useState<ObjectivePriority>("medium");
   const [duplicateCandidates, setDuplicateCandidates] = useState<DuplicateCandidate[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [professionals, setProfessionals] = useState<User[]>([]);
+
+  useEffect(() => {
+    apiRequest<User[]>("/professionals").then(setProfessionals);
+  }, []);
 
   function load() {
     if (!patientId) return;
@@ -297,7 +385,7 @@ export default function TreatmentPlanPage() {
             <div key={areaKey}>
               <h2 className="font-semibold text-brand-navy mb-2">{AREA_LABELS[areaKey as TreatmentArea]}</h2>
               {objectives.map((objective) => (
-                <ObjectiveCard key={objective.id} objective={objective} onChanged={load} />
+                <ObjectiveCard key={objective.id} objective={objective} onChanged={load} professionals={professionals} />
               ))}
             </div>
           ))}

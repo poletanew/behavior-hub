@@ -59,6 +59,16 @@ O limite de tamanho de arquivo (10MB) e os tipos aceitos (PDF, PNG/JPEG/WEBP, te
 "regras de armazenamento e tamanho de arquivos" como pendente de confirmação do Product Owner —
 ajuste `MAX_SIZE_BYTES`/`ALLOWED_CONTENT_TYPES` quando essa decisão for confirmada.
 
+## Nota sobre Notificações e Templates de Sessão (Seção 32.4/32.6/32.13)
+
+`app/services/notification_service.py` cobre comentários novos em objetivos e menções (@) diretas —
+sempre validando que o usuário mencionado pertence ao mesmo tenant do paciente antes de notificar.
+`app/services/session_template_service.py` cobre "salvar como modelo" a partir de uma sessão
+existente, iniciar uma sessão a partir de um modelo, e duplicar a sessão anterior do mesmo paciente.
+Alertas clínicos (Seção 29.9) e faturas (Seção 8) ainda não existem no produto, então não alimentam
+a Central de Notificações nesta fase — apenas comentários e menções, que são as únicas fontes reais
+disponíveis hoje.
+
 ## Estrutura
 
 - `app/models/` — entidades SQLAlchemy (Seção 18/27 do PRD).

@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 from app.core.deps import get_current_user
 from app.db.session import get_db
 from app.models.enums import ObjectivePriority, ObjectiveStatus, TreatmentArea
-from app.models.treatment_plan import Objective
+from app.models.treatment_plan import Objective, TreatmentPlan
 from app.models.user import User
 from app.schemas.treatment_plan import (
     ObjectiveCommentCreateRequest,
@@ -24,9 +24,11 @@ router = APIRouter(tags=["treatment-plans"])
 
 
 def _to_objective_response(db: Session, objective: Objective) -> ObjectiveResponse:
+    plan = db.get(TreatmentPlan, objective.plan_id)
     return ObjectiveResponse(
         id=objective.id,
         plan_id=objective.plan_id,
+        patient_id=plan.patient_id,
         area=objective.area,
         title=objective.title,
         description=objective.description,
@@ -91,6 +93,13 @@ def create_objective(
     return _to_objective_response(db, objective)
 
 
+@router.get("/objectives/{objective_id}", response_model=ObjectiveResponse)
+def get_objective(objective_id: uuid.UUID, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+    """Usado para resolver a origem de uma notificação (Seção 32.6)."""
+    _patient, objective = treatment_plan_service.get_objective(db, user, objective_id)
+    return _to_objective_response(db, objective)
+
+
 @router.patch("/objectives/{objective_id}", response_model=ObjectiveResponse)
 def update_objective(
     objective_id: uuid.UUID,
@@ -124,7 +133,7 @@ def add_comment(
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
-    return treatment_plan_service.add_comment(db, user, objective_id, payload.body)
+    return treatment_plan_service.add_comment(db, user, objective_id, payload.body, payload.mentioned_user_id)
 
 
 @router.get("/objectives/{objective_id}/comments", response_model=list[ObjectiveCommentResponse])

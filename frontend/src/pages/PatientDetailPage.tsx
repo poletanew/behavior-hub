@@ -1,7 +1,7 @@
 import { FormEvent, useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { apiRequest } from "../api/client";
-import { ClinicalSession, Patient, Training, TrainingCategory } from "../types";
+import { ClinicalSession, Patient, SessionTemplate, Training, TrainingCategory } from "../types";
 import { useAuth } from "../context/AuthContext";
 
 function formatDateTime(value: string) {
@@ -17,6 +17,7 @@ export default function PatientDetailPage() {
   const [sessions, setSessions] = useState<ClinicalSession[]>([]);
   const [categories, setCategories] = useState<TrainingCategory[]>([]);
   const [trainings, setTrainings] = useState<Training[]>([]);
+  const [templates, setTemplates] = useState<SessionTemplate[]>([]);
   const [showNewSession, setShowNewSession] = useState(false);
   const [occurredAt, setOccurredAt] = useState("");
   const [notes, setNotes] = useState("");
@@ -27,6 +28,7 @@ export default function PatientDetailPage() {
     if (!patientId) return;
     apiRequest<Patient>(`/patients/${patientId}`).then(setPatient);
     apiRequest<ClinicalSession[]>(`/sessions?patient_id=${patientId}`).then(setSessions);
+    apiRequest<SessionTemplate[]>(`/session-templates?patient_id=${patientId}`).then(setTemplates);
   }
 
   useEffect(load, [patientId]);
@@ -35,6 +37,13 @@ export default function PatientDetailPage() {
     apiRequest<TrainingCategory[]>("/training-categories").then(setCategories);
     apiRequest<Training[]>("/trainings").then(setTrainings);
   }, []);
+
+  function applyTemplate(templateId: string) {
+    const template = templates.find((t) => t.id === templateId);
+    if (template) {
+      setSelectedTrainingIds(template.trainings.map((t) => t.training_id));
+    }
+  }
 
   async function handleCreateSession(e: FormEvent) {
     e.preventDefault();
@@ -95,6 +104,23 @@ export default function PatientDetailPage() {
 
       {showNewSession && (
         <form onSubmit={handleCreateSession} className="bg-white rounded-card shadow-sm p-6 mb-6 space-y-4">
+          {templates.length > 0 && (
+            <div>
+              <label className="block text-sm font-medium mb-1">Usar modelo de atendimento (opcional)</label>
+              <select
+                onChange={(e) => e.target.value && applyTemplate(e.target.value)}
+                className="w-full h-10 rounded-btn border border-slate-300 px-3"
+                defaultValue=""
+              >
+                <option value="">Selecionar treinos manualmente</option>
+                {templates.map((t) => (
+                  <option key={t.id} value={t.id}>
+                    {t.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
           <div>
             <label className="block text-sm font-medium mb-1">Data e hora</label>
             <input

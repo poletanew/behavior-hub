@@ -5,10 +5,12 @@ from app.api.v1 import (
     dashboard,
     deleted_data,
     invitations,
+    notifications,
     patients,
     professionals,
     reports,
     resources,
+    session_templates,
     sessions,
     trainings,
     treatment_plans,
@@ -20,9 +22,11 @@ api_router.include_router(invitations.router)
 api_router.include_router(patients.router)
 api_router.include_router(professionals.router)
 api_router.include_router(sessions.router)
+api_router.include_router(session_templates.router)
 api_router.include_router(trainings.router)
 api_router.include_router(dashboard.router)
 api_router.include_router(treatment_plans.router)
 api_router.include_router(reports.router)
 api_router.include_router(resources.router)
 api_router.include_router(deleted_data.router)
+api_router.include_router(notifications.router)

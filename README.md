@@ -8,7 +8,9 @@ Este repositório está sendo construído **por fases**, seguindo o roadmap da S
 - **Fase 1 — Core (MVP)**: autenticação, contas (clínica e individual), pacientes, atribuições,
   sessões/atendimentos com tentativas individualizadas e uma Training Library básica.
 - **Fase 2 — Clínico (V1)**: Planos de Tratamento multidisciplinares, Reports com gráficos e resumo
-  editável, Recursos Terapêuticos e Dados Excluídos (visão unificada com restauração).
+  editável, Recursos Terapêuticos, Dados Excluídos (visão unificada com restauração), Central de
+  Notificações, Templates de Sessão/duplicar atendimento e Modo Offline de coleta (Seção 32.4/32.5/32.6
+  — fechando o restante do escopo da Fase 2).
 
 ## Stack (Seção 4 do PRD)
 
@@ -84,13 +86,28 @@ dados).
     objetivo de plano excluído) aparece na lista unificada com contagem regressiva de 60 dias; use
     **Restaurar** para repor o registro.
 
+### Fase 2 (fechamento) — Notificações, Templates de Sessão e Modo Offline
+
+11. No **Plano de Tratamento**, expanda um objetivo e escreva um comentário mencionando (@) outro
+    profissional da clínica: ele recebe uma notificação (sino no canto superior direito) que leva
+    diretamente ao objetivo de origem (Seção 32.6/32.13).
+12. Em um **Atendimento**, clique em **Salvar como modelo** para guardar o conjunto de treinos como
+    um "modelo de atendimento" reutilizável, ou em **Duplicar sessão** para criar uma nova sessão com
+    os mesmos treinos da anterior em outra data (Seção 32.4). Ao abrir **Novo Atendimento** para o
+    mesmo paciente depois, o modelo salvo aparece no seletor "Usar modelo de atendimento".
+13. Para testar o **Modo Offline** (Seção 32.5): abra um atendimento, desligue a rede (ou use as
+    ferramentas de desenvolvedor do navegador para simular "offline") e registre uma tentativa — ela
+    fica marcada como "aguardando sincronização" localmente. Ao reconectar, a tentativa é enviada
+    automaticamente e passa a aparecer como uma tentativa normal (numerada), sem precisar recarregar
+    manualmente nem duplicar o registro.
+
 ### Rodando os testes automatizados do backend
 
 ```bash
 docker compose exec backend pytest -q
 ```
 
-(ou localmente, sem Docker — ver `backend/README.md`). 65 testes cobrem, entre outros:
+(ou localmente, sem Docker — ver `backend/README.md`). 78 testes cobrem, entre outros:
 
 - **AC-01**: conta nova inicia com zero pacientes/sessões/dashboard.
 - **AC-02** / **AC-03**: limite de 3 pacientes e bloqueio de foto no plano Free.
@@ -106,6 +123,9 @@ docker compose exec backend pytest -q
 - Cálculos de percentual de acerto, independência e distribuição de ajuda (Seção 14.4) como testes
   unitários isolados, e reaproveitados nos gráficos de Reports.
 - Upload/download de Recursos Terapêuticos (mockando o S3 com `moto` — ver `backend/README.md`).
+- Notificações por comentário/menção (incluindo isolamento de tenant — mencionar alguém de outra
+  clínica nunca cria notificação cruzada) e Templates de Sessão (incluindo a regra de que um template
+  específico de um paciente não pode ser usado para outro).
 
 ## O que **não** está nesta fase
 
@@ -114,8 +134,6 @@ docker compose exec backend pytest -q
   (baseado em regras, não em um modelo de linguagem), claramente rotulado como tal, com a mesma
   estrutura de edição/aprovação/versionamento que a IA real usará depois. Quando você definir o
   provedor (Anthropic, OpenAI, etc.) e me passar a chave, trocamos só essa peça.
-- **Notificações, Templates de Sessão e Modo Offline/Tablet** (Seção 32.4/32.5/32.6): combinamos de
-  deixar para uma iteração seguinte dentro da própria Fase 2, após validar o núcleo acima.
 - Seguindo o roadmap (Seção 31.1 do PRD): RBAC completo, Stripe/planos pagos, Agenda/Scheduling e
   importação em lote de pacientes ficam para a **Fase 3**; Timeline clínica, heatmaps e alertas
   inteligentes para a **Fase 4**.

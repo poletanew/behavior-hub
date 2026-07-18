@@ -3,7 +3,10 @@ import ReactDOM from "react-dom/client";
 import { BrowserRouter } from "react-router-dom";
 import App from "./App";
 import { AuthProvider } from "./context/AuthContext";
+import { initOfflineSync } from "./offline/offlineQueue";
 import "./index.css";
+
+initOfflineSync();
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>

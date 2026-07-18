@@ -1,5 +1,6 @@
 import { NavLink, Outlet } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
+import NotificationBell from "./NotificationBell";
 
 const navItems = [
   { to: "/dashboard", label: "Dashboard" },
@@ -72,8 +73,13 @@ export default function Layout() {
           </button>
         </div>
       </aside>
-      <main className="flex-1 p-8">
-        <Outlet />
+      <main className="flex-1">
+        <div className="flex justify-end px-8 pt-4">
+          <NotificationBell />
+        </div>
+        <div className="px-8 pb-8">
+          <Outlet />
+        </div>
       </main>
     </div>
   );

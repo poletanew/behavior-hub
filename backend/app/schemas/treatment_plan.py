@@ -38,6 +38,7 @@ class DuplicateCandidate(BaseModel):
 class ObjectiveResponse(BaseModel):
     id: uuid.UUID
     plan_id: uuid.UUID
+    patient_id: uuid.UUID
     area: TreatmentArea
     title: str
     description: str | None

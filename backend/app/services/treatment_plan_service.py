@@ -19,7 +19,7 @@ from app.models.training import Training
 from app.models.treatment_plan import Objective, ObjectiveComment, ObjectiveTraining, TreatmentPlan
 from app.models.user import User
 from app.schemas.treatment_plan import ObjectiveCreateRequest, ObjectiveUpdateRequest
-from app.services import audit_service, patient_service
+from app.services import audit_service, notification_service, patient_service
 
 DUPLICATE_SIMILARITY_THRESHOLD = 0.35
 
@@ -202,6 +202,11 @@ def _get_objective_or_404(db: Session, user: User, objective_id: uuid.UUID) -> t
     return patient, objective
 
 
+def get_objective(db: Session, user: User, objective_id: uuid.UUID) -> tuple[Patient, Objective]:
+    """Usado para resolver a origem de uma notificação (Seção 32.6)."""
+    return _get_objective_or_404(db, user, objective_id)
+
+
 def update_objective(
     db: Session, user: User, objective_id: uuid.UUID, payload: ObjectiveUpdateRequest
 ) -> Objective:
@@ -281,7 +286,11 @@ def restore_objective(db: Session, user: User, objective_id: uuid.UUID) -> Objec
     return objective
 
 
-def add_comment(db: Session, user: User, objective_id: uuid.UUID, body: str) -> ObjectiveComment:
+def add_comment(
+    db: Session, user: User, objective_id: uuid.UUID, body: str, mentioned_user_id: uuid.UUID | None = None
+) -> ObjectiveComment:
+    """Seção 13.1/32.13 — comentários por objetivo, com menção (@) opcional que
+    dispara notificação direta ao profissional marcado."""
     patient, objective = _get_objective_or_404(db, user, objective_id)
     comment = ObjectiveComment(objective_id=objective.id, author_id=user.id, body=body)
     db.add(comment)
@@ -292,6 +301,35 @@ def add_comment(db: Session, user: User, objective_id: uuid.UUID, body: str) -> 
         entity_type="objective",
         entity_id=objective.id,
     )
+
+    if objective.author_id != user.id:
+        notification_service.create_notification(
+            db,
+            recipient_user_id=objective.author_id,
+            actor_user_id=user.id,
+            notification_type="comment",
+            message=f"{user.name} comentou no objetivo \"{objective.title}\".",
+            entity_type="objective",
+            entity_id=objective.id,
+        )
+
+    if mentioned_user_id is not None and mentioned_user_id != user.id:
+        mentioned_user = db.get(User, mentioned_user_id)
+        same_tenant = mentioned_user is not None and (
+            (patient.clinic_id is not None and mentioned_user.clinic_id == patient.clinic_id)
+            or (patient.individual_owner_id is not None and mentioned_user.id == patient.individual_owner_id)
+        )
+        if same_tenant:
+            notification_service.create_notification(
+                db,
+                recipient_user_id=mentioned_user_id,
+                actor_user_id=user.id,
+                notification_type="mention",
+                message=f"{user.name} mencionou você em um comentário no objetivo \"{objective.title}\".",
+                entity_type="objective",
+                entity_id=objective.id,
+            )
+
     db.commit()
     db.refresh(comment)
     return comment

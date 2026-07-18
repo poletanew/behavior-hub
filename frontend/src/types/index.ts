@@ -103,6 +103,7 @@ export type ObjectivePriority = "low" | "medium" | "high";
 export interface Objective {
   id: string;
   plan_id: string;
+  patient_id: string;
   area: TreatmentArea;
   title: string;
   description: string | null;
@@ -251,4 +252,29 @@ export interface DeletedItem {
   deleted_at: string;
   deleted_by: string | null;
   days_remaining: number;
+}
+
+export interface AppNotification {
+  id: string;
+  actor_user_id: string | null;
+  type: "comment" | "mention";
+  message: string;
+  entity_type: string;
+  entity_id: string;
+  read_at: string | null;
+  created_at: string;
+}
+
+export interface SessionTemplateTrainingRef {
+  training_id: string;
+  sequence: number;
+}
+
+export interface SessionTemplate {
+  id: string;
+  name: string;
+  patient_id: string | null;
+  created_by_user_id: string;
+  created_at: string;
+  trainings: SessionTemplateTrainingRef[];
 }

@@ -15,7 +15,13 @@ from app.schemas.session import (
     TrialResponse,
     TrialUpdateRequest,
 )
-from app.services import session_service
+from app.schemas.session_template import (
+    DuplicateSessionRequest,
+    SaveAsTemplateRequest,
+    SessionFromTemplateRequest,
+    SessionTemplateResponse,
+)
+from app.services import session_service, session_template_service
 
 router = APIRouter(tags=["sessions"])
 
@@ -92,3 +98,42 @@ def update_trial(
 @router.delete("/trials/{trial_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_trial(trial_id: uuid.UUID, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
     session_service.delete_trial(db, user, trial_id)
+
+
+@router.post(
+    "/sessions/{session_id}/save-as-template",
+    response_model=SessionTemplateResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+def save_as_template(
+    session_id: uuid.UUID,
+    payload: SaveAsTemplateRequest,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """Seção 32.4 — salvar um modelo de atendimento a partir de uma sessão existente."""
+    return session_template_service.save_session_as_template(db, user, session_id, payload.name)
+
+
+@router.post(
+    "/sessions/from-template/{template_id}", response_model=SessionResponse, status_code=status.HTTP_201_CREATED
+)
+def create_session_from_template(
+    template_id: uuid.UUID,
+    payload: SessionFromTemplateRequest,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """Seção 32.4 — iniciar uma nova sessão a partir do modelo em um clique."""
+    return session_template_service.create_session_from_template(db, user, template_id, payload)
+
+
+@router.post("/sessions/{session_id}/duplicate", response_model=SessionResponse, status_code=status.HTTP_201_CREATED)
+def duplicate_session(
+    session_id: uuid.UUID,
+    payload: DuplicateSessionRequest,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """Seção 32.4 — duplicar a sessão anterior do mesmo paciente como ponto de partida."""
+    return session_template_service.duplicate_session(db, user, session_id, payload)
