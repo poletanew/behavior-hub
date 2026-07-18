@@ -5,6 +5,7 @@ import NotificationBell from "./NotificationBell";
 const navItems = [
   { to: "/dashboard", label: "Dashboard" },
   { to: "/patients", label: "Pacientes" },
+  { to: "/agenda", label: "Agenda" },
   { to: "/sessions", label: "Atendimentos" },
   { to: "/training-library", label: "Training Library" },
   { to: "/resources", label: "Recursos" },

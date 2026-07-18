@@ -18,6 +18,7 @@ import DeletedDataPage from "./pages/DeletedDataPage";
 import ClinicSettingsPage from "./pages/ClinicSettingsPage";
 import AuditLogPage from "./pages/AuditLogPage";
 import PatientImportPage from "./pages/PatientImportPage";
+import AgendaPage from "./pages/AgendaPage";
 
 export default function App() {
   return (
@@ -38,6 +39,7 @@ export default function App() {
         <Route path="/patients/:patientId" element={<PatientDetailPage />} />
         <Route path="/patients/:patientId/treatment-plan" element={<TreatmentPlanPage />} />
         <Route path="/patients/:patientId/reports" element={<ReportsPage />} />
+        <Route path="/agenda" element={<AgendaPage />} />
         <Route path="/sessions" element={<SessionsPage />} />
         <Route path="/sessions/:sessionId" element={<SessionDetailPage />} />
         <Route path="/training-library" element={<TrainingLibraryPage />} />

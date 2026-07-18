@@ -92,6 +92,32 @@ simplificação de escopo deliberada, já que os aliases cobrem o próprio exemp
 Linhas com nome ou data de nascimento ausente/inválida são rejeitadas individualmente (o restante do
 arquivo é importado normalmente) e reportadas com o motivo da rejeição.
 
+## Nota sobre Agenda e Scheduling (Fase 3 — Seção 32.2/32.3)
+
+`app/models/appointment.py` introduz `Appointment`, deliberadamente separado de `ClinicalSession`
+(Seção 32.2 — "diferencia sessão agendada de sessão registrada"). `app/services/appointment_service.py`
+concentra: bloqueio de conflito de horário por profissional (`_has_conflict`, ignorando compromissos
+cancelados/não-comparecidos, que liberam o horário), transições de status válidas, alerta de faltas
+consecutivas (limiar de 2 — escolha de engenharia, o PRD não especifica um número) restrito a
+administradores/supervisores do mesmo tenant, cálculo de taxa de comparecimento por paciente e
+geração manual de `.ics` (RFC 5545 mínimo, sem biblioteca externa).
+
+O vínculo entre "marcar como realizada" e o Novo Atendimento é feito via `SessionCreateRequest.appointment_id`
+opcional: `session_service.create_session` chama `appointment_service.link_session_to_appointment`
+quando presente, o que marca o compromisso como `completed` e grava `session_id` na mesma transação —
+não existe um endpoint separado para marcar "realizada" manualmente, seguindo a redação literal do
+PRD ("ao marcar... abrir diretamente a tela de Novo Atendimento").
+
+Compromissos seguem soft delete (Seção 16) e entram na purga diária e no ciclo de exclusão/restauração
+do paciente (`patient_service.soft_delete_patient`/`restore_patient` agora cascateiam para
+`Appointment` do mesmo jeito que já faziam para `ClinicalSession`/`Trial`); `app/tasks/purge.py` remove
+`Appointment` antes de `ClinicalSession` no purge de paciente para não violar a FK `appointments.session_id`.
+
+Lembretes automáticos (`app/tasks/reminders.py`, Celery beat a cada hora) cobrem apenas a notificação
+in-app ao profissional para compromissos nas próximas 24h — envio por e-mail ao profissional e aviso
+ao responsável (Seção 32.2: "quando aplicável") dependem de um provedor de e-mail e de uma conta de
+responsável/Family Portal que ainda não existem no produto; mesma lacuna já documentada para convites.
+
 ## Estrutura
 
 - `app/models/` — entidades SQLAlchemy (Seção 18/27 do PRD).

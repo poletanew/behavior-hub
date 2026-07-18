@@ -14,8 +14,12 @@ Este repositório está sendo construído **por fases**, seguindo o roadmap da S
 - **Fase 3 (núcleo) — RBAC configurável, Auditoria e Importação de Pacientes**: permissões
   configuráveis por clínica para profissionais/supervisores (Seção 17.1), papel de Supervisor nos
   convites, log de auditoria (visão de administrador, escopada por tenant) e importação em lote de
-  pacientes via CSV. Stripe/planos pagos, Agenda/Scheduling e 2FA ficam para a próxima etapa da
-  Fase 3 (você escolheu "núcleo primeiro").
+  pacientes via CSV.
+- **Fase 3 — Agenda e Scheduling (Seção 32.2/32.3)**: agendamento de atendimentos futuros (diferente
+  de registrar um atendimento já realizado), status agendada/confirmada/realizada/cancelada/não
+  compareceu, bloqueio de conflito de horário por profissional, exportação de agenda em .ics,
+  faltas/cancelamentos com motivo, alerta por faltas consecutivas e taxa de comparecimento por
+  paciente. 2FA e Stripe/planos pagos ficam para as próximas etapas da Fase 3.
 
 ## Stack (Seção 4 do PRD)
 
@@ -126,13 +130,30 @@ dados).
     inválida) antes de **Confirmar importação**; o relatório final mostra quantos pacientes foram
     importados e o motivo de cada linha rejeitada.
 
+### Fase 3 — Agenda e Scheduling
+
+18. Acesse **Agenda** e clique em **+ Agendar**: escolha paciente, profissional (se for clínica) e o
+    horário de início/fim. Tente agendar outro compromisso para o mesmo profissional em um horário
+    sobreposto — o sistema bloqueia com "já tem um atendimento nesse horário" (Seção 32.2).
+19. No compromisso criado, use **Confirmar**, depois **Faltou** ou **Cancelar** (ambos pedem um
+    motivo: paciente, clínica, profissional ou força maior — Seção 32.3). Repita duas faltas seguidas
+    para o mesmo paciente e confirme que administradores/supervisores recebem uma notificação de
+    alerta de faltas consecutivas.
+20. Clique em **Realizada** em um compromisso agendado/confirmado: você é levado à tela de Novo
+    Atendimento já com paciente, profissional e data/hora preenchidos. Ao salvar o atendimento, o
+    compromisso na Agenda passa automaticamente para "Realizada" e fica vinculado à sessão criada.
+21. Use **Exportar (.ics)** para baixar a agenda da semana visível e importe o arquivo em um app de
+    calendário (Google Calendar/Outlook) para conferir os eventos — a sincronização é hoje somente de
+    exportação (unidirecional); importar de volta fica para uma fase futura, conforme o próprio PRD
+    já prevê.
+
 ### Rodando os testes automatizados do backend
 
 ```bash
 docker compose exec backend pytest -q
 ```
 
-(ou localmente, sem Docker — ver `backend/README.md`). 99 testes cobrem, entre outros:
+(ou localmente, sem Docker — ver `backend/README.md`). 112 testes cobrem, entre outros:
 
 - **AC-01**: conta nova inicia com zero pacientes/sessões/dashboard.
 - **AC-02** / **AC-03**: limite de 3 pacientes e bloqueio de foto no plano Free.
@@ -154,6 +175,11 @@ docker compose exec backend pytest -q
 - Permissões "Configurável" da Seção 17.1 com valores padrão conservadores e liberação explícita por
   toggle, papel de Supervisor nos convites, log de auditoria escopado por tenant e importação de
   pacientes via CSV (linhas válidas x rejeitadas, detecção automática de colunas em português).
+- Agenda/Scheduling: bloqueio de conflito de horário por profissional (e liberação do horário ao
+  cancelar), transições de status válidas (agendada → confirmada → realizada, e para cancelada/não
+  compareceu), motivo obrigatório em cancelamento/falta, alerta de faltas consecutivas restrito ao
+  tenant certo, vínculo automático entre sessão criada e compromisso agendado, isolamento de tenant e
+  de profissional/paciente atribuído, exportação `.ics` e cálculo de taxa de comparecimento.
 
 ## O que **não** está nesta fase
 
@@ -162,13 +188,22 @@ docker compose exec backend pytest -q
   (baseado em regras, não em um modelo de linguagem), claramente rotulado como tal, com a mesma
   estrutura de edição/aprovação/versionamento que a IA real usará depois. Quando você definir o
   provedor (Anthropic, OpenAI, etc.) e me passar a chave, trocamos só essa peça.
-- Seguindo o roadmap (Seção 31.1 do PRD), dentro da própria Fase 3: Stripe/planos pagos,
-  Agenda/Scheduling e 2FA ainda não foram implementados (você escolheu fechar primeiro o núcleo de
-  RBAC configurável + Auditoria + Importação de Pacientes). Timeline clínica, heatmaps e alertas
-  inteligentes continuam previstos para a **Fase 4**.
+- Seguindo o roadmap (Seção 31.1 do PRD), dentro da própria Fase 3: Stripe/planos pagos e 2FA ainda
+  não foram implementados (próximas etapas, por escolha sua de fazer um bloco por vez). Timeline
+  clínica, heatmaps e alertas inteligentes continuam previstos para a **Fase 4**.
 - A importação de pacientes usa detecção automática de colunas por alias (cobrindo os cabeçalhos em
   português do próprio exemplo do PRD) em vez de uma UI de remapeamento manual coluna-a-coluna —
   uma simplificação de escopo deliberada, documentada em `csv_import_service.py`.
+- **Agenda/Scheduling**: a visão de calendário é semanal (com navegação dia a dia dentro da semana);
+  uma grade mensal completa não foi construída nesta etapa — a lista semanal já cobre a necessidade
+  operacional descrita no PRD sem o investimento extra de uma grade de mês. A exportação `.ics` é
+  unidirecional (só sai do Behavior Hub); sincronização bidirecional com Google Calendar/Outlook é
+  citada no próprio PRD como item de fase futura. Lembretes automáticos hoje chegam apenas como
+  notificação in-app para o profissional (Celery roda a cada hora, janela de 24h); o envio por e-mail
+  para o profissional e o aviso ao responsável dependem de um provedor de e-mail e de um Family
+  Portal/conta de responsável, nenhum dos dois ainda existentes no produto — mesma lacuna já
+  documentada para convites e 2FA. O limiar de "faltas consecutivas" que dispara o alerta ao
+  supervisor foi fixado em 2 (o PRD não especifica um número).
 
 Consulte `backend/README.md` para observações sobre a curadoria da Training Library e o limite de
 tamanho de arquivo dos Recursos Terapêuticos (Seção 34 — pendente de confirmação do PO).

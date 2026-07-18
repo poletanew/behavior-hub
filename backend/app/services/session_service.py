@@ -9,7 +9,7 @@ from app.models.session import ClinicalSession, SessionTraining, Trial
 from app.models.training import Training
 from app.models.user import User
 from app.schemas.session import SessionCreateRequest, TrialCreateRequest, TrialUpdateRequest
-from app.services import audit_service, patient_service, rbac_service
+from app.services import appointment_service, audit_service, patient_service, rbac_service
 from app.services.calculations import accuracy_pct, independence_pct
 from app.services.plan_service import current_plan
 
@@ -61,6 +61,10 @@ def create_session(db: DbSession, user: User, payload: SessionCreateRequest) -> 
         entity_id=session.id,
         after={"patient_id": str(patient.id)},
     )
+    if payload.appointment_id is not None:
+        # Seção 32.2 — "marcar como realizada" abre o Novo Atendimento; salvá-lo
+        # vincula e completa o compromisso agendado.
+        appointment_service.link_session_to_appointment(db, user, payload.appointment_id, session.id)
     db.commit()
     db.refresh(session)
     return session

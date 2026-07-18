@@ -10,7 +10,7 @@ from app.models.patient import Patient
 from app.models.resource import Resource
 from app.models.treatment_plan import Objective, TreatmentPlan
 from app.models.user import User
-from app.services import patient_service, rbac_service, resource_service, treatment_plan_service
+from app.services import appointment_service, patient_service, rbac_service, resource_service, treatment_plan_service
 
 settings = get_settings()
 
@@ -82,6 +82,19 @@ def list_deleted_items(db: Session, user: User) -> list[dict]:
             }
         )
 
+    for appointment in appointment_service.list_deleted_appointments(db, user):
+        patient = db.get(Patient, appointment.patient_id)
+        items.append(
+            {
+                "entity_type": "appointment",
+                "id": appointment.id,
+                "label": f"Atendimento - {patient.name if patient else '?'} ({appointment.scheduled_start.strftime('%d/%m/%Y %H:%M')})",
+                "deleted_at": appointment.deleted_at,
+                "deleted_by": appointment.deleted_by,
+                "days_remaining": _days_remaining(appointment.deleted_at),
+            }
+        )
+
     items.sort(key=lambda i: i["deleted_at"], reverse=True)
     return items
 
@@ -94,4 +107,6 @@ def restore_item(db: Session, user: User, entity_type: str, item_id: uuid.UUID):
         return treatment_plan_service.restore_objective(db, user, item_id)
     if entity_type == "resource":
         return resource_service.restore_resource(db, user, item_id)
+    if entity_type == "appointment":
+        return appointment_service.restore_appointment(db, user, item_id)
     raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Unknown entity type")

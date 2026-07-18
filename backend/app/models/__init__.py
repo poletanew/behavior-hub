@@ -1,3 +1,4 @@
+from app.models.appointment import Appointment
 from app.models.audit_log import AuditLog
 from app.models.clinic import Clinic
 from app.models.clinic_permission_settings import ClinicPermissionSettings

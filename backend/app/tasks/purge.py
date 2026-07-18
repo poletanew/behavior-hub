@@ -2,6 +2,7 @@ import datetime
 
 from app.core.config import get_settings
 from app.db.session import SessionLocal
+from app.models.appointment import Appointment
 from app.models.audit_log import AuditLog
 from app.models.patient import Patient, PatientAssignment
 from app.models.report_summary import ReportSummary
@@ -23,6 +24,10 @@ def _cutoff() -> datetime.datetime:
 def _purge_patient(db, patient: Patient) -> None:
     """Respeita a ordem de dependências (trials -> session_trainings -> sessions ->
     plano/objetivos -> atribuições -> paciente) dentro de uma transação (Seção 16.3)."""
+    # Appointments referenciam patient_id e (opcionalmente) session_id — precisam ser
+    # removidos antes das sessões para não violar a FK appointments.session_id.
+    db.query(Appointment).filter(Appointment.patient_id == patient.id).delete(synchronize_session=False)
+
     session_ids = [
         row[0] for row in db.query(ClinicalSession.id).filter(ClinicalSession.patient_id == patient.id).all()
     ]
@@ -99,6 +104,20 @@ def _purge_resource(db, resource: Resource) -> None:
     db.delete(resource)
 
 
+def _purge_appointment(db, appointment: Appointment) -> None:
+    db.add(
+        AuditLog(
+            actor_user_id=None,
+            action="appointment_permanently_purged",
+            entity_type="appointment",
+            entity_id=appointment.id,
+            before={"deleted_at": appointment.deleted_at.isoformat()},
+            after=None,
+        )
+    )
+    db.delete(appointment)
+
+
 @celery_app.task(name="app.tasks.purge.purge_expired_soft_deleted_records")
 def purge_expired_soft_deleted_records() -> int:
     """Seção 16.2 — executa diariamente e remove definitivamente registros com
@@ -130,6 +149,14 @@ def purge_expired_soft_deleted_records() -> int:
         )
         for resource in expired_resources:
             _purge_resource(db, resource)
+            db.commit()
+            purged_count += 1
+
+        expired_appointments = (
+            db.query(Appointment).filter(Appointment.deleted_at.isnot(None), Appointment.deleted_at < cutoff).all()
+        )
+        for appointment in expired_appointments:
+            _purge_appointment(db, appointment)
             db.commit()
             purged_count += 1
     finally:

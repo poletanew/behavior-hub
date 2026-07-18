@@ -143,6 +143,7 @@ def soft_delete_patient(db: Session, user: User, patient_id: uuid.UUID, reason: 
 
     # Cascade soft delete to sessions/trials so they leave active listings too
     # (Seção 16.3 — sessões, relatórios, planos e listas não podem exibir registros deletados).
+    from app.models.appointment import Appointment
     from app.models.session import ClinicalSession, SessionTraining, Trial
 
     session_ids = [
@@ -164,6 +165,10 @@ def soft_delete_patient(db: Session, user: User, patient_id: uuid.UUID, reason: 
         db.query(Trial).filter(Trial.id.in_(trial_ids_subquery.select())).update(
             {"deleted_at": now, "deleted_by": user.id}, synchronize_session=False
         )
+
+    db.query(Appointment).filter(Appointment.patient_id == patient.id, Appointment.deleted_at.is_(None)).update(
+        {"deleted_at": now, "deleted_by": user.id}, synchronize_session=False
+    )
 
     audit_service.record(
         db,
@@ -192,6 +197,7 @@ def restore_patient(db: Session, user: User, patient_id: uuid.UUID) -> Patient:
     patient.deleted_by = None
     patient.deletion_reason = None
 
+    from app.models.appointment import Appointment
     from app.models.session import ClinicalSession, SessionTraining, Trial
 
     session_ids = [
@@ -213,6 +219,10 @@ def restore_patient(db: Session, user: User, patient_id: uuid.UUID) -> Patient:
         db.query(Trial).filter(Trial.id.in_(trial_ids_subquery.select())).update(
             {"deleted_at": None, "deleted_by": None}, synchronize_session=False
         )
+
+    db.query(Appointment).filter(Appointment.patient_id == patient.id, Appointment.deleted_at.isnot(None)).update(
+        {"deleted_at": None, "deleted_by": None}, synchronize_session=False
+    )
 
     audit_service.record(
         db,

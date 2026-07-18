@@ -6,6 +6,7 @@ const ENTITY_LABELS: Record<string, string> = {
   patient: "Paciente",
   objective: "Objetivo do plano",
   resource: "Recurso terapêutico",
+  appointment: "Compromisso da agenda",
 };
 
 export default function DeletedDataPage() {

@@ -327,3 +327,30 @@ export interface PatientImportCommitResult {
   imported_count: number;
   rejected: PatientImportRejection[];
 }
+
+export type AppointmentStatus = "scheduled" | "confirmed" | "completed" | "cancelled" | "no_show";
+export type CancellationReason = "patient" | "clinic" | "professional" | "force_majeure";
+
+export interface Appointment {
+  id: string;
+  patient_id: string;
+  patient_name: string;
+  professional_id: string;
+  professional_name: string;
+  scheduled_start: string;
+  scheduled_end: string;
+  status: AppointmentStatus;
+  cancellation_reason: CancellationReason | null;
+  status_notes: string | null;
+  notes: string | null;
+  session_id: string | null;
+  deleted_at: string | null;
+  created_at: string;
+}
+
+export interface AttendanceRate {
+  patient_id: string;
+  completed_count: number;
+  no_show_count: number;
+  attendance_rate_pct: number | null;
+}

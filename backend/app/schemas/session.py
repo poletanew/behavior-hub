@@ -13,6 +13,7 @@ class SessionCreateRequest(BaseModel):
     notes: str | None = None
     photo_url: str | None = None
     training_ids: list[uuid.UUID] = Field(default_factory=list)
+    appointment_id: uuid.UUID | None = None
 
 
 class SessionTrainingResponse(BaseModel):

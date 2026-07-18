@@ -135,3 +135,22 @@ class ReportSummaryStatus(str, enum.Enum):
     DRAFT = "draft"
     APPROVED = "approved"
     DISCARDED = "discarded"
+
+
+class AppointmentStatus(str, enum.Enum):
+    """Seção 32.2 — diferencia sessão agendada de sessão registrada."""
+
+    SCHEDULED = "scheduled"
+    CONFIRMED = "confirmed"
+    COMPLETED = "completed"
+    CANCELLED = "cancelled"
+    NO_SHOW = "no_show"
+
+
+class CancellationReason(str, enum.Enum):
+    """Seção 32.3 — motivo de cancelamento/falta."""
+
+    PATIENT = "patient"
+    CLINIC = "clinic"
+    PROFESSIONAL = "professional"
+    FORCE_MAJEURE = "force_majeure"

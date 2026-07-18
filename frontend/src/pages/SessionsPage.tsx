@@ -1,5 +1,5 @@
 import { FormEvent, useEffect, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { apiRequest } from "../api/client";
 import { ClinicalSession, Patient, Training, TrainingCategory } from "../types";
 import { useAuth } from "../context/AuthContext";
@@ -11,14 +11,20 @@ function formatDateTime(value: string) {
 export default function SessionsPage() {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const prefillPatientId = searchParams.get("patient_id") ?? "";
+  const prefillProfessionalId = searchParams.get("professional_id") ?? "";
+  const prefillAppointmentId = searchParams.get("appointment_id");
+  const prefillOccurredAt = searchParams.get("occurred_at") ?? "";
+
   const [sessions, setSessions] = useState<ClinicalSession[]>([]);
   const [patients, setPatients] = useState<Patient[]>([]);
   const [categories, setCategories] = useState<TrainingCategory[]>([]);
   const [trainings, setTrainings] = useState<Training[]>([]);
   const [loading, setLoading] = useState(true);
-  const [showForm, setShowForm] = useState(false);
-  const [patientId, setPatientId] = useState("");
-  const [occurredAt, setOccurredAt] = useState("");
+  const [showForm, setShowForm] = useState(Boolean(prefillAppointmentId));
+  const [patientId, setPatientId] = useState(prefillPatientId);
+  const [occurredAt, setOccurredAt] = useState(prefillOccurredAt);
   const [notes, setNotes] = useState("");
   const [selectedTrainingIds, setSelectedTrainingIds] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -44,10 +50,11 @@ export default function SessionsPage() {
         method: "POST",
         body: {
           patient_id: patientId,
-          professional_id: user?.id,
+          professional_id: prefillProfessionalId || user?.id,
           occurred_at: new Date(occurredAt).toISOString(),
           notes: notes || null,
           training_ids: selectedTrainingIds,
+          appointment_id: prefillAppointmentId || undefined,
         },
       });
       navigate(`/sessions/${session.id}`);
@@ -70,6 +77,11 @@ export default function SessionsPage() {
 
       {showForm && (
         <form onSubmit={handleCreateSession} className="bg-white rounded-card shadow-sm p-6 mb-6 space-y-4">
+          {prefillAppointmentId && (
+            <div className="bg-brand-grayLight border border-brand-blueLight rounded-btn p-3 text-sm">
+              Concluindo o atendimento agendado na Agenda. Ao salvar, o compromisso será marcado como realizado.
+            </div>
+          )}
           <div>
             <label className="block text-sm font-medium mb-1">Paciente</label>
             <select
