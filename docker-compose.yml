@@ -77,6 +77,14 @@ services:
       S3_SECRET_KEY: minioadmin
       S3_BUCKET_NAME: behavior-hub
       CORS_ORIGINS: '["http://localhost:5173"]'
+      FRONTEND_URL: http://localhost:5173
+      # Seção 8.3 — deixe em branco enquanto não houver conta Stripe; os
+      # endpoints de checkout/portal/webhook retornam erro claro nesse caso.
+      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-}
+      STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-}
+      STRIPE_PRICE_ID_BASIC: ${STRIPE_PRICE_ID_BASIC:-}
+      STRIPE_PRICE_ID_PREMIUM: ${STRIPE_PRICE_ID_PREMIUM:-}
+      STRIPE_PRICE_ID_ENTERPRISE: ${STRIPE_PRICE_ID_ENTERPRISE:-}
     ports:
       - "8000:8000"
     volumes:

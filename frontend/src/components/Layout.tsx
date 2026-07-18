@@ -117,6 +117,18 @@ export default function Layout() {
           >
             Segurança
           </NavLink>
+          {isAdmin && (
+            <NavLink
+              to="/plans"
+              className={({ isActive }) =>
+                `block rounded-btn px-3 py-2 text-sm font-medium transition-colors ${
+                  isActive ? "bg-brand-turquoise text-white" : "text-slate-200 hover:bg-white/10"
+                }`
+              }
+            >
+              Planos
+            </NavLink>
+          )}
         </nav>
         <div className="px-4 py-4 border-t border-white/10 text-sm">
           <div className="font-medium">{user?.name}</div>

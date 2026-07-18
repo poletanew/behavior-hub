@@ -1,4 +1,4 @@
-# Behavior Hub — Backend (Fase 1 + Fase 2 + Fase 3 núcleo)
+# Behavior Hub — Backend (Fase 1 + Fase 2 + Fase 3)
 
 FastAPI + SQLAlchemy + Alembic + PostgreSQL. Ver o [README raiz](../README.md) para como subir o
 ambiente completo com Docker Compose.
@@ -138,6 +138,41 @@ Stripe (próxima etapa da Fase 3) permitir que uma clínica esteja de fato no pl
 fallback por e-mail citado na Seção 32.8 não foi implementado (mesma lacuna do provedor de e-mail já
 documentada para convites e lembretes de agenda); a tela de configuração mostra a chave em texto para
 entrada manual no aplicativo autenticador, sem gerar uma imagem de QR code.
+
+## Nota sobre Planos, Assinaturas e Stripe (Fase 3 — Seção 8)
+
+`app/services/billing_service.py` usa o SDK oficial `stripe`. `Clinic` e `User` ganharam
+`StripeBillingMixin` (`app/db/base.py`) com `stripe_customer_id`, `stripe_subscription_id` e
+`subscription_current_period_end`; `subscription_status` (`SubscriptionStatus`, espelhando os status
+do Stripe) é declarado em cada modelo individualmente — não no mixin — porque `app.db.base` é
+importado por `app.models.appointment` antes de `app.models.__init__` terminar de rodar, e importar
+`app.models.enums` a partir de `app.db.base` reintroduziria o pacote `app.models` no meio da própria
+inicialização (import circular). `has_paid_access` (em cada modelo) é a fonte única de verdade de
+"a assinatura paga está de fato valendo agora" — `plan_service.current_plan` sempre cai para `"free"`
+quando `has_paid_access` é falso, mesmo que `subscription_plan` ainda esteja com o rótulo antigo
+(ex.: José antes do próximo webhook confirmar um cancelamento). Isso implementa literalmente a
+Seção 8.3: "nunca confiar apenas no frontend para liberar funcionalidades".
+
+Sem `STRIPE_SECRET_KEY`/`STRIPE_WEBHOOK_SECRET`/Price IDs configurados (o padrão neste ambiente, já
+que essas chaves não existem ainda), `/stripe/checkout`, `/stripe/portal` e `/webhooks/stripe`
+retornam `503` com uma mensagem clara em vez de tentar chamar a API do Stripe com uma chave inválida
+ou travar. `StripeWebhookEvent` (tabela `stripe_webhook_events`, `stripe_event_id` único) implementa
+a deduplicação de eventos da Seção 28.4: toda reentrega do mesmo evento é ignorada antes de qualquer
+processamento.
+
+**Decisão de escopo**: o PRD (Seção 28.4) pede que todo webhook seja "processado de forma assíncrona
+via fila, com reprocessamento automático em caso de falha temporária". Implementei a validação de
+assinatura e a deduplicação de forma síncrona (como pede a seção — são operações locais, sem chamada
+de rede) mas o processamento do evento em si (`billing_service.process_stripe_event`) roda dentro da
+própria requisição, na mesma sessão de banco do FastAPI `Depends(get_db)`, em vez de ser despachado
+para uma task Celery separada. Motivo: uma task Celery usaria `SessionLocal()` — uma conexão nova,
+fora da transação por teste que `tests/conftest.py` usa (savepoint por teste) — o que tornaria
+impossível testar de ponta a ponta que o webhook realmente atualizou `Clinic`/`User` sem reestruturar
+o harness de testes. Como o próprio Stripe já reentrega automaticamente webhooks que não respondem
+`2xx`, e a deduplicação garante que uma reentrega nunca reaplica o efeito duas vezes, o processamento
+síncrono já oferece uma resiliência razoável para uma implantação de instância única — revisitar isso
+com uma fila verdadeiramente assíncrona é um item razoável para quando o produto precisar de
+desacoplamento real (múltiplas instâncias, picos de carga de webhook, etc.).
 
 ## Estrutura
 

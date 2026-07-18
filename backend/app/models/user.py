@@ -4,11 +4,11 @@ import uuid
 from sqlalchemy import Boolean, DateTime, ForeignKey, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from app.db.base import Base, TimestampMixin, UUIDPrimaryKeyMixin
-from app.models.enums import SubscriptionPlan, Specialty, UserStatus, UserType
+from app.db.base import Base, StripeBillingMixin, TimestampMixin, UUIDPrimaryKeyMixin
+from app.models.enums import SubscriptionPlan, SubscriptionStatus, Specialty, UserStatus, UserType
 
 
-class User(Base, UUIDPrimaryKeyMixin, TimestampMixin):
+class User(Base, UUIDPrimaryKeyMixin, TimestampMixin, StripeBillingMixin):
     __tablename__ = "users"
 
     email: Mapped[str] = mapped_column(String(320), unique=True, nullable=False, index=True)
@@ -30,6 +30,9 @@ class User(Base, UUIDPrimaryKeyMixin, TimestampMixin):
 
     # Individual professionals (no clinic) carry their own subscription plan.
     subscription_plan: Mapped[SubscriptionPlan | None] = mapped_column(nullable=True)
+    subscription_status: Mapped[SubscriptionStatus] = mapped_column(
+        default=SubscriptionStatus.NONE, nullable=False
+    )
 
     terms_accepted_at: Mapped[datetime.datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
@@ -45,3 +48,10 @@ class User(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     def tenant_key(self) -> str:
         """Unique identifier of the isolation boundary this user belongs to."""
         return f"clinic:{self.clinic_id}" if self.clinic_id else f"individual:{self.id}"
+
+    @property
+    def has_paid_access(self) -> bool:
+        """Seção 8.3 — "nunca confiar apenas no frontend": uma assinatura
+        atrasada/cancelada nunca mantém os direitos do plano pago, mesmo que
+        subscription_plan ainda esteja com o rótulo antigo."""
+        return self.subscription_status in (SubscriptionStatus.ACTIVE, SubscriptionStatus.TRIALING)

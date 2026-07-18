@@ -22,7 +22,12 @@ Este repositório está sendo construído **por fases**, seguindo o roadmap da S
   paciente.
 - **Fase 3 — Autenticação de Dois Fatores (Seção 32.8)**: 2FA via aplicativo autenticador (TOTP),
   obrigatória para administradores de clínica no plano Enterprise e opcional para os demais perfis.
-  Stripe/planos pagos fica para a próxima (e última) etapa da Fase 3.
+- **Fase 3 — Planos, Assinaturas e Stripe (Seção 8)**: tela de comparação de planos, criação de
+  Stripe Checkout Session e Portal do Cliente, e processamento de webhooks (assinatura validada,
+  idempotência por chave de deduplicação de evento) — **completa o roadmap da Fase 3**. Como você
+  ainda não tem uma conta/chaves do Stripe, toda a integração está pronta e testada com o SDK do
+  Stripe mockado, mas roda em modo "não configurado" até você cadastrar `STRIPE_SECRET_KEY`,
+  `STRIPE_WEBHOOK_SECRET` e os Price IDs de cada plano (ver seção de configuração abaixo).
 
 ## Stack (Seção 4 do PRD)
 
@@ -162,13 +167,38 @@ dados).
     código correto do momento libera o acesso normalmente.
 24. Volte em **Segurança** e use **Desativar 2FA** — a desativação exige confirmar sua senha atual.
 
+### Fase 3 — Planos, Assinaturas e Stripe
+
+25. Acesse **Planos** no menu lateral: veja a tabela comparativa dos 4 planos (Seção 8.1) com o plano
+    atual destacado. Sem as chaves do Stripe configuradas (o cenário padrão deste ambiente), clicar em
+    **Assinar** ou em **Gerenciar assinatura** mostra uma mensagem clara explicando que o pagamento
+    ainda não foi configurado — em vez de travar ou dar um erro genérico.
+26. **Quando você tiver uma conta Stripe (modo teste)**, configure estas variáveis de ambiente no
+    backend (`.env` ou `docker-compose.yml`) e reinicie:
+    ```
+    STRIPE_SECRET_KEY=sk_test_...
+    STRIPE_WEBHOOK_SECRET=whsec_...
+    STRIPE_PRICE_ID_BASIC=price_...
+    STRIPE_PRICE_ID_PREMIUM=price_...
+    STRIPE_PRICE_ID_ENTERPRISE=price_...
+    FRONTEND_URL=http://localhost:5173
+    ```
+    Crie os 3 Price IDs (um por plano pago) no Dashboard do Stripe em modo teste, e configure um
+    endpoint de webhook apontando para `https://<seu-domínio>/v1/webhooks/stripe` (ou use o
+    `stripe listen --forward-to localhost:8000/v1/webhooks/stripe` da Stripe CLI para testar
+    localmente) escutando os eventos `checkout.session.completed`, `customer.subscription.updated`,
+    `customer.subscription.deleted`, `invoice.payment_succeeded` e `invoice.payment_failed`. Depois
+    disso, clicar em **Assinar** leva de fato ao Stripe Checkout, e completar o pagamento de teste
+    atualiza automaticamente o plano/status aqui via webhook — nenhuma mudança de código é
+    necessária, só a configuração.
+
 ### Rodando os testes automatizados do backend
 
 ```bash
 docker compose exec backend pytest -q
 ```
 
-(ou localmente, sem Docker — ver `backend/README.md`). 121 testes cobrem, entre outros:
+(ou localmente, sem Docker — ver `backend/README.md`). 136 testes cobrem, entre outros:
 
 - **AC-01**: conta nova inicia com zero pacientes/sessões/dashboard.
 - **AC-02** / **AC-03**: limite de 3 pacientes e bloqueio de foto no plano Free.
@@ -198,6 +228,13 @@ docker compose exec backend pytest -q
 - 2FA: fluxo completo de setup/ativação/desativação, rejeição de código inválido em cada etapa,
   desafio de segunda etapa no login apenas quando habilitado, e a flag de exigência para
   administrador de clínica Enterprise.
+- Stripe/Planos: checkout e portal do cliente com o SDK do Stripe mockado (criação de customer,
+  Checkout Session, Billing Portal Session), erro claro quando não configurado, os 5 tipos de evento
+  de webhook processados (`checkout.session.completed`, `customer.subscription.updated/deleted`,
+  `invoice.payment_succeeded/failed`), idempotência (reentrega do mesmo evento é ignorada), rejeição
+  de assinatura inválida, e a regra "nunca confiar apenas no frontend" (plano pago só concede acesso
+  quando a assinatura está de fato ativa/em trial — uma assinatura em atraso ou cancelada volta a
+  valer como Free mesmo que o rótulo do plano ainda não tenha sido atualizado).
 
 ## O que **não** está nesta fase
 
@@ -206,9 +243,8 @@ docker compose exec backend pytest -q
   (baseado em regras, não em um modelo de linguagem), claramente rotulado como tal, com a mesma
   estrutura de edição/aprovação/versionamento que a IA real usará depois. Quando você definir o
   provedor (Anthropic, OpenAI, etc.) e me passar a chave, trocamos só essa peça.
-- Seguindo o roadmap (Seção 31.1 do PRD), dentro da própria Fase 3: Stripe/planos pagos ainda não foi
-  implementado (próxima e última etapa da Fase 3). Timeline clínica, heatmaps e alertas inteligentes
-  continuam previstos para a **Fase 4**.
+- Seguindo o roadmap (Seção 31.1 do PRD): com Stripe implementado, a Fase 3 está completa. Timeline
+  clínica, heatmaps e alertas inteligentes continuam previstos para a **Fase 4**.
 - A importação de pacientes usa detecção automática de colunas por alias (cobrindo os cabeçalhos em
   português do próprio exemplo do PRD) em vez de uma UI de remapeamento manual coluna-a-coluna —
   uma simplificação de escopo deliberada, documentada em `csv_import_service.py`.
@@ -228,8 +264,21 @@ docker compose exec backend pytest -q
   configuração mostra a chave em texto para entrada manual no aplicativo (sem gerar uma imagem de QR
   code), uma simplificação de UI razoável já que todo aplicativo autenticador comum aceita entrada
   manual da chave. A exigência de 2FA para administradores Enterprise já está implementada e
-  testável (inclusive com um banner de aviso no app), mas só passa a valer na prática quando a
-  integração com Stripe (próxima etapa) permitir que uma clínica esteja de fato no plano Enterprise.
+  testável (inclusive com um banner de aviso no app), e agora passa a valer na prática assim que uma
+  clínica migrar de fato para o plano Enterprise via Stripe.
+- **Stripe/Planos**: como você ainda não tem uma conta Stripe, não há chaves reais configuradas neste
+  ambiente — `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET` e os Price IDs de cada plano continuam
+  vazios até você criá-los (veja a seção de configuração acima). Toda a integração (customer,
+  Checkout, Portal do Cliente, processamento dos 5 eventos de webhook) está implementada e coberta
+  por testes com o SDK do Stripe mockado — falta apenas a configuração real para funcionar de ponta a
+  ponta. O processamento de webhook acontece de forma síncrona dentro da própria requisição (usando a
+  mesma sessão de banco do request), em vez de ser despachado para uma fila Celery separada como o
+  PRD descreve na Seção 28.4 — uma simplificação deliberada, já que o Stripe já reentrega
+  automaticamente webhooks que não retornam 2xx (e a tabela de deduplicação de eventos garante que
+  uma reentrega nunca reaplica o efeito duas vezes), e uma fila assíncrona verdadeira adicionaria uma
+  segunda conexão de banco fora da transação da requisição, o que conflitaria com o isolamento de
+  transação por teste usado na suíte automatizada. Faturamento por sessão (Seção 32.10, cobrança que
+  a clínica emite a seus próprios pacientes/convênios) é um recurso diferente, fora de escopo aqui.
 
 Consulte `backend/README.md` para observações sobre a curadoria da Training Library e o limite de
 tamanho de arquivo dos Recursos Terapêuticos (Seção 34 — pendente de confirmação do PO).

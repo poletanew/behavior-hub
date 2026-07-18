@@ -354,3 +354,13 @@ export interface AttendanceRate {
   no_show_count: number;
   attendance_rate_pct: number | null;
 }
+
+export type PlanId = "free" | "basic" | "premium" | "enterprise";
+
+export interface BillingStatus {
+  subscription_plan: PlanId | null;
+  subscription_status: string;
+  subscription_current_period_end: string | null;
+  has_paid_access: boolean;
+  stripe_configured: boolean;
+}

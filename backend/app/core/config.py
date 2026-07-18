@@ -31,6 +31,19 @@ class Settings(BaseSettings):
 
     CORS_ORIGINS: list[str] = ["http://localhost:5173", "http://localhost:3000"]
 
+    FRONTEND_URL: str = "http://localhost:5173"
+
+    # Seção 8.3 — nenhum valor de produção é inventado aqui: sem estas variáveis
+    # configuradas, os endpoints de checkout/portal retornam um erro claro em
+    # vez de tentar chamar a API do Stripe com uma chave inválida.
+    STRIPE_SECRET_KEY: str | None = None
+    STRIPE_WEBHOOK_SECRET: str | None = None
+    STRIPE_PRICE_ID_BASIC: str | None = None
+    STRIPE_PRICE_ID_PREMIUM: str | None = None
+    STRIPE_PRICE_ID_ENTERPRISE: str | None = None
+
+    CELERY_TASK_ALWAYS_EAGER: bool = False
+
 
 @lru_cache
 def get_settings() -> Settings:

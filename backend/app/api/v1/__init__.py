@@ -4,6 +4,7 @@ from app.api.v1 import (
     appointments,
     audit_logs,
     auth,
+    billing,
     dashboard,
     deleted_data,
     invitations,
@@ -21,6 +22,7 @@ from app.api.v1 import (
 
 api_router = APIRouter(prefix="/v1")
 api_router.include_router(auth.router)
+api_router.include_router(billing.router)
 api_router.include_router(appointments.router)
 api_router.include_router(invitations.router)
 api_router.include_router(patients.router)

@@ -35,6 +35,21 @@ class SubscriptionPlan(str, enum.Enum):
     ENTERPRISE = "enterprise"
 
 
+class SubscriptionStatus(str, enum.Enum):
+    """Seção 8.3 — espelha os status de assinatura do Stripe; usado para nunca
+    confiar apenas no rótulo do plano ao liberar funcionalidades (ex.: uma
+    assinatura em atraso/cancelada não deve manter os direitos do plano pago)."""
+
+    NONE = "none"
+    ACTIVE = "active"
+    TRIALING = "trialing"
+    PAST_DUE = "past_due"
+    CANCELED = "canceled"
+    INCOMPLETE = "incomplete"
+    INCOMPLETE_EXPIRED = "incomplete_expired"
+    UNPAID = "unpaid"
+
+
 class InvitationStatus(str, enum.Enum):
     PENDING = "pending"
     ACCEPTED = "accepted"
