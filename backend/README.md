@@ -1,4 +1,4 @@
-# Behavior Hub — Backend (Fase 1 / MVP)
+# Behavior Hub — Backend (Fase 1 + Fase 2)
 
 FastAPI + SQLAlchemy + Alembic + PostgreSQL. Ver o [README raiz](../README.md) para como subir o
 ambiente completo com Docker Compose.
@@ -14,6 +14,10 @@ alembic upgrade head
 uvicorn app.main:app --reload
 ```
 
+Fase 2 requer a extensão `pg_trgm` do PostgreSQL (usada na detecção de objetivos duplicados —
+Seção 13.2); a migração `e52a0826e753_...` já cria a extensão automaticamente (`CREATE EXTENSION IF
+NOT EXISTS pg_trgm`), não é necessário nenhum passo manual.
+
 ## Testes
 
 ```bash
@@ -25,6 +29,10 @@ pytest -q
 Os testes usam uma transação com SAVEPOINT por teste (não sujam o banco entre testes) e não dependem
 dos dados de seed da Training Library — cada teste cria sua própria categoria/treino quando precisa.
 
+Os testes de Recursos Terapêuticos (`tests/test_resources.py`) usam a biblioteca `moto` para mockar
+o S3 (fixture `mock_s3` em `tests/conftest.py`) — não é necessário ter MinIO rodando para testar o
+upload/download. Contra o MinIO real do `docker compose`, o mesmo código funciona sem alteração.
+
 ## Nota sobre a Training Library (Seção 12.1 do PRD)
 
 O PRD pede ~20 treinos por categoria + 15 adicionais, **clinicamente revisados antes de produção**.
@@ -34,12 +42,31 @@ a ponta na Fase 1. Este conjunto **não** substitui a curadoria clínica complet
 antes de qualquer uso em produção real, um profissional habilitado deve revisar, expandir e aprovar
 o conteúdo de cada treino.
 
+## Nota sobre o resumo de Reports (Seção 14.5 do PRD)
+
+Combinado com o Product Owner: nenhuma chamada a uma API de IA externa foi integrada nesta fase.
+`app/services/report_summary_service.py` gera um rascunho **determinístico** (baseado nos dados
+agregados, não em um modelo de linguagem), sempre rotulado como tal (`generated_by:
+"rule_based_draft"`), com o mesmo fluxo de edição/aprovação/versionamento que uma IA real usaria.
+Quando o provedor de IA (Anthropic, OpenAI, etc.) for definido, a única peça a trocar é a função
+`_draft_text` — o schema, a API e o frontend já estão prontos para receber texto gerado por IA no
+mesmo formato.
+
+## Nota sobre Recursos Terapêuticos (Seção 15/34 do PRD)
+
+O limite de tamanho de arquivo (10MB) e os tipos aceitos (PDF, PNG/JPEG/WEBP, texto simples) em
+`app/services/resource_service.py` são um padrão conservador de engenharia. A Seção 34 do PRD lista
+"regras de armazenamento e tamanho de arquivos" como pendente de confirmação do Product Owner —
+ajuste `MAX_SIZE_BYTES`/`ALLOWED_CONTENT_TYPES` quando essa decisão for confirmada.
+
 ## Estrutura
 
-- `app/models/` — entidades SQLAlchemy (Seção 18 do PRD).
-- `app/services/` — regras de negócio (isolamento de tenant, soft delete, cálculos da Seção 14.4 etc).
+- `app/models/` — entidades SQLAlchemy (Seção 18/27 do PRD).
+- `app/services/` — regras de negócio (isolamento de tenant, soft delete, cálculos da Seção 14.4,
+  detecção de duplicidade da Seção 13.2, upload S3 via `file_service.py`, etc).
 - `app/api/v1/` — rotas FastAPI.
 - `app/tasks/` — Celery (worker + beat), incluindo a purga diária de Dados Excluídos após 60 dias
-  (Seção 16.2).
+  (Seção 16.2) — agora cobrindo pacientes, objetivos de plano de tratamento excluídos isoladamente e
+  recursos terapêuticos.
 - `alembic/versions/` — migrações versionadas.
 - `tests/` — pytest (unitários + integração + isolamento multi-tenant).

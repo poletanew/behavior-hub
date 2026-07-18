@@ -6,10 +6,12 @@ const navItems = [
   { to: "/patients", label: "Pacientes" },
   { to: "/sessions", label: "Atendimentos" },
   { to: "/training-library", label: "Training Library" },
+  { to: "/resources", label: "Recursos" },
 ];
 
 export default function Layout() {
   const { user, logout } = useAuth();
+  const isAdmin = user?.user_type === "clinic_admin" || user?.user_type === "individual";
 
   return (
     <div className="flex min-h-screen">
@@ -44,6 +46,18 @@ export default function Layout() {
               }
             >
               Profissionais
+            </NavLink>
+          )}
+          {isAdmin && (
+            <NavLink
+              to="/deleted-data"
+              className={({ isActive }) =>
+                `block rounded-btn px-3 py-2 text-sm font-medium transition-colors ${
+                  isActive ? "bg-brand-turquoise text-white" : "text-slate-200 hover:bg-white/10"
+                }`
+              }
+            >
+              Dados Excluídos
             </NavLink>
           )}
         </nav>

@@ -9,7 +9,7 @@ os.environ.setdefault("JWT_SECRET_KEY", "test-secret")
 
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy import create_engine, event
+from sqlalchemy import create_engine, event, text
 from sqlalchemy.orm import sessionmaker
 
 from app.core.config import get_settings
@@ -26,6 +26,10 @@ TestSessionLocal = sessionmaker(bind=engine)
 @pytest.fixture(scope="session", autouse=True)
 def _prepare_database():
     Base.metadata.drop_all(engine)
+    with engine.begin() as connection:
+        # Seção 13.2 — pg_trgm é usado para similaridade de trigramas na detecção
+        # de objetivos duplicados; a migração real já cria isso em produção.
+        connection.execute(text("CREATE EXTENSION IF NOT EXISTS pg_trgm"))
     Base.metadata.create_all(engine)
     yield
     Base.metadata.drop_all(engine)
@@ -133,6 +137,40 @@ def create_training(db_session, category, title: str = "Aguardar por 30 segundos
     db_session.commit()
     db_session.refresh(training)
     return training
+
+
+def create_patient(client, headers, name: str = "Paciente Exemplo") -> dict:
+    response = client.post("/v1/patients", json={"name": name, "birth_date": "2018-05-10"}, headers=headers)
+    assert response.status_code == 201, response.text
+    return response.json()
+
+
+def assign_professional(client, admin_headers, patient_id, professional_id, permission="edit_sessions"):
+    response = client.post(
+        f"/v1/patients/{patient_id}/assignments",
+        json={"professional_id": professional_id, "permission": permission},
+        headers=admin_headers,
+    )
+    assert response.status_code == 201, response.text
+    return response.json()
+
+
+@pytest.fixture()
+def mock_s3():
+    """moto intercepts requests to standard AWS endpoints, not custom ones like
+    MinIO's http://localhost:9000, so this fixture temporarily clears the
+    endpoint_url override while the mock is active."""
+    from moto import mock_aws
+
+    from app.services import file_service
+
+    original_endpoint = file_service.settings.S3_ENDPOINT_URL
+    file_service.settings.S3_ENDPOINT_URL = None
+    file_service._client = None
+    with mock_aws():
+        yield
+    file_service.settings.S3_ENDPOINT_URL = original_endpoint
+    file_service._client = None
 
 
 def invite_and_accept_professional(client, admin_headers: dict, specialty: str = "fonoaudiologo") -> dict:

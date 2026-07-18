@@ -86,3 +86,169 @@ export interface DashboardData {
   sessions_today_count: number;
   recent_sessions: ClinicalSession[];
 }
+
+export type TreatmentArea =
+  | "psicologia"
+  | "aba"
+  | "fonoaudiologia"
+  | "terapia_ocupacional"
+  | "psicopedagogia"
+  | "fisioterapia"
+  | "nutricao"
+  | "outra";
+
+export type ObjectiveStatus = "not_started" | "in_progress" | "mastered" | "paused" | "discontinued";
+export type ObjectivePriority = "low" | "medium" | "high";
+
+export interface Objective {
+  id: string;
+  plan_id: string;
+  area: TreatmentArea;
+  title: string;
+  description: string | null;
+  criteria: string | null;
+  strategies: string | null;
+  status: ObjectiveStatus;
+  priority: ObjectivePriority;
+  author_id: string;
+  created_at: string;
+  updated_at: string;
+  deleted_at: string | null;
+  training_ids: string[];
+}
+
+export interface TreatmentPlan {
+  id: string;
+  patient_id: string;
+  version: number;
+  objectives: Objective[];
+}
+
+export interface DuplicateCandidate {
+  id: string;
+  title: string;
+  area: TreatmentArea;
+  status: ObjectiveStatus;
+  author_id: string;
+  similarity: number;
+}
+
+export interface ObjectiveComment {
+  id: string;
+  objective_id: string;
+  author_id: string;
+  body: string;
+  created_at: string;
+}
+
+export interface ObjectiveHistoryEntry {
+  action: string;
+  actor_user_id: string | null;
+  before: Record<string, unknown> | null;
+  after: Record<string, unknown> | null;
+  timestamp: string;
+}
+
+export interface LineSeries {
+  training_id: string;
+  training_title: string;
+  points: { date: string; accuracy_pct: number | null; independence_pct: number | null }[];
+}
+
+export interface BarPoint {
+  training_id: string;
+  training_title: string;
+  accuracy_pct: number | null;
+  sample_size: number;
+}
+
+export interface StackedBarPoint {
+  session_id: string;
+  date: string;
+  distribution_pct: Record<string, number>;
+}
+
+export interface PieData {
+  correct: number;
+  incorrect: number;
+  partial: number;
+  no_response: number;
+}
+
+export interface RadarPoint {
+  area: string;
+  accuracy_pct: number | null;
+  sample_size: number;
+  insufficient_data: boolean;
+}
+
+export interface CumulativePoint {
+  date: string;
+  cumulative_correct: number;
+  cumulative_total: number;
+  cumulative_independence_pct: number | null;
+}
+
+export interface ReportData {
+  patient_id: string;
+  period_start: string | null;
+  period_end: string | null;
+  total_trials: number;
+  line: LineSeries[];
+  bar: BarPoint[];
+  stacked_bar: StackedBarPoint[];
+  pie: PieData;
+  radar: RadarPoint[];
+  cumulative: CumulativePoint[];
+  comparison: {
+    available: boolean;
+    message?: string | null;
+    period_a_accuracy_pct?: number | null;
+    period_b_accuracy_pct?: number | null;
+    delta_pct?: number | null;
+  } | null;
+}
+
+export interface ReportSummary {
+  id: string;
+  patient_id: string;
+  period_start: string;
+  period_end: string;
+  version: number;
+  content: string;
+  status: "draft" | "approved" | "discarded";
+  generated_by: string;
+  author_id: string | null;
+}
+
+export type ResourceType = "pdf" | "image" | "text";
+export type ResourceVisibility = "private" | "clinic_shared";
+
+export interface ResourceItem {
+  id: string;
+  title: string;
+  description: string | null;
+  category: string | null;
+  suggested_age_range: string | null;
+  resource_type: ResourceType;
+  original_filename: string;
+  content_type: string;
+  size_bytes: number;
+  visibility: ResourceVisibility;
+  uploaded_by_user_id: string;
+  created_at: string;
+  deleted_at: string | null;
+}
+
+export interface ResourceWithUrl extends ResourceItem {
+  view_url: string;
+}
+
+export interface DeletedItem {
+  entity_type: "patient" | "objective" | "resource";
+  id: string;
+  label: string;
+  deleted_at: string;
+  deleted_by: string | null;
+  days_remaining: number;
+}

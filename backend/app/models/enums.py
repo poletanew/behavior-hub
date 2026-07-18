@@ -74,3 +74,64 @@ class TrainingVisibility(str, enum.Enum):
     SYSTEM = "system"
     CLINIC_SHARED = "clinic_shared"
     PRIVATE = "private"
+
+
+class TreatmentArea(str, enum.Enum):
+    """Seção 13.1 — áreas da grade multidisciplinar do plano de tratamento."""
+
+    PSICOLOGIA = "psicologia"
+    ABA = "aba"
+    FONOAUDIOLOGIA = "fonoaudiologia"
+    TERAPIA_OCUPACIONAL = "terapia_ocupacional"
+    PSICOPEDAGOGIA = "psicopedagogia"
+    FISIOTERAPIA = "fisioterapia"
+    NUTRICAO = "nutricao"
+    OUTRA = "outra"
+
+
+# Seção 13.3 — mapeamento entre especialidade do profissional e a área do plano
+# de tratamento que ele pode editar quando o vínculo é EDIT_AREA_PLAN.
+SPECIALTY_TO_AREA: dict[Specialty, TreatmentArea] = {
+    Specialty.PSICOLOGO_INFANTIL: TreatmentArea.PSICOLOGIA,
+    Specialty.ANALISTA_COMPORTAMENTO_ABA: TreatmentArea.ABA,
+    Specialty.FONOAUDIOLOGO: TreatmentArea.FONOAUDIOLOGIA,
+    Specialty.TERAPEUTA_OCUPACIONAL: TreatmentArea.TERAPIA_OCUPACIONAL,
+    Specialty.PSICOPEDAGOGO: TreatmentArea.PSICOPEDAGOGIA,
+    Specialty.FISIOTERAPEUTA_PEDIATRICO: TreatmentArea.FISIOTERAPIA,
+    Specialty.NUTRICIONISTA_INFANTIL: TreatmentArea.NUTRICAO,
+}
+
+
+class ObjectiveStatus(str, enum.Enum):
+    """Seção 13.1 — status: não iniciado, em andamento, dominado, pausado, descontinuado."""
+
+    NOT_STARTED = "not_started"
+    IN_PROGRESS = "in_progress"
+    MASTERED = "mastered"
+    PAUSED = "paused"
+    DISCONTINUED = "discontinued"
+
+
+class ObjectivePriority(str, enum.Enum):
+    LOW = "low"
+    MEDIUM = "medium"
+    HIGH = "high"
+
+
+class ResourceType(str, enum.Enum):
+    PDF = "pdf"
+    IMAGE = "image"
+    TEXT = "text"
+
+
+class ResourceVisibility(str, enum.Enum):
+    PRIVATE = "private"
+    CLINIC_SHARED = "clinic_shared"
+
+
+class ReportSummaryStatus(str, enum.Enum):
+    """Seção 14.5 — o terapeuta pode editar, aprovar ou descartar o texto."""
+
+    DRAFT = "draft"
+    APPROVED = "approved"
+    DISCARDED = "discarded"

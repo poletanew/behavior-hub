@@ -73,6 +73,14 @@ export default function PatientDetailPage() {
         <p className="text-neutralState text-sm mt-1">Nascimento: {patient.birth_date}</p>
         {patient.guardian_name && <p className="text-sm mt-1">Responsável: {patient.guardian_name}</p>}
         {patient.diagnosis && <p className="text-sm mt-1">Diagnóstico: {patient.diagnosis}</p>}
+        <div className="flex gap-4 mt-3 text-sm">
+          <Link to={`/patients/${patientId}/treatment-plan`} className="text-brand-blue underline">
+            Plano de Tratamento
+          </Link>
+          <Link to={`/patients/${patientId}/reports`} className="text-brand-blue underline">
+            Reports
+          </Link>
+        </div>
       </div>
 
       <div className="flex items-center justify-between mb-4">

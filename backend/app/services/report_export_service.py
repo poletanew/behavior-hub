@@ -1,0 +1,131 @@
+import csv
+import datetime
+import io
+import uuid
+
+from reportlab.lib import colors
+from reportlab.lib.pagesizes import A4
+from reportlab.lib.units import mm
+from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
+from reportlab.lib.styles import getSampleStyleSheet
+from sqlalchemy.orm import Session
+
+from app.models.session import ClinicalSession, SessionTraining, Trial
+from app.models.training import Training, TrainingCategory
+from app.models.user import User
+from app.services import patient_service, report_service
+
+
+def _fetch_export_rows(db, patient_id, **filters):
+    return (
+        db.query(
+            ClinicalSession.occurred_at,
+            Training.title,
+            TrainingCategory.name,
+            Trial.attempt_number,
+            Trial.result,
+            Trial.prompt_level,
+            Trial.notes,
+        )
+        .join(SessionTraining, Trial.session_training_id == SessionTraining.id)
+        .join(ClinicalSession, SessionTraining.session_id == ClinicalSession.id)
+        .join(Training, SessionTraining.training_id == Training.id)
+        .join(TrainingCategory, Training.category_id == TrainingCategory.id)
+        .filter(
+            ClinicalSession.patient_id == patient_id,
+            ClinicalSession.deleted_at.is_(None),
+            Trial.deleted_at.is_(None),
+        )
+        .order_by(ClinicalSession.occurred_at, Training.title, Trial.attempt_number)
+        .all()
+    )
+
+
+def export_csv(
+    db: Session,
+    user: User,
+    patient_id: uuid.UUID,
+) -> str:
+    """Seção 14.6 — exportar dados tabulares em Excel/CSV."""
+    patient_service.get_patient_or_404(db, user, patient_id)
+    rows = _fetch_export_rows(db, patient_id)
+
+    buffer = io.StringIO()
+    writer = csv.writer(buffer)
+    writer.writerow(["Data", "Treino", "Categoria", "Tentativa", "Resultado", "Nível de ajuda", "Observação"])
+    for occurred_at, training_title, category_name, attempt_number, result, prompt_level, notes in rows:
+        writer.writerow(
+            [
+                occurred_at.strftime("%Y-%m-%d %H:%M"),
+                training_title,
+                category_name,
+                attempt_number,
+                result.value,
+                prompt_level.value,
+                notes or "",
+            ]
+        )
+    return buffer.getvalue()
+
+
+def export_pdf(
+    db: Session,
+    user: User,
+    patient_id: uuid.UUID,
+    *,
+    date_from: datetime.date | None,
+    date_to: datetime.date | None,
+    summary_text: str | None,
+) -> bytes:
+    """Seção 14.6 — relatório consolidado em PDF, com identificação, filtros
+    aplicados e data de geração (o logo da clínica fica para o White-label da
+    Fase 5 — Seção 32.9)."""
+    patient = patient_service.get_patient_or_404(db, user, patient_id)
+    data = report_service.get_report_data(db, user, patient_id, date_from=date_from, date_to=date_to)
+
+    buffer = io.BytesIO()
+    doc = SimpleDocTemplate(buffer, pagesize=A4, topMargin=20 * mm, bottomMargin=20 * mm)
+    styles = getSampleStyleSheet()
+    elements = []
+
+    elements.append(Paragraph("Behavior Hub — Relatório Consolidado", styles["Title"]))
+    elements.append(Spacer(1, 6))
+    elements.append(Paragraph(f"Paciente: {patient.name}", styles["Normal"]))
+    period_label = (
+        f"{date_from.strftime('%d/%m/%Y')} a {date_to.strftime('%d/%m/%Y')}" if date_from and date_to else "Todo o histórico"
+    )
+    elements.append(Paragraph(f"Período: {period_label}", styles["Normal"]))
+    elements.append(
+        Paragraph(
+            f"Gerado em: {datetime.datetime.now(datetime.timezone.utc).strftime('%d/%m/%Y %H:%M UTC')}",
+            styles["Normal"],
+        )
+    )
+    elements.append(Spacer(1, 12))
+
+    if summary_text:
+        elements.append(Paragraph("Resumo", styles["Heading2"]))
+        elements.append(Paragraph(summary_text, styles["Normal"]))
+        elements.append(Spacer(1, 12))
+
+    elements.append(Paragraph("Percentual de acerto por treino", styles["Heading2"]))
+    table_data = [["Treino", "Percentual de acerto", "Tentativas"]]
+    for row in data["bar"]:
+        table_data.append(
+            [row["training_title"], f"{row['accuracy_pct']}%" if row["accuracy_pct"] is not None else "-", row["sample_size"]]
+        )
+    table = Table(table_data, hAlign="LEFT")
+    table.setStyle(
+        TableStyle(
+            [
+                ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#1D4ED8")),
+                ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+                ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#CBD5E1")),
+                ("FONTSIZE", (0, 0), (-1, -1), 9),
+            ]
+        )
+    )
+    elements.append(table)
+
+    doc.build(elements)
+    return buffer.getvalue()
