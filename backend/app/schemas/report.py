@@ -43,6 +43,13 @@ class RadarPoint(BaseModel):
     insufficient_data: bool
 
 
+class HeatmapAreaPoint(BaseModel):
+    area: str
+    trial_count: int
+    intensity_pct: float
+    intensity_label: str
+
+
 class CumulativePoint(BaseModel):
     date: datetime.date
     cumulative_correct: int
@@ -69,6 +76,7 @@ class ReportDataResponse(BaseModel):
     pie: PieData
     radar: list[RadarPoint]
     cumulative: list[CumulativePoint]
+    heatmap: list[HeatmapAreaPoint]
     comparison: PeriodComparison | None = None
 
 

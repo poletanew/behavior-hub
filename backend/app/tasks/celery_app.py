@@ -9,7 +9,7 @@ celery_app = Celery(
     "behavior_hub",
     broker=settings.CELERY_BROKER_URL,
     backend=settings.CELERY_RESULT_BACKEND,
-    include=["app.tasks.purge", "app.tasks.reminders"],
+    include=["app.tasks.purge", "app.tasks.reminders", "app.tasks.clinical_alerts"],
 )
 
 celery_app.conf.beat_schedule = {
@@ -20,6 +20,10 @@ celery_app.conf.beat_schedule = {
     "send-appointment-reminders-hourly": {
         "task": "app.tasks.reminders.send_appointment_reminders",
         "schedule": crontab(minute=0),
+    },
+    "recompute-clinical-alerts-daily": {
+        "task": "app.tasks.clinical_alerts.recompute_clinical_alerts_daily",
+        "schedule": crontab(hour=4, minute=0),
     },
 }
 celery_app.conf.timezone = "UTC"

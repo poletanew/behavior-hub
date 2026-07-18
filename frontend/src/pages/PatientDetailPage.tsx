@@ -1,12 +1,26 @@
 import { FormEvent, useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { apiRequest } from "../api/client";
-import { ClinicalSession, Patient, SessionTemplate, Training, TrainingCategory } from "../types";
+import { ClinicalAlert, ClinicalSession, Patient, SessionTemplate, Training, TrainingCategory } from "../types";
 import { useAuth } from "../context/AuthContext";
 
 function formatDateTime(value: string) {
   return new Date(value).toLocaleString("pt-BR");
 }
+
+const ALERT_LABELS: Record<string, string> = {
+  no_collection: "Sem coleta",
+  regression: "Regressão",
+  stagnation: "Estagnação",
+  fading_candidate: "Candidato a fading",
+};
+
+const ALERT_COLORS: Record<string, string> = {
+  no_collection: "bg-slate-200 text-neutralState",
+  regression: "bg-danger/10 text-danger",
+  stagnation: "bg-amber-100 text-amber-700",
+  fading_candidate: "bg-success/10 text-success",
+};
 
 export default function PatientDetailPage() {
   const { patientId } = useParams<{ patientId: string }>();
@@ -14,6 +28,7 @@ export default function PatientDetailPage() {
   const navigate = useNavigate();
 
   const [patient, setPatient] = useState<Patient | null>(null);
+  const [alerts, setAlerts] = useState<ClinicalAlert[]>([]);
   const [sessions, setSessions] = useState<ClinicalSession[]>([]);
   const [categories, setCategories] = useState<TrainingCategory[]>([]);
   const [trainings, setTrainings] = useState<Training[]>([]);
@@ -27,6 +42,7 @@ export default function PatientDetailPage() {
   function load() {
     if (!patientId) return;
     apiRequest<Patient>(`/patients/${patientId}`).then(setPatient);
+    apiRequest<ClinicalAlert[]>(`/patients/${patientId}/alerts`).then(setAlerts);
     apiRequest<ClinicalSession[]>(`/sessions?patient_id=${patientId}`).then(setSessions);
     apiRequest<SessionTemplate[]>(`/session-templates?patient_id=${patientId}`).then(setTemplates);
   }
@@ -89,8 +105,30 @@ export default function PatientDetailPage() {
           <Link to={`/patients/${patientId}/reports`} className="text-brand-blue underline">
             Reports
           </Link>
+          <Link to={`/patients/${patientId}/timeline`} className="text-brand-blue underline">
+            Timeline
+          </Link>
         </div>
       </div>
+
+      {alerts.length > 0 && (
+        <div className="bg-white rounded-card shadow-sm p-4 mb-6">
+          <h2 className="font-semibold text-brand-navy mb-3">Alertas clínicos</h2>
+          <div className="space-y-2">
+            {alerts.map((alert) => (
+              <div key={alert.id} className="flex items-start gap-3 text-sm">
+                <span className={`shrink-0 rounded px-2 py-0.5 text-xs font-medium ${ALERT_COLORS[alert.alert_type]}`}>
+                  {ALERT_LABELS[alert.alert_type] ?? alert.alert_type}
+                </span>
+                <div>
+                  <span>{alert.message}</span>
+                  <span className="text-neutralState"> — objetivo: {alert.objective_title}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       <div className="flex items-center justify-between mb-4">
         <h2 className="font-semibold text-brand-navy">Histórico de sessões</h2>

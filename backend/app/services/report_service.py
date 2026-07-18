@@ -13,6 +13,7 @@ from app.services import patient_service
 from app.services.calculations import accuracy_pct, independence_pct, prompt_level_distribution
 
 RADAR_MIN_SAMPLE_SIZE = 5
+HEATMAP_WINDOW_DAYS = 30
 
 
 class _TrialRow:
@@ -151,6 +152,40 @@ def build_radar_data(rows: list[_TrialRow]) -> list[dict]:
     ]
 
 
+def _intensity_label(pct: float) -> str:
+    if pct >= 75:
+        return "muito_alta"
+    if pct >= 50:
+        return "alta"
+    if pct >= 25:
+        return "media"
+    return "baixa"
+
+
+def build_heatmap_data(rows: list[_TrialRow]) -> list[dict]:
+    """Seção 29.3/AC-17 — intensidade de treino por área nos últimos 30 dias, sempre
+    recalculada a partir das tentativas reais (nunca um valor fixado manualmente)."""
+    counts: dict[str, int] = collections.defaultdict(int)
+    for row in rows:
+        counts[row.category_name] += 1
+    if not counts:
+        return []
+
+    max_count = max(counts.values())
+    return sorted(
+        (
+            {
+                "area": area,
+                "trial_count": count,
+                "intensity_pct": round(count / max_count * 100, 1),
+                "intensity_label": _intensity_label(count / max_count * 100),
+            }
+            for area, count in counts.items()
+        ),
+        key=lambda point: (-point["trial_count"], point["area"]),
+    )
+
+
 def build_cumulative_data(rows: list[_TrialRow]) -> list[dict]:
     """Seção 14.3 — avanço acumulado e mudança da dependência de ajuda."""
     by_date: dict[datetime.date, list] = collections.defaultdict(list)
@@ -232,6 +267,17 @@ def get_report_data(
         else:
             comparison = {"available": False, "message": "Dados insuficientes para comparação entre os períodos."}
 
+    today = datetime.date.today()
+    heatmap_rows = _fetch_rows(
+        db,
+        patient_id,
+        date_from=today - datetime.timedelta(days=HEATMAP_WINDOW_DAYS),
+        date_to=today,
+        training_id=None,
+        category_id=None,
+        professional_id=None,
+    )
+
     return {
         "patient_id": patient_id,
         "period_start": date_from,
@@ -243,5 +289,6 @@ def get_report_data(
         "pie": build_pie_data(rows),
         "radar": build_radar_data(rows),
         "cumulative": build_cumulative_data(rows),
+        "heatmap": build_heatmap_data(heatmap_rows),
         "comparison": comparison,
     }

@@ -1,6 +1,6 @@
 import uuid
 
-from sqlalchemy import Boolean, ForeignKey, UniqueConstraint
+from sqlalchemy import Boolean, ForeignKey, Integer, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base import Base, TimestampMixin, UUIDPrimaryKeyMixin
@@ -27,3 +27,14 @@ class ClinicPermissionSettings(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     supervisors_can_restore_deleted_data: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     # "Gerar convite": Supervisor — Configurável
     supervisors_can_generate_invitations: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+
+    # Seção 29.1 — limiares dos Alertas Clínicos Inteligentes. Padrão de fábrica
+    # conforme o PRD; configuráveis por clínica apenas no plano Enterprise
+    # (aplicado em clinical_alert_service.update_thresholds).
+    no_collection_days: Mapped[int] = mapped_column(Integer, default=14, nullable=False)
+    regression_window_sessions: Mapped[int] = mapped_column(Integer, default=3, nullable=False)
+    regression_drop_pp: Mapped[int] = mapped_column(Integer, default=20, nullable=False)
+    stagnation_session_count: Mapped[int] = mapped_column(Integer, default=5, nullable=False)
+    stagnation_band_pp: Mapped[int] = mapped_column(Integer, default=5, nullable=False)
+    fading_session_count: Mapped[int] = mapped_column(Integer, default=3, nullable=False)
+    fading_independence_pct: Mapped[int] = mapped_column(Integer, default=80, nullable=False)

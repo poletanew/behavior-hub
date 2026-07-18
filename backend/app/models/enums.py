@@ -169,3 +169,13 @@ class CancellationReason(str, enum.Enum):
     CLINIC = "clinic"
     PROFESSIONAL = "professional"
     FORCE_MAJEURE = "force_majeure"
+
+
+class ClinicalAlertType(str, enum.Enum):
+    """Seção 29.1/29.9 — as quatro regras computáveis obrigatórias antes do
+    desenvolvimento (AC-15/AC-16)."""
+
+    NO_COLLECTION = "no_collection"
+    REGRESSION = "regression"
+    STAGNATION = "stagnation"
+    FADING_CANDIDATE = "fading_candidate"

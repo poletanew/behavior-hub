@@ -28,6 +28,21 @@ Este repositório está sendo construído **por fases**, seguindo o roadmap da S
   ainda não tem uma conta/chaves do Stripe, toda a integração está pronta e testada com o SDK do
   Stripe mockado, mas roda em modo "não configurado" até você cadastrar `STRIPE_SECRET_KEY`,
   `STRIPE_WEBHOOK_SECRET` e os Price IDs de cada plano (ver seção de configuração abaixo).
+- **Fase 4a (bloco 1) — Alertas Clínicos Inteligentes (Seção 29.1/29.9, AC-15/AC-16)**: as quatro
+  regras computáveis do PRD (sem coleta há 14 dias, regressão de 20 pontos percentuais na média
+  móvel de 3 sessões, estagnação por 5 sessões, candidato a fading com independência ≥80%), com
+  limiares configuráveis por clínica no plano Enterprise, recálculo em tempo real a cada tentativa
+  salva, varredura diária para o alerta de "sem coleta", e notificação ao supervisor/profissional
+  vinculado. Início da **Fase 4 — Inteligência Clínica** (Seção 29 do PRD).
+- **Fase 4a (bloco 2) — Timeline Clínica (Seção 29.2, AC-18)**: linha do tempo única por paciente,
+  consolidando atendimentos, ciclo de vida de objetivos (criado/atualizado/excluído/restaurado, com
+  "objetivo dominado" tratado como marco distinto), vínculo/desvínculo de profissional e geração de
+  relatórios — ordenada cronologicamente e sem duplicatas, com link de volta para o registro de
+  origem quando aplicável.
+- **Fase 4a (bloco 3) — Heatmap de Habilidades (Seção 29.3, AC-17)**: novo gráfico em Reports que
+  mostra a intensidade de treino por área (Comunicação, Social, Autonomia, Motor, etc.) nos últimos
+  30 dias corridos, sempre recalculado ao vivo a partir das tentativas reais — sem cache manual e
+  independente dos filtros de período do restante do relatório.
 
 ## Stack (Seção 4 do PRD)
 
@@ -192,13 +207,57 @@ dados).
     atualiza automaticamente o plano/status aqui via webhook — nenhuma mudança de código é
     necessária, só a configuração.
 
+### Fase 4a (bloco 1) — Alertas Clínicos Inteligentes
+
+27. Na página de um paciente, cadastre um objetivo no **Plano de Tratamento** vinculado a um treino da
+    Training Library. Registre pelo menos 3 atendimentos com bom desempenho (a maioria das tentativas
+    corretas) e depois mais 3 atendimentos com desempenho bem pior (a maioria incorreta) para o mesmo
+    treino — ao salvar a última tentativa, um alerta de **Regressão** aparece na página do paciente
+    (queda ≥20 pontos percentuais na média móvel de 3 sessões — Seção 29.1/AC-16).
+28. Registre 5 atendimentos seguidos com percentual de acerto praticamente igual (variação de até 5
+    pontos percentuais) para gerar um alerta de **Estagnação**; ou 3 atendimentos com tentativas
+    sempre marcadas como "Independente" (percentual de independência ≥80%) para gerar um alerta de
+    **Candidato a fading**.
+29. Como administrador, acesse **Configurações** e role até "Alertas Clínicos Inteligentes": os
+    limiares aparecem, mas só ficam editáveis no plano Enterprise (nos demais planos, mostram o padrão
+    de fábrica com uma mensagem explicando a restrição).
+30. Um alerta novo gera uma notificação (sino no cabeçalho) para o administrador, supervisores e
+    profissionais atribuídos ao paciente. Um alerta permanece "ativo" até a condição deixar de ser
+    verdadeira (por exemplo, um atendimento novo resolve o alerta de "sem coleta") — não é preciso
+    apagar ou dispensar manualmente.
+
+### Fase 4a (bloco 2) — Timeline Clínica
+
+31. Na página de um paciente, clique em **Timeline** (ao lado de "Plano de Tratamento" e "Reports").
+    A tela mostra, da mais recente para a mais antiga, todos os eventos já registrados: atendimentos,
+    criação/atualização/exclusão/restauração de objetivos, vínculo e desvínculo de profissional, e
+    geração de relatórios.
+32. Quando um objetivo muda de status para **Dominado**, a timeline mostra um "Marco de evolução"
+    (badge amarelo) em vez do evento genérico de atualização — destacando visualmente o marco clínico
+    em meio às demais edições do plano de tratamento.
+33. Cada evento com um registro de origem correspondente (atendimento, plano de tratamento, relatório)
+    é clicável e leva direto para a tela de origem.
+
+### Fase 4a (bloco 3) — Heatmap de Habilidades
+
+34. Na página de Reports de um paciente, o novo card **Heatmap de habilidades** aparece logo acima
+    dos demais gráficos, mostrando a intensidade de treino por área (categoria do treino) nos
+    últimos 30 dias corridos — sempre esse período fixo, mesmo que você mude os filtros de "De/Até"
+    do restante do relatório.
+35. Registre tentativas em treinos de áreas diferentes (por exemplo, mais tentativas em
+    "Comunicação" do que em "Motor"); a barra de cada área é dimensionada proporcionalmente à área
+    com mais tentativas, com um rótulo relativo (Baixa/Média/Alta/Muito alta) e a contagem exata ao
+    lado.
+36. Ao salvar uma nova tentativa, o heatmap reflete a mudança imediatamente na próxima vez que a
+    página de Reports é carregada — não existe um valor em cache desatualizado.
+
 ### Rodando os testes automatizados do backend
 
 ```bash
 docker compose exec backend pytest -q
 ```
 
-(ou localmente, sem Docker — ver `backend/README.md`). 136 testes cobrem, entre outros:
+(ou localmente, sem Docker — ver `backend/README.md`). 162 testes cobrem, entre outros:
 
 - **AC-01**: conta nova inicia com zero pacientes/sessões/dashboard.
 - **AC-02** / **AC-03**: limite de 3 pacientes e bloqueio de foto no plano Free.
@@ -235,6 +294,23 @@ docker compose exec backend pytest -q
   de assinatura inválida, e a regra "nunca confiar apenas no frontend" (plano pago só concede acesso
   quando a assinatura está de fato ativa/em trial — uma assinatura em atraso ou cancelada volta a
   valer como Free mesmo que o rótulo do plano ainda não tenha sido atualizado).
+- Alertas Clínicos Inteligentes: as 4 regras da Seção 29.1 (AC-15/AC-16 reproduzindo o exemplo exato
+  de queda de 20 pontos percentuais), objetivo dominado nunca gera estagnação, objetivo descontinuado
+  resolve todos os alertas ativos, deduplicação (nunca dois alertas ativos do mesmo tipo para o mesmo
+  objetivo), resolução automática quando a condição deixa de ser verdadeira, notificação ao
+  administrador/supervisor/profissional atribuído, isolamento de tenant, e a exigência de plano
+  Enterprise para configurar os limiares.
+- Timeline Clínica: paciente novo começa com timeline vazia, atendimento e ciclo de vida completo de
+  objetivo (criado/atualizado/excluído/restaurado) aparecem como eventos, "objetivo dominado" é um
+  marco distinto do evento genérico de atualização (o evento genérico correspondente não aparece
+  duplicado), vínculo/desvínculo de profissional e geração de relatório aparecem com o rótulo
+  correto, ordenação cronológica sem duplicatas mesmo com eventos de fontes diferentes na mesma
+  janela de tempo (AC-18), e isolamento de tenant.
+- Heatmap de Habilidades: distribuição real de tentativas por área nos últimos 30 dias (AC-17),
+  rótulo de intensidade relativa correto para cada faixa (baixa/média/alta/muito alta), exclusão de
+  tentativas com mais de 30 dias, recálculo imediato ao salvar uma nova tentativa, e independência
+  total dos filtros de período do restante do relatório (o heatmap nunca muda quando o usuário altera
+  "De/Até", "Treino" ou "Área" dos outros gráficos).
 
 ## O que **não** está nesta fase
 
@@ -243,8 +319,15 @@ docker compose exec backend pytest -q
   (baseado em regras, não em um modelo de linguagem), claramente rotulado como tal, com a mesma
   estrutura de edição/aprovação/versionamento que a IA real usará depois. Quando você definir o
   provedor (Anthropic, OpenAI, etc.) e me passar a chave, trocamos só essa peça.
-- Seguindo o roadmap (Seção 31.1 do PRD): com Stripe implementado, a Fase 3 está completa. Timeline
-  clínica, heatmaps e alertas inteligentes continuam previstos para a **Fase 4**.
+- Seguindo o roadmap (Seção 31.1 do PRD): a Fase 3 está completa. Os dashboards de Supervisor e de
+  Gestor ainda não foram implementados — próximos blocos da Fase 4a. A Fase 4b (sugestões geradas por
+  IA, módulo de avaliações VB-MAPP/ABLLS-R, Biblioteca Inteligente) e a Fase 5 (Family Portal, ML
+  preditivo) continuam para depois.
+- **Timeline Clínica**: a linha do tempo é montada a partir de fontes já existentes (atendimentos,
+  log de auditoria de objetivos/atribuições, resumos de relatório) em vez de um novo modelo dedicado
+  de "evento" — evita duplicar armazenamento e manter tudo sincronizado. Como consequência,
+  avaliações formais (Seção 30, ainda não implementada) e intercorrências/notas livres não aparecem
+  na timeline ainda; entram quando esses módulos existirem.
 - A importação de pacientes usa detecção automática de colunas por alias (cobrindo os cabeçalhos em
   português do próprio exemplo do PRD) em vez de uma UI de remapeamento manual coluna-a-coluna —
   uma simplificação de escopo deliberada, documentada em `csv_import_service.py`.
@@ -266,6 +349,14 @@ docker compose exec backend pytest -q
   manual da chave. A exigência de 2FA para administradores Enterprise já está implementada e
   testável (inclusive com um banner de aviso no app), e agora passa a valer na prática assim que uma
   clínica migrar de fato para o plano Enterprise via Stripe.
+- **Alertas Clínicos Inteligentes**: só disparam para objetivos com pelo menos um treino vinculado
+  (`ObjectiveTraining`) — sem esse vínculo estrutural não há como derivar uma série histórica de
+  tentativas por objetivo. A interpretação adotada para "estagnação dentro de uma faixa de ±5 pontos
+  percentuais" foi variação (máximo − mínimo) ≤ 5pp entre as sessões, já que o PRD formaliza a fórmula
+  exata apenas para regressão (Seção 29.1); a fórmula de regressão em si segue literalmente o texto e
+  o exemplo do PRD (AC-16). O recálculo em tempo real cobre
+  regressão/estagnação/fading a cada tentativa salva; o alerta de "sem coleta" depende
+  necessariamente da varredura diária via Celery, já que não há evento de tentativa para dispará-lo.
 - **Stripe/Planos**: como você ainda não tem uma conta Stripe, não há chaves reais configuradas neste
   ambiente — `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET` e os Price IDs de cada plano continuam
   vazios até você criá-los (veja a seção de configuração acima). Toda a integração (customer,
