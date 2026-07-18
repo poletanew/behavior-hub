@@ -1,5 +1,6 @@
 from app.models.audit_log import AuditLog
 from app.models.clinic import Clinic
+from app.models.clinic_permission_settings import ClinicPermissionSettings
 from app.models.invitation import Invitation
 from app.models.notification import Notification
 from app.models.patient import Patient, PatientAssignment
@@ -14,6 +15,7 @@ from app.models.user import User
 __all__ = [
     "AuditLog",
     "Clinic",
+    "ClinicPermissionSettings",
     "Invitation",
     "Notification",
     "Patient",

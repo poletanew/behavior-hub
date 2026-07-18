@@ -10,7 +10,7 @@ from app.models.enums import AssignmentPermission, PatientStatus, UserType
 from app.models.patient import Patient, PatientAssignment
 from app.models.user import User
 from app.schemas.patient import PatientAssignmentCreateRequest, PatientCreateRequest, PatientUpdateRequest
-from app.services import audit_service
+from app.services import audit_service, rbac_service
 from app.services.plan_service import current_plan
 
 settings = get_settings()
@@ -69,7 +69,11 @@ def count_active_patients(db: Session, user: User) -> int:
 
 
 def create_patient(db: Session, user: User, payload: PatientCreateRequest) -> Patient:
-    """AC-02 — plano Free bloqueia o quarto paciente ativo no backend."""
+    """AC-02 — plano Free bloqueia o quarto paciente ativo no backend.
+    Seção 17.1 — "Cadastrar paciente" é Configurável para profissional/supervisor."""
+    if not rbac_service.can_create_patient(db, user):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized to register patients")
+
     if current_plan(user) == "free":
         active_count = count_active_patients(db, user)
         if active_count >= settings.FREE_PLAN_PATIENT_LIMIT:

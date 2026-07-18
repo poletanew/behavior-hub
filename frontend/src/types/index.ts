@@ -278,3 +278,52 @@ export interface SessionTemplate {
   created_at: string;
   trainings: SessionTemplateTrainingRef[];
 }
+
+export interface ClinicPermissionSettings {
+  professionals_can_create_patients: boolean;
+  supervisors_can_register_sessions: boolean;
+  supervisors_can_edit_any_objective_area: boolean;
+  admins_can_edit_any_objective_area: boolean;
+  supervisors_can_restore_deleted_data: boolean;
+  supervisors_can_generate_invitations: boolean;
+}
+
+export interface AuditLogEntry {
+  id: string;
+  actor_user_id: string | null;
+  actor_name: string | null;
+  action: string;
+  entity_type: string;
+  entity_id: string | null;
+  before: unknown;
+  after: unknown;
+  timestamp: string;
+}
+
+export interface PatientImportRow {
+  row_number: number;
+  name: string | null;
+  birth_date: string | null;
+  guardian_name: string | null;
+  diagnosis: string | null;
+  valid: boolean;
+  error: string | null;
+}
+
+export interface PatientImportPreview {
+  detected_columns: Record<string, string>;
+  missing_required_columns: string[];
+  rows: PatientImportRow[];
+  total_rows: number;
+}
+
+export interface PatientImportRejection {
+  row_number: number;
+  name: string | null;
+  reason: string;
+}
+
+export interface PatientImportCommitResult {
+  imported_count: number;
+  rejected: PatientImportRejection[];
+}

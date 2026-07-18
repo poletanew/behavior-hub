@@ -1,6 +1,6 @@
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
 from sqlalchemy.orm import Session
 
 from app.core.deps import get_current_user
@@ -14,7 +14,8 @@ from app.schemas.patient import (
     PatientResponse,
     PatientUpdateRequest,
 )
-from app.services import patient_service
+from app.schemas.patient_import import PatientImportCommitResponse, PatientImportPreviewResponse
+from app.services import csv_import_service, patient_service, rbac_service
 
 router = APIRouter(prefix="/patients", tags=["patients"])
 
@@ -62,18 +63,43 @@ def delete_patient(
 
 @router.post("/{patient_id}/restore", response_model=PatientResponse)
 def restore_patient(patient_id: uuid.UUID, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
-    """Seção 16.2 — restaurar paciente repoe sessoes, planos e indicadores (AC-11)."""
-    if user.user_type not in (UserType.CLINIC_ADMIN, UserType.INDIVIDUAL):
+    """Seção 16.2/17.1 — restaurar paciente repoe sessoes, planos e indicadores (AC-11);
+    Configurável para supervisor."""
+    if user.user_type not in (UserType.CLINIC_ADMIN, UserType.INDIVIDUAL) and not rbac_service.can_restore_deleted_data(
+        db, user
+    ):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized to restore patients")
     return patient_service.restore_patient(db, user, patient_id)
 
 
 @router.get("/deleted/list", response_model=list[PatientResponse])
 def list_deleted_patients(db: Session = Depends(get_db), user: User = Depends(get_current_user)):
-    """Seção 16.2 — administradores podem ver; profissionais comuns nao acessam a aba."""
-    if user.user_type not in (UserType.CLINIC_ADMIN, UserType.INDIVIDUAL):
+    """Seção 16.2/17.1 — administradores podem ver; supervisor Configurável; demais não acessam a aba."""
+    if user.user_type not in (UserType.CLINIC_ADMIN, UserType.INDIVIDUAL) and not rbac_service.can_restore_deleted_data(
+        db, user
+    ):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized")
     return patient_service.list_deleted_patients(db, user)
+
+
+@router.post("/import/preview", response_model=PatientImportPreviewResponse)
+async def preview_patient_import(
+    file: UploadFile = File(...), db: Session = Depends(get_db), user: User = Depends(get_current_user)
+):
+    """Seção 32.7 — pré-visualização do CSV antes de confirmar a importação."""
+    if not rbac_service.can_create_patient(db, user):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized to import patients")
+    return await csv_import_service.preview_import(file)
+
+
+@router.post("/import/commit", response_model=PatientImportCommitResponse)
+async def commit_patient_import(
+    file: UploadFile = File(...), db: Session = Depends(get_db), user: User = Depends(get_current_user)
+):
+    """Seção 32.7 — importa em lote e retorna relatório de linhas importadas versus rejeitadas."""
+    if not rbac_service.can_create_patient(db, user):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized to import patients")
+    return await csv_import_service.commit_import_from_file(db, user, file)
 
 
 @router.post(

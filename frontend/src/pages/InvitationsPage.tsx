@@ -1,10 +1,11 @@
 import { FormEvent, useEffect, useState } from "react";
-import { apiRequest } from "../api/client";
+import { apiRequest, ApiError } from "../api/client";
 
 interface Invitation {
   id: string;
   email: string;
   specialty: string | null;
+  role: string;
   status: string;
   expires_at: string;
   created_at: string;
@@ -14,9 +15,15 @@ interface InvitationCreated extends Invitation {
   raw_token: string;
 }
 
+const ROLE_LABELS: Record<string, string> = {
+  professional: "Profissional",
+  supervisor: "Supervisor",
+};
+
 export default function InvitationsPage() {
   const [invitations, setInvitations] = useState<Invitation[]>([]);
   const [email, setEmail] = useState("");
+  const [role, setRole] = useState("professional");
   const [lastLink, setLastLink] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -32,14 +39,18 @@ export default function InvitationsPage() {
     try {
       const invitation = await apiRequest<InvitationCreated>("/invitations", {
         method: "POST",
-        body: { email },
+        body: { email, role },
       });
       const link = `${window.location.origin}/invitations/${invitation.raw_token}/accept`;
       setLastLink(link);
       setEmail("");
       load();
-    } catch {
-      setError("Não foi possível gerar o convite.");
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 403) {
+        setError("Você não tem permissão para gerar convites.");
+      } else {
+        setError("Não foi possível gerar o convite.");
+      }
     }
   }
 
@@ -63,6 +74,17 @@ export default function InvitationsPage() {
             className="w-full h-10 rounded-btn border border-slate-300 px-3"
           />
         </div>
+        <div>
+          <label className="block text-sm font-medium mb-1">Papel</label>
+          <select
+            value={role}
+            onChange={(e) => setRole(e.target.value)}
+            className="h-10 rounded-btn border border-slate-300 px-3 text-sm"
+          >
+            <option value="professional">Profissional</option>
+            <option value="supervisor">Supervisor</option>
+          </select>
+        </div>
         <button type="submit" className="h-10 rounded-btn bg-brand-turquoise text-white px-4 text-sm font-medium">
           Gerar convite
         </button>
@@ -79,6 +101,7 @@ export default function InvitationsPage() {
           <thead className="bg-brand-navy text-white">
             <tr>
               <th className="text-left px-4 py-3">E-mail</th>
+              <th className="text-left px-4 py-3">Papel</th>
               <th className="text-left px-4 py-3">Status</th>
               <th className="text-left px-4 py-3">Expira em</th>
               <th className="text-right px-4 py-3">Ações</th>
@@ -88,6 +111,7 @@ export default function InvitationsPage() {
             {invitations.map((inv, idx) => (
               <tr key={inv.id} className={idx % 2 === 1 ? "bg-slate-50" : undefined}>
                 <td className="px-4 py-3">{inv.email}</td>
+                <td className="px-4 py-3">{ROLE_LABELS[inv.role] ?? inv.role}</td>
                 <td className="px-4 py-3 capitalize">{inv.status}</td>
                 <td className="px-4 py-3">{new Date(inv.expires_at).toLocaleDateString("pt-BR")}</td>
                 <td className="px-4 py-3 text-right">
@@ -101,7 +125,7 @@ export default function InvitationsPage() {
             ))}
             {invitations.length === 0 && (
               <tr>
-                <td colSpan={4} className="px-4 py-6 text-center text-neutralState">
+                <td colSpan={5} className="px-4 py-6 text-center text-neutralState">
                   Nenhum convite gerado ainda.
                 </td>
               </tr>

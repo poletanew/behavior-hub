@@ -5,7 +5,7 @@ from sqlalchemy import DateTime, ForeignKey, String
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base import Base, TimestampMixin, UUIDPrimaryKeyMixin
-from app.models.enums import InvitationStatus, Specialty
+from app.models.enums import InvitationStatus, Specialty, UserType
 
 
 class Invitation(Base, UUIDPrimaryKeyMixin, TimestampMixin):
@@ -16,6 +16,8 @@ class Invitation(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     clinic_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("clinics.id"), nullable=False, index=True)
     email: Mapped[str] = mapped_column(String(320), nullable=False)
     specialty: Mapped[Specialty | None] = mapped_column(nullable=True)
+    # Seção 17.1 — permite convidar tanto profissionais quanto supervisores.
+    role: Mapped[UserType] = mapped_column(default=UserType.PROFESSIONAL, nullable=False)
 
     token_hash: Mapped[str] = mapped_column(String(255), unique=True, nullable=False)
     status: Mapped[InvitationStatus] = mapped_column(default=InvitationStatus.PENDING, nullable=False)

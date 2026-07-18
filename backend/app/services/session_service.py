@@ -9,7 +9,7 @@ from app.models.session import ClinicalSession, SessionTraining, Trial
 from app.models.training import Training
 from app.models.user import User
 from app.schemas.session import SessionCreateRequest, TrialCreateRequest, TrialUpdateRequest
-from app.services import audit_service, patient_service
+from app.services import audit_service, patient_service, rbac_service
 from app.services.calculations import accuracy_pct, independence_pct
 from app.services.plan_service import current_plan
 
@@ -21,7 +21,11 @@ def _tenant_scope_filter(user: User):
 
 
 def create_session(db: DbSession, user: User, payload: SessionCreateRequest) -> ClinicalSession:
-    """Seção 11.2 — Novo Atendimento. Garante que o paciente e acessivel ao usuario (AC-14)."""
+    """Seção 11.2 — Novo Atendimento. Garante que o paciente e acessivel ao usuario (AC-14).
+    Seção 17.1 — "Registrar sessão" é Configurável para supervisor."""
+    if not rbac_service.can_register_session(db, user):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized to register sessions")
+
     patient = patient_service.get_patient_or_404(db, user, payload.patient_id)
 
     if payload.photo_url and current_plan(user) == "free":

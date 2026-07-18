@@ -174,16 +174,20 @@ def mock_s3():
 
 
 def invite_and_accept_professional(client, admin_headers: dict, specialty: str = "fonoaudiologo") -> dict:
-    email = unique_email("professional")
+    return invite_and_accept(client, admin_headers, role="professional", specialty=specialty)
+
+
+def invite_and_accept(client, admin_headers: dict, role: str = "professional", specialty: str | None = None) -> dict:
+    email = unique_email(role)
     invite_response = client.post(
-        "/v1/invitations", json={"email": email, "specialty": specialty}, headers=admin_headers
+        "/v1/invitations", json={"email": email, "specialty": specialty, "role": role}, headers=admin_headers
     )
     assert invite_response.status_code == 201, invite_response.text
     raw_token = invite_response.json()["raw_token"]
 
     accept_response = client.post(
         f"/v1/invitations/{raw_token}/accept",
-        json={"name": "Profissional Convidado", "password": "senha-super-segura-123", "accept_terms": True},
+        json={"name": f"Convidado {role}", "password": "senha-super-segura-123", "accept_terms": True},
     )
     assert accept_response.status_code == 201, accept_response.text
     user = accept_response.json()

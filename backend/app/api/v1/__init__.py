@@ -1,6 +1,7 @@
 from fastapi import APIRouter
 
 from app.api.v1 import (
+    audit_logs,
     auth,
     dashboard,
     deleted_data,
@@ -8,6 +9,7 @@ from app.api.v1 import (
     notifications,
     patients,
     professionals,
+    rbac,
     reports,
     resources,
     session_templates,
@@ -30,3 +32,5 @@ api_router.include_router(reports.router)
 api_router.include_router(resources.router)
 api_router.include_router(deleted_data.router)
 api_router.include_router(notifications.router)
+api_router.include_router(rbac.router)
+api_router.include_router(audit_logs.router)

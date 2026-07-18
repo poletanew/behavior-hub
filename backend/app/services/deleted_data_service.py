@@ -10,14 +10,16 @@ from app.models.patient import Patient
 from app.models.resource import Resource
 from app.models.treatment_plan import Objective, TreatmentPlan
 from app.models.user import User
-from app.services import patient_service, resource_service, treatment_plan_service
+from app.services import patient_service, rbac_service, resource_service, treatment_plan_service
 
 settings = get_settings()
 
 
-def _require_admin(user: User) -> None:
-    """Seção 16.2 — administradores podem ver e restaurar; profissionais comuns não acessam a aba."""
-    if user.user_type not in (UserType.CLINIC_ADMIN, UserType.INDIVIDUAL):
+def _require_admin(db: Session, user: User) -> None:
+    """Seção 16.2/17.1 — administradores e individuais sempre podem; supervisor é Configurável."""
+    if user.user_type in (UserType.CLINIC_ADMIN, UserType.INDIVIDUAL):
+        return
+    if not rbac_service.can_restore_deleted_data(db, user):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized to access Deleted Data")
 
 
@@ -29,7 +31,7 @@ def _days_remaining(deleted_at: datetime.datetime) -> int:
 
 def list_deleted_items(db: Session, user: User) -> list[dict]:
     """Seção 16 — visão unificada de Dados Excluídos por tenant, com contagem regressiva de 60 dias."""
-    _require_admin(user)
+    _require_admin(db, user)
     items: list[dict] = []
 
     for patient in patient_service.list_deleted_patients(db, user):
@@ -85,7 +87,7 @@ def list_deleted_items(db: Session, user: User) -> list[dict]:
 
 
 def restore_item(db: Session, user: User, entity_type: str, item_id: uuid.UUID):
-    _require_admin(user)
+    _require_admin(db, user)
     if entity_type == "patient":
         return patient_service.restore_patient(db, user, item_id)
     if entity_type == "objective":

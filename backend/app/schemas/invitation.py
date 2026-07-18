@@ -3,18 +3,22 @@ import uuid
 
 from pydantic import BaseModel, EmailStr
 
-from app.models.enums import InvitationStatus, Specialty
+from app.models.enums import InvitationStatus, Specialty, UserType
+
+INVITABLE_ROLES = (UserType.PROFESSIONAL, UserType.SUPERVISOR)
 
 
 class InvitationCreateRequest(BaseModel):
     email: EmailStr
     specialty: Specialty | None = None
+    role: UserType = UserType.PROFESSIONAL
 
 
 class InvitationResponse(BaseModel):
     id: uuid.UUID
     email: str
     specialty: Specialty | None
+    role: UserType
     status: InvitationStatus
     expires_at: datetime.datetime
     created_at: datetime.datetime

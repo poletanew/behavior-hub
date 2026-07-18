@@ -1,4 +1,4 @@
-# Behavior Hub — Backend (Fase 1 + Fase 2)
+# Behavior Hub — Backend (Fase 1 + Fase 2 + Fase 3 núcleo)
 
 FastAPI + SQLAlchemy + Alembic + PostgreSQL. Ver o [README raiz](../README.md) para como subir o
 ambiente completo com Docker Compose.
@@ -68,6 +68,29 @@ existente, iniciar uma sessão a partir de um modelo, e duplicar a sessão anter
 Alertas clínicos (Seção 29.9) e faturas (Seção 8) ainda não existem no produto, então não alimentam
 a Central de Notificações nesta fase — apenas comentários e menções, que são as únicas fontes reais
 disponíveis hoje.
+
+## Nota sobre RBAC configurável, Auditoria e Importação de Pacientes (Fase 3 núcleo — Seção 17.1/32.7)
+
+`app/services/rbac_service.py` centraliza as checagens de permissão "Configurável" da tabela da
+Seção 17.1: cada clínica tem um `ClinicPermissionSettings` (criado sob demanda, com valores padrão
+conservadores — desabilitado, exceto nas células em que a própria tabela do PRD já é permissiva por
+padrão) e cada serviço (`patient_service`, `session_service`, `treatment_plan_service`,
+`deleted_data_service`, `resource_service`, `auth_service`) consulta essa função em vez de checar
+`user_type` diretamente. Convites agora carregam um `role` (`professional` ou `supervisor`),
+validado contra `INVITABLE_ROLES` e contra a permissão de quem está convidando.
+
+`app/services/audit_log_service.py` expõe o log já registrado pelo `AuditLog`/`audit_service`
+existente desde a Fase 1, escopado por tenant via o `clinic_id` do autor da ação — restrito a
+administradores de clínica e contas individuais (Seção 17/21). Limitação conhecida: ações de sistema
+sem ator (ex.: a purga automática da Seção 16.2) não aparecem nesta consulta, pois não há um usuário
+do qual derivar o tenant.
+
+`app/services/csv_import_service.py` faz a importação em lote de pacientes (Seção 32.7) com detecção
+automática de colunas por alias comum em português/inglês (`nome`, `data de nascimento`,
+`responsável`, `diagnóstico`, etc.) em vez de uma UI de remapeamento manual coluna-a-coluna — uma
+simplificação de escopo deliberada, já que os aliases cobrem o próprio exemplo de cabeçalho do PRD.
+Linhas com nome ou data de nascimento ausente/inválida são rejeitadas individualmente (o restante do
+arquivo é importado normalmente) e reportadas com o motivo da rejeição.
 
 ## Estrutura
 

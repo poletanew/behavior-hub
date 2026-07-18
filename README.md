@@ -11,6 +11,11 @@ Este repositório está sendo construído **por fases**, seguindo o roadmap da S
   editável, Recursos Terapêuticos, Dados Excluídos (visão unificada com restauração), Central de
   Notificações, Templates de Sessão/duplicar atendimento e Modo Offline de coleta (Seção 32.4/32.5/32.6
   — fechando o restante do escopo da Fase 2).
+- **Fase 3 (núcleo) — RBAC configurável, Auditoria e Importação de Pacientes**: permissões
+  configuráveis por clínica para profissionais/supervisores (Seção 17.1), papel de Supervisor nos
+  convites, log de auditoria (visão de administrador, escopada por tenant) e importação em lote de
+  pacientes via CSV. Stripe/planos pagos, Agenda/Scheduling e 2FA ficam para a próxima etapa da
+  Fase 3 (você escolheu "núcleo primeiro").
 
 ## Stack (Seção 4 do PRD)
 
@@ -101,13 +106,33 @@ dados).
     automaticamente e passa a aparecer como uma tentativa normal (numerada), sem precisar recarregar
     manualmente nem duplicar o registro.
 
+### Fase 3 (núcleo) — RBAC configurável, Auditoria e Importação de Pacientes
+
+14. Como administrador, acesse **Configurações**: ative/desative os toggles de permissão (Seção
+    17.1 — ex.: "Profissionais podem cadastrar pacientes", "Supervisores podem editar objetivos de
+    qualquer área"). Os padrões começam conservadores (desabilitados), exceto onde a própria tabela
+    do PRD já é permissiva. Convide um profissional em **Profissionais** e confirme que, sem o toggle
+    ligado, ele recebe erro ao tentar cadastrar um paciente — e que passa a conseguir depois de você
+    habilitar a opção.
+15. Em **Profissionais**, gere um convite escolhendo o papel **Supervisor** (além de Profissional).
+    Aceite o convite em outra aba/navegador anônimo e confirme que a conta criada já nasce com o
+    papel correto.
+16. Acesse **Auditoria** (administrador ou conta individual): veja o histórico de ações relevantes
+    da sua clínica (cadastro de paciente, convites, mudança de permissões etc.), com filtro por tipo
+    de entidade e período. Confirme que uma segunda clínica/conta não vê nenhuma entrada da primeira.
+17. Em **Importar Pacientes**, envie um CSV com colunas em português (`nome`, `data de nascimento`,
+    `responsável`, `diagnóstico`) — as colunas são detectadas automaticamente. Use
+    **Pré-visualizar** para ver quais linhas são válidas e quais têm erro (nome ou data ausente/
+    inválida) antes de **Confirmar importação**; o relatório final mostra quantos pacientes foram
+    importados e o motivo de cada linha rejeitada.
+
 ### Rodando os testes automatizados do backend
 
 ```bash
 docker compose exec backend pytest -q
 ```
 
-(ou localmente, sem Docker — ver `backend/README.md`). 78 testes cobrem, entre outros:
+(ou localmente, sem Docker — ver `backend/README.md`). 99 testes cobrem, entre outros:
 
 - **AC-01**: conta nova inicia com zero pacientes/sessões/dashboard.
 - **AC-02** / **AC-03**: limite de 3 pacientes e bloqueio de foto no plano Free.
@@ -126,6 +151,9 @@ docker compose exec backend pytest -q
 - Notificações por comentário/menção (incluindo isolamento de tenant — mencionar alguém de outra
   clínica nunca cria notificação cruzada) e Templates de Sessão (incluindo a regra de que um template
   específico de um paciente não pode ser usado para outro).
+- Permissões "Configurável" da Seção 17.1 com valores padrão conservadores e liberação explícita por
+  toggle, papel de Supervisor nos convites, log de auditoria escopado por tenant e importação de
+  pacientes via CSV (linhas válidas x rejeitadas, detecção automática de colunas em português).
 
 ## O que **não** está nesta fase
 
@@ -134,9 +162,13 @@ docker compose exec backend pytest -q
   (baseado em regras, não em um modelo de linguagem), claramente rotulado como tal, com a mesma
   estrutura de edição/aprovação/versionamento que a IA real usará depois. Quando você definir o
   provedor (Anthropic, OpenAI, etc.) e me passar a chave, trocamos só essa peça.
-- Seguindo o roadmap (Seção 31.1 do PRD): RBAC completo, Stripe/planos pagos, Agenda/Scheduling e
-  importação em lote de pacientes ficam para a **Fase 3**; Timeline clínica, heatmaps e alertas
-  inteligentes para a **Fase 4**.
+- Seguindo o roadmap (Seção 31.1 do PRD), dentro da própria Fase 3: Stripe/planos pagos,
+  Agenda/Scheduling e 2FA ainda não foram implementados (você escolheu fechar primeiro o núcleo de
+  RBAC configurável + Auditoria + Importação de Pacientes). Timeline clínica, heatmaps e alertas
+  inteligentes continuam previstos para a **Fase 4**.
+- A importação de pacientes usa detecção automática de colunas por alias (cobrindo os cabeçalhos em
+  português do próprio exemplo do PRD) em vez de uma UI de remapeamento manual coluna-a-coluna —
+  uma simplificação de escopo deliberada, documentada em `csv_import_service.py`.
 
 Consulte `backend/README.md` para observações sobre a curadoria da Training Library e o limite de
 tamanho de arquivo dos Recursos Terapêuticos (Seção 34 — pendente de confirmação do PO).

@@ -15,6 +15,9 @@ import TreatmentPlanPage from "./pages/TreatmentPlanPage";
 import ReportsPage from "./pages/ReportsPage";
 import ResourcesPage from "./pages/ResourcesPage";
 import DeletedDataPage from "./pages/DeletedDataPage";
+import ClinicSettingsPage from "./pages/ClinicSettingsPage";
+import AuditLogPage from "./pages/AuditLogPage";
+import PatientImportPage from "./pages/PatientImportPage";
 
 export default function App() {
   return (
@@ -41,6 +44,9 @@ export default function App() {
         <Route path="/resources" element={<ResourcesPage />} />
         <Route path="/deleted-data" element={<DeletedDataPage />} />
         <Route path="/invitations" element={<InvitationsPage />} />
+        <Route path="/clinic-settings" element={<ClinicSettingsPage />} />
+        <Route path="/audit-log" element={<AuditLogPage />} />
+        <Route path="/patients/import" element={<PatientImportPage />} />
       </Route>
 
       <Route path="/" element={<Navigate to="/dashboard" replace />} />

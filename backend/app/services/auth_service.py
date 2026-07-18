@@ -140,29 +140,39 @@ def refresh_access_token(db: Session, refresh_token: str) -> tuple[str, str]:
     return issue_tokens(user)
 
 
-def create_invitation(db: Session, clinic_admin: User, payload: InvitationCreateRequest) -> tuple[Invitation, str]:
-    """Seção 7.1 — gerar link unico com token criptograficamente seguro, expiracao padrao 7 dias."""
+def create_invitation(db: Session, inviter: User, payload: InvitationCreateRequest) -> tuple[Invitation, str]:
+    """Seção 7.1 — gerar link unico com token criptograficamente seguro, expiracao padrao 7 dias.
+    Seção 17.1 — "Gerar convite" é Sim para admin e Configurável para supervisor."""
+    from app.schemas.invitation import INVITABLE_ROLES
+    from app.services import rbac_service
+
+    if payload.role not in INVITABLE_ROLES:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid role for invitation")
+    if not rbac_service.can_generate_invitation(db, inviter):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized to generate invitations")
+
     raw_token, token_hash = generate_invitation_token()
     expires_at = datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(
         days=INVITATION_EXPIRATION_DAYS
     )
     invitation = Invitation(
-        clinic_id=clinic_admin.clinic_id,
+        clinic_id=inviter.clinic_id,
         email=payload.email.lower(),
         specialty=payload.specialty,
+        role=payload.role,
         token_hash=token_hash,
         expires_at=expires_at,
-        created_by_user_id=clinic_admin.id,
+        created_by_user_id=inviter.id,
     )
     db.add(invitation)
     db.flush()
     audit_service.record(
         db,
-        actor_user_id=clinic_admin.id,
+        actor_user_id=inviter.id,
         action="invitation_created",
         entity_type="invitation",
         entity_id=invitation.id,
-        after={"email": invitation.email},
+        after={"email": invitation.email, "role": invitation.role.value},
     )
     db.commit()
     db.refresh(invitation)
@@ -217,7 +227,7 @@ def accept_invitation(db: Session, raw_token: str, payload: InvitationAcceptRequ
         email=invitation.email,
         password_hash=hash_password(payload.password),
         name=payload.name,
-        user_type=UserType.PROFESSIONAL,
+        user_type=invitation.role,
         specialty=invitation.specialty,
         status=UserStatus.ACTIVE,
         clinic_id=invitation.clinic_id,

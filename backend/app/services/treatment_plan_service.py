@@ -19,7 +19,7 @@ from app.models.training import Training
 from app.models.treatment_plan import Objective, ObjectiveComment, ObjectiveTraining, TreatmentPlan
 from app.models.user import User
 from app.schemas.treatment_plan import ObjectiveCreateRequest, ObjectiveUpdateRequest
-from app.services import audit_service, notification_service, patient_service
+from app.services import audit_service, notification_service, patient_service, rbac_service
 
 DUPLICATE_SIMILARITY_THRESHOLD = 0.35
 
@@ -48,12 +48,13 @@ def _assignment_for(db: Session, patient: Patient, user: User) -> PatientAssignm
 
 
 def can_edit_area(db: Session, user: User, patient: Patient, area: TreatmentArea) -> bool:
-    """Seção 13.3 — cada profissional edita objetivos da própria área ou aqueles
-    para os quais recebeu permissão (aqui: vínculo FULL_ACCESS)."""
-    if user.user_type in (UserType.CLINIC_ADMIN, UserType.INDIVIDUAL):
+    """Seção 13.3/17.1 — cada profissional edita objetivos da própria área ou aqueles
+    para os quais recebeu permissão (aqui: vínculo FULL_ACCESS). "Editar objetivo de
+    outra área" é Configurável para admin de clínica e supervisor."""
+    if user.user_type == UserType.INDIVIDUAL:
         return True
-    if user.user_type == UserType.SUPERVISOR:
-        return False  # Seção 13.3 — supervisor revisa e comenta; edição fica desabilitada por padrão.
+    if user.user_type in (UserType.CLINIC_ADMIN, UserType.SUPERVISOR):
+        return rbac_service.can_edit_any_objective_area(db, user)
 
     assignment = _assignment_for(db, patient, user)
     if assignment is None:
@@ -269,7 +270,9 @@ def restore_objective(db: Session, user: User, objective_id: uuid.UUID) -> Objec
     plan = db.get(TreatmentPlan, objective.plan_id)
     patient = patient_service.get_patient_or_404(db, user, plan.patient_id, include_deleted=True)
 
-    if user.user_type not in (UserType.CLINIC_ADMIN, UserType.INDIVIDUAL):
+    if user.user_type not in (UserType.CLINIC_ADMIN, UserType.INDIVIDUAL) and not rbac_service.can_restore_deleted_data(
+        db, user
+    ):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized to restore objectives")
 
     objective.deleted_at = None

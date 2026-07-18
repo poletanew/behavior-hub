@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 from app.models.enums import ResourceType, ResourceVisibility, UserType
 from app.models.resource import Resource
 from app.models.user import User
-from app.services import audit_service, file_service
+from app.services import audit_service, file_service, rbac_service
 
 # Seção 34 — "regras de armazenamento e tamanho de arquivos" fica marcada como
 # pendente de confirmação do Product Owner; usamos um padrão conservador de
@@ -158,7 +158,9 @@ def restore_resource(db: Session, user: User, resource_id: uuid.UUID) -> Resourc
     resource = get_resource_or_404(db, user, resource_id, include_deleted=True)
     if resource.deleted_at is None:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Resource is not deleted")
-    if user.user_type not in (UserType.CLINIC_ADMIN, UserType.INDIVIDUAL):
+    if user.user_type not in (UserType.CLINIC_ADMIN, UserType.INDIVIDUAL) and not rbac_service.can_restore_deleted_data(
+        db, user
+    ):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized to restore resources")
 
     resource.deleted_at = None

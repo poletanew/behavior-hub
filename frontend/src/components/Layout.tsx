@@ -13,6 +13,8 @@ const navItems = [
 export default function Layout() {
   const { user, logout } = useAuth();
   const isAdmin = user?.user_type === "clinic_admin" || user?.user_type === "individual";
+  const canSeeClinicSettings = user?.user_type === "clinic_admin" || user?.user_type === "supervisor";
+  const canSeeAuditLog = user?.user_type === "clinic_admin" || user?.user_type === "individual";
 
   return (
     <div className="flex min-h-screen">
@@ -59,6 +61,40 @@ export default function Layout() {
               }
             >
               Dados Excluídos
+            </NavLink>
+          )}
+          <NavLink
+            to="/patients/import"
+            className={({ isActive }) =>
+              `block rounded-btn px-3 py-2 text-sm font-medium transition-colors ${
+                isActive ? "bg-brand-turquoise text-white" : "text-slate-200 hover:bg-white/10"
+              }`
+            }
+          >
+            Importar Pacientes
+          </NavLink>
+          {canSeeAuditLog && (
+            <NavLink
+              to="/audit-log"
+              className={({ isActive }) =>
+                `block rounded-btn px-3 py-2 text-sm font-medium transition-colors ${
+                  isActive ? "bg-brand-turquoise text-white" : "text-slate-200 hover:bg-white/10"
+                }`
+              }
+            >
+              Auditoria
+            </NavLink>
+          )}
+          {canSeeClinicSettings && (
+            <NavLink
+              to="/clinic-settings"
+              className={({ isActive }) =>
+                `block rounded-btn px-3 py-2 text-sm font-medium transition-colors ${
+                  isActive ? "bg-brand-turquoise text-white" : "text-slate-200 hover:bg-white/10"
+                }`
+              }
+            >
+              Configurações
             </NavLink>
           )}
         </nav>
