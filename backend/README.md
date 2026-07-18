@@ -224,6 +224,25 @@ mesmo timestamp. Avaliações formais (Seção 30) e intercorrências/notas livr
 modelo próprio no sistema, então não aparecem na timeline por enquanto; entram quando esses módulos
 forem implementados (Fase 4b/5).
 
+## Nota sobre Heatmap de Habilidades (Fase 4a bloco 3 — Seção 29.3/AC-17)
+
+`build_heatmap_data` (em `app/services/report_service.py`) reutiliza o mesmo conceito de "área" já
+usado pelo radar (`build_radar_data`): a categoria do treino (`TrainingCategory.name`), não o campo
+`area` (enum `TreatmentArea`) do `Objective` — mantendo os dois gráficos de "área" do relatório
+consistentes entre si. O PRD (Seção 27.2) propõe uma tabela `SkillHeatmapCache` recalculada de forma
+assíncrona via Celery; optamos por calcular ao vivo a cada requisição (mesmo padrão já usado pelos
+outros 6 gráficos de Reports) em vez de introduzir cache e uma tarefa assíncrona dedicada — o volume
+de tentativas por paciente em 30 dias é pequeno o bastante para isso ser instantâneo, e evita
+mais uma fonte de dado potencialmente desatualizada. Se o volume de dados crescer a ponto de a
+consulta ficar lenta, a mesma função pode ser adaptada para ler de um cache sem mudar o contrato da
+API.
+
+Diferente dos demais gráficos de Reports, a janela do heatmap é sempre "hoje menos 30 dias corridos"
+— fixa por definição do AC-17 — e ignora deliberadamente os filtros de `date_from`/`date_to`/
+`training_id`/`category_id`/`professional_id` que o usuário aplica ao restante do relatório
+(`get_report_data` busca as linhas do heatmap com sua própria chamada a `_fetch_rows`, independente
+da consulta filtrada usada pelos outros gráficos).
+
 ## Estrutura
 
 - `app/models/` — entidades SQLAlchemy (Seção 18/27 do PRD).

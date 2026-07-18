@@ -39,6 +39,10 @@ Este repositório está sendo construído **por fases**, seguindo o roadmap da S
   "objetivo dominado" tratado como marco distinto), vínculo/desvínculo de profissional e geração de
   relatórios — ordenada cronologicamente e sem duplicatas, com link de volta para o registro de
   origem quando aplicável.
+- **Fase 4a (bloco 3) — Heatmap de Habilidades (Seção 29.3, AC-17)**: novo gráfico em Reports que
+  mostra a intensidade de treino por área (Comunicação, Social, Autonomia, Motor, etc.) nos últimos
+  30 dias corridos, sempre recalculado ao vivo a partir das tentativas reais — sem cache manual e
+  independente dos filtros de período do restante do relatório.
 
 ## Stack (Seção 4 do PRD)
 
@@ -234,13 +238,26 @@ dados).
 33. Cada evento com um registro de origem correspondente (atendimento, plano de tratamento, relatório)
     é clicável e leva direto para a tela de origem.
 
+### Fase 4a (bloco 3) — Heatmap de Habilidades
+
+34. Na página de Reports de um paciente, o novo card **Heatmap de habilidades** aparece logo acima
+    dos demais gráficos, mostrando a intensidade de treino por área (categoria do treino) nos
+    últimos 30 dias corridos — sempre esse período fixo, mesmo que você mude os filtros de "De/Até"
+    do restante do relatório.
+35. Registre tentativas em treinos de áreas diferentes (por exemplo, mais tentativas em
+    "Comunicação" do que em "Motor"); a barra de cada área é dimensionada proporcionalmente à área
+    com mais tentativas, com um rótulo relativo (Baixa/Média/Alta/Muito alta) e a contagem exata ao
+    lado.
+36. Ao salvar uma nova tentativa, o heatmap reflete a mudança imediatamente na próxima vez que a
+    página de Reports é carregada — não existe um valor em cache desatualizado.
+
 ### Rodando os testes automatizados do backend
 
 ```bash
 docker compose exec backend pytest -q
 ```
 
-(ou localmente, sem Docker — ver `backend/README.md`). 157 testes cobrem, entre outros:
+(ou localmente, sem Docker — ver `backend/README.md`). 162 testes cobrem, entre outros:
 
 - **AC-01**: conta nova inicia com zero pacientes/sessões/dashboard.
 - **AC-02** / **AC-03**: limite de 3 pacientes e bloqueio de foto no plano Free.
@@ -289,6 +306,11 @@ docker compose exec backend pytest -q
   duplicado), vínculo/desvínculo de profissional e geração de relatório aparecem com o rótulo
   correto, ordenação cronológica sem duplicatas mesmo com eventos de fontes diferentes na mesma
   janela de tempo (AC-18), e isolamento de tenant.
+- Heatmap de Habilidades: distribuição real de tentativas por área nos últimos 30 dias (AC-17),
+  rótulo de intensidade relativa correto para cada faixa (baixa/média/alta/muito alta), exclusão de
+  tentativas com mais de 30 dias, recálculo imediato ao salvar uma nova tentativa, e independência
+  total dos filtros de período do restante do relatório (o heatmap nunca muda quando o usuário altera
+  "De/Até", "Treino" ou "Área" dos outros gráficos).
 
 ## O que **não** está nesta fase
 
@@ -297,10 +319,10 @@ docker compose exec backend pytest -q
   (baseado em regras, não em um modelo de linguagem), claramente rotulado como tal, com a mesma
   estrutura de edição/aprovação/versionamento que a IA real usará depois. Quando você definir o
   provedor (Anthropic, OpenAI, etc.) e me passar a chave, trocamos só essa peça.
-- Seguindo o roadmap (Seção 31.1 do PRD): a Fase 3 está completa. Heatmaps de habilidades e os
-  dashboards de Supervisor/Gestor ainda não foram implementados — próximos blocos da Fase 4a. A
-  Fase 4b (sugestões geradas por IA, módulo de avaliações VB-MAPP/ABLLS-R, Biblioteca Inteligente) e
-  a Fase 5 (Family Portal, ML preditivo) continuam para depois.
+- Seguindo o roadmap (Seção 31.1 do PRD): a Fase 3 está completa. Os dashboards de Supervisor e de
+  Gestor ainda não foram implementados — próximos blocos da Fase 4a. A Fase 4b (sugestões geradas por
+  IA, módulo de avaliações VB-MAPP/ABLLS-R, Biblioteca Inteligente) e a Fase 5 (Family Portal, ML
+  preditivo) continuam para depois.
 - **Timeline Clínica**: a linha do tempo é montada a partir de fontes já existentes (atendimentos,
   log de auditoria de objetivos/atribuições, resumos de relatório) em vez de um novo modelo dedicado
   de "evento" — evita duplicar armazenamento e manter tudo sincronizado. Como consequência,

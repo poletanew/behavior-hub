@@ -190,6 +190,15 @@ export interface CumulativePoint {
   cumulative_independence_pct: number | null;
 }
 
+export type HeatmapIntensity = "baixa" | "media" | "alta" | "muito_alta";
+
+export interface HeatmapAreaPoint {
+  area: string;
+  trial_count: number;
+  intensity_pct: number;
+  intensity_label: HeatmapIntensity;
+}
+
 export interface ReportData {
   patient_id: string;
   period_start: string | null;
@@ -201,6 +210,7 @@ export interface ReportData {
   pie: PieData;
   radar: RadarPoint[];
   cumulative: CumulativePoint[];
+  heatmap: HeatmapAreaPoint[];
   comparison: {
     available: boolean;
     message?: string | null;

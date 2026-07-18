@@ -23,6 +23,18 @@ import { apiDownload, apiRequest } from "../api/client";
 import { Patient, ReportData, ReportSummary, Training, TrainingCategory } from "../types";
 
 const CHART_COLORS = ["#3B82F6", "#14B8A6", "#22C55E", "#84CC16", "#8B5CF6", "#334155"];
+const INTENSITY_LABELS: Record<string, string> = {
+  baixa: "Baixa",
+  media: "Média",
+  alta: "Alta",
+  muito_alta: "Muito alta",
+};
+const INTENSITY_BAR_COLORS: Record<string, string> = {
+  baixa: "bg-slate-300",
+  media: "bg-brand-blueLight",
+  alta: "bg-brand-turquoise",
+  muito_alta: "bg-brand-navy",
+};
 const PROMPT_LABELS: Record<string, string> = {
   independent: "Independente",
   gestural: "Ajuda gestual",
@@ -218,6 +230,36 @@ export default function ReportsPage() {
           <button onClick={generateSummary} className="rounded-btn bg-brand-turquoise text-white px-4 py-2 text-sm font-medium">
             Gerar resumo do período
           </button>
+        )}
+      </div>
+
+      <div className="bg-white rounded-card shadow-sm p-6 mb-6">
+        <h3 className="font-semibold text-brand-navy mb-1">Heatmap de habilidades</h3>
+        <p className="text-xs text-neutralState mb-4">
+          Intensidade de treino por área nos últimos 30 dias (Seção 29.3) — sempre considera os últimos 30 dias
+          corridos, independente dos filtros de período acima.
+        </p>
+        {data.heatmap.length === 0 ? (
+          <p className="text-sm text-neutralState">Nenhuma tentativa registrada nos últimos 30 dias.</p>
+        ) : (
+          <div className="space-y-2">
+            {data.heatmap.map((point) => (
+              <div key={point.area} className="flex items-center gap-3">
+                <span className="w-32 shrink-0 text-sm truncate" title={point.area}>
+                  {point.area}
+                </span>
+                <div className="flex-1 h-4 rounded-full bg-slate-100 overflow-hidden">
+                  <div
+                    className={`h-full rounded-full ${INTENSITY_BAR_COLORS[point.intensity_label] ?? "bg-slate-300"}`}
+                    style={{ width: `${point.intensity_pct}%` }}
+                  />
+                </div>
+                <span className="w-24 shrink-0 text-xs text-neutralState text-right">
+                  {INTENSITY_LABELS[point.intensity_label] ?? point.intensity_label} ({point.trial_count})
+                </span>
+              </div>
+            ))}
+          </div>
         )}
       </div>
 
