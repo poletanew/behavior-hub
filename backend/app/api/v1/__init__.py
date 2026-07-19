@@ -17,6 +17,7 @@ from app.api.v1 import (
     professionals,
     rbac,
     reports,
+    resource_links,
     resources,
     session_templates,
     sessions,
@@ -45,6 +46,7 @@ api_router.include_router(dashboard.router)
 api_router.include_router(treatment_plans.router)
 api_router.include_router(reports.router)
 api_router.include_router(resources.router)
+api_router.include_router(resource_links.router)
 api_router.include_router(deleted_data.router)
 api_router.include_router(notifications.router)
 api_router.include_router(rbac.router)

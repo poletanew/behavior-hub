@@ -67,6 +67,13 @@ Este repositório está sendo construído **por fases**, seguindo o roadmap da S
   protocolo com ganho absoluto/percentual por domínio, avaliações agora aparecem na Timeline Clínica
   e em Dados Excluídos (soft delete/restauração), texto interpretativo da comparação gerado por
   regra (não IA real — mesma nota de escopo do bloco anterior).
+- **Fase 4b (bloco 3) — Biblioteca Inteligente (Seção 29.7)**: `ResourceLink`, o vínculo estruturado
+  recurso↔treino e recurso↔objetivo que a Seção 29.7 marcava como dependência bloqueante — agora
+  implementado. Populado manualmente (tagueamento) pelo profissional, com uma pontuação de
+  relevância (1–5), a partir da Training Library (vincular a um treino) ou do Plano de Tratamento
+  (vincular a um objetivo). Ao abrir um objetivo, os recursos recomendados agregam os vínculos
+  diretos do objetivo com os vínculos dos treinos que ele usa — **fecha o roadmap da Fase 4b —
+  Inteligência Clínica avançada**.
 
 ## Stack (Seção 4 do PRD)
 
@@ -343,13 +350,28 @@ dados).
     VB-MAPP aplicada") e pode ser excluída/restaurada por **Dados Excluídos**, como qualquer outro
     dado clínico do produto.
 
+### Fase 4b (bloco 3) — Biblioteca Inteligente
+
+52. Na **Training Library**, selecione um treino: um novo card "Recursos vinculados" aparece no
+    painel de detalhes, com um seletor para vincular qualquer Recurso Terapêutico já cadastrado a
+    esse treino, com uma nota de relevância de 1 a 5.
+53. No **Plano de Tratamento**, abra "Ver detalhes" em um objetivo: o card "Recursos recomendados"
+    mostra os recursos vinculados diretamente a esse objetivo **e** os recursos vinculados a
+    qualquer treino que o objetivo usa — por exemplo, um recurso vinculado ao treino "Tolerância à
+    espera" aparece automaticamente recomendado em qualquer objetivo que use esse treino, marcado
+    como "(via treino)".
+54. A pontuação de relevância é sempre definida manualmente pelo profissional ao vincular — não há
+    inferência automática por IA (a Seção 29.7 do PRD já previa isso: "não há dado histórico
+    suficiente para a IA inferir a relação sozinha no lançamento"). Clicar em **Remover** desfaz o
+    vínculo a qualquer momento.
+
 ### Rodando os testes automatizados do backend
 
 ```bash
 docker compose exec backend pytest -q
 ```
 
-(ou localmente, sem Docker — ver `backend/README.md`). 198 testes cobrem, entre outros:
+(ou localmente, sem Docker — ver `backend/README.md`). 207 testes cobrem, entre outros:
 
 - **AC-01**: conta nova inicia com zero pacientes/sessões/dashboard.
 - **AC-02** / **AC-03**: limite de 3 pacientes e bloqueio de foto no plano Free.
@@ -427,6 +449,12 @@ docker compose exec backend pytest -q
   data (Seção 27.3), comparação entre duas aplicações produz ganho absoluto e percentual corretos
   por domínio usando `normalized_pct` (AC-19), exigência de pelo menos duas avaliações para comparar,
   soft delete/restauração via Dados Excluídos, presença na Timeline Clínica, e isolamento de tenant.
+- Biblioteca Inteligente: vínculo recurso↔treino e recurso↔objetivo criado e listado corretamente,
+  recomendação do objetivo agrega vínculos diretos com vínculos dos treinos vinculados (sem exigir
+  vínculo direto), bloqueio de vínculo duplicado, exigência de exatamente um alvo (treino OU
+  objetivo, nunca os dois nem nenhum), limite de pontuação de relevância (1–5), permissão de remoção
+  restrita ao autor do vínculo ou administrador, recurso privado de outro profissional nunca aparece
+  na recomendação (mesma regra de visibilidade da Biblioteca de Recursos), e isolamento de tenant.
 
 ## O que **não** está nesta fase
 
@@ -435,10 +463,16 @@ docker compose exec backend pytest -q
   (baseado em regras, não em um modelo de linguagem), claramente rotulado como tal, com a mesma
   estrutura de edição/aprovação/versionamento que a IA real usará depois. Quando você definir o
   provedor (Anthropic, OpenAI, etc.) e me passar a chave, trocamos só essa peça.
-- Seguindo o roadmap (Seção 31.1 do PRD): **a Fase 4a — Inteligência Clínica básica está completa**
-  (Fase 1, 2 e 3 também). Dentro da Fase 4b, a Biblioteca Inteligente ainda não foi implementada
-  (depende do `ResourceLink`, Seção 29.7) — próximo bloco. A Fase 5 (Family Portal, ondas seguintes
-  de protocolos de avaliação, ML preditivo) continua para depois.
+- Seguindo o roadmap (Seção 31.1 do PRD): **a Fase 4a e a Fase 4b — Inteligência Clínica completa —
+  estão concluídas** (Fase 1, 2 e 3 também). A Fase 5 (Family Portal, ondas seguintes de protocolos
+  de avaliação, white-label, faturamento por sessão, waitlist, ML preditivo) é o que resta do
+  roadmap.
+- **Biblioteca Inteligente**: a "recomendação automática" da Seção 29.7 é, nesta fase, um vínculo
+  manual (tagueamento) com pontuação de relevância definida pelo profissional — o próprio PRD já
+  antecipava isso ("não há dado histórico suficiente para a IA inferir a relação sozinha no
+  lançamento"). Não há ranking por IA real nem sugestão automática de quais recursos vincular; isso
+  fica para quando houver volume de dados suficiente (Seção 29.10, Machine Learning, visão de
+  futuro) ou um provedor de IA definido.
 - **Sugestões Clínicas (Fase 4b bloco 1)**: as "sugestões geradas por IA" da Seção 29.1 são, nesta
   fase, geradas por regra determinística — o mesmo motivo do resumo de Reports acima: você ainda não
   definiu um fornecedor de IA (Anthropic, OpenAI, etc.) nem a política de tratamento de dados

@@ -8,6 +8,8 @@ import {
   ObjectivePriority,
   ObjectiveStatus,
   Patient,
+  ResourceItem,
+  ResourceLink,
   TreatmentArea,
   TreatmentPlan,
   User,
@@ -46,23 +48,52 @@ function ObjectiveCard({
   objective,
   onChanged,
   professionals,
+  resources,
 }: {
   objective: Objective;
   onChanged: () => void;
   professionals: User[];
+  resources: ResourceItem[];
 }) {
   const [expanded, setExpanded] = useState(false);
   const [comments, setComments] = useState<ObjectiveComment[]>([]);
   const [commentBody, setCommentBody] = useState("");
   const [mentionedUserId, setMentionedUserId] = useState("");
+  const [resourceLinks, setResourceLinks] = useState<ResourceLink[]>([]);
+  const [linkResourceId, setLinkResourceId] = useState("");
+  const [linkRelevance, setLinkRelevance] = useState(3);
 
   function loadComments() {
     apiRequest<ObjectiveComment[]>(`/objectives/${objective.id}/comments`).then(setComments);
   }
 
+  function loadResourceLinks() {
+    apiRequest<ResourceLink[]>(`/objectives/${objective.id}/resource-links`).then(setResourceLinks);
+  }
+
   useEffect(() => {
-    if (expanded) loadComments();
+    if (expanded) {
+      loadComments();
+      loadResourceLinks();
+    }
   }, [expanded]);
+
+  async function handleLinkResource(e: FormEvent) {
+    e.preventDefault();
+    if (!linkResourceId) return;
+    await apiRequest("/resource-links", {
+      method: "POST",
+      body: { resource_id: linkResourceId, objective_id: objective.id, relevance_score: linkRelevance },
+    });
+    setLinkResourceId("");
+    setLinkRelevance(3);
+    loadResourceLinks();
+  }
+
+  async function handleUnlinkResource(linkId: string) {
+    await apiRequest(`/resource-links/${linkId}`, { method: "DELETE" });
+    loadResourceLinks();
+  }
 
   function professionalName(userId: string): string {
     return professionals.find((p) => p.id === userId)?.name || "Profissional";
@@ -174,6 +205,56 @@ function ObjectiveCard({
               </div>
             </form>
           </div>
+
+          <div className="pt-3 border-t border-slate-100 mt-2">
+            <div className="font-medium text-xs uppercase text-neutralState mb-2">
+              Recursos recomendados (Biblioteca Inteligente)
+            </div>
+            <ul className="space-y-2 mb-3">
+              {resourceLinks.map((link) => (
+                <li key={link.id} className="flex items-center justify-between bg-slate-50 rounded-btn px-3 py-2 text-xs">
+                  <span>
+                    {link.resource_title} — relevância {link.relevance_score}/5
+                    {link.training_id && <span className="text-neutralState"> (via treino)</span>}
+                  </span>
+                  <button onClick={() => handleUnlinkResource(link.id)} className="text-danger">
+                    Remover
+                  </button>
+                </li>
+              ))}
+              {resourceLinks.length === 0 && (
+                <li className="text-xs text-neutralState">Nenhum recurso vinculado ainda.</li>
+              )}
+            </ul>
+            <form onSubmit={handleLinkResource} className="flex gap-2">
+              <select
+                value={linkResourceId}
+                onChange={(e) => setLinkResourceId(e.target.value)}
+                className="h-8 text-xs rounded-btn border border-slate-300 px-2 flex-1"
+              >
+                <option value="">Vincular um recurso...</option>
+                {resources.map((r) => (
+                  <option key={r.id} value={r.id}>
+                    {r.title}
+                  </option>
+                ))}
+              </select>
+              <select
+                value={linkRelevance}
+                onChange={(e) => setLinkRelevance(Number(e.target.value))}
+                className="h-8 text-xs rounded-btn border border-slate-300 px-2"
+              >
+                {[1, 2, 3, 4, 5].map((n) => (
+                  <option key={n} value={n}>
+                    Relevância {n}
+                  </option>
+                ))}
+              </select>
+              <button type="submit" className="h-8 rounded-btn bg-brand-turquoise text-white px-3 text-xs font-medium">
+                Vincular
+              </button>
+            </form>
+          </div>
         </div>
       )}
     </div>
@@ -197,9 +278,11 @@ export default function TreatmentPlanPage() {
   const [duplicateCandidates, setDuplicateCandidates] = useState<DuplicateCandidate[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [professionals, setProfessionals] = useState<User[]>([]);
+  const [resources, setResources] = useState<ResourceItem[]>([]);
 
   useEffect(() => {
     apiRequest<User[]>("/professionals").then(setProfessionals);
+    apiRequest<ResourceItem[]>("/resources").then(setResources);
   }, []);
 
   function load() {
@@ -385,7 +468,13 @@ export default function TreatmentPlanPage() {
             <div key={areaKey}>
               <h2 className="font-semibold text-brand-navy mb-2">{AREA_LABELS[areaKey as TreatmentArea]}</h2>
               {objectives.map((objective) => (
-                <ObjectiveCard key={objective.id} objective={objective} onChanged={load} professionals={professionals} />
+                <ObjectiveCard
+                  key={objective.id}
+                  objective={objective}
+                  onChanged={load}
+                  professionals={professionals}
+                  resources={resources}
+                />
               ))}
             </div>
           ))}

@@ -366,6 +366,28 @@ das Sugestões Clínicas acima: nenhuma chamada a um provedor de IA real ainda).
 Assessment tem soft delete e está integrado a Dados Excluídos e à Timeline Clínica (evento
 `assessment_applied`), fechando a lacuna documentada no bloco anterior da Fase 4a.
 
+## Nota sobre Biblioteca Inteligente (Fase 4b bloco 3 — Seção 29.7, fecha a Fase 4b)
+
+`ResourceLink` (`app/models/resource_link.py`) é exatamente a "dependência bloqueante" que a Seção
+29.7 do PRD descrevia: "a tabela de associação ResourceLink (resource_id, training_id ou
+objective_id, relevance_score)". Um `ResourceLink` aponta para exatamente um alvo — `training_id` OU
+`objective_id`, nunca os dois nem nenhum (`ck_resource_links_single_target`, mesmo padrão do XOR já
+usado em `Appointment.clinic_id`/`individual_owner_id`) — e nunca se repete para o mesmo par
+recurso+alvo (dois índices únicos parciais). Populado manualmente pelo profissional (tagueamento com
+uma pontuação de relevância de 1 a 5), nunca inferido automaticamente: o próprio PRD já antecipava
+essa limitação ("não há dado histórico suficiente para a IA inferir a relação sozinha no
+lançamento").
+
+`resource_link_service.list_links_for_objective` é a peça central da "recomendação": agrega os
+vínculos diretos ao objetivo com os vínculos de qualquer treino que o objetivo usa
+(`ObjectiveTraining`), deduplicando por recurso (mantendo a maior pontuação de relevância quando o
+mesmo recurso aparece nas duas fontes) — realizando literalmente "ao trabalhar um objetivo
+específico, a IA recomenda automaticamente atividades... relacionadas ao mesmo objetivo" (Seção
+29.7), exceto que a fonte da recomendação é o vínculo manual, não uma IA. A visibilidade de recursos
+privados de outros profissionais é reaplicada aqui (`_resource_visible`, mesma regra de
+`resource_service.list_resources`) para que um vínculo não vaze um recurso privado de outra pessoa
+na lista agregada.
+
 ## Estrutura
 
 - `app/models/` — entidades SQLAlchemy (Seção 18/27 do PRD).

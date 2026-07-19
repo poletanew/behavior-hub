@@ -491,6 +491,18 @@ export interface AssessmentComparison {
   interpretive_summary: string;
 }
 
+export interface ResourceLink {
+  id: string;
+  resource_id: string;
+  resource_title: string;
+  resource_type: ResourceType;
+  training_id: string | null;
+  objective_id: string | null;
+  relevance_score: number;
+  created_by_user_id: string;
+  created_at: string;
+}
+
 export interface BillingStatus {
   subscription_plan: PlanId | null;
   subscription_status: string;
