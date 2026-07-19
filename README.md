@@ -434,6 +434,19 @@ dados).
     desiste da triagem) — tanto conversão quanto descarte são ações finais: uma entrada já
     convertida/descartada não pode ser editada nem convertida de novo.
 
+### Fase 5 (bloco 5) — Anotação por Voz (Voice-to-Text)
+
+71. Em um **Atendimento**, ao lado do campo "Observação (opcional)" de qualquer treino, um botão
+    **Ditar** aparece nos navegadores que suportam a Web Speech API nativa (Chrome/Edge; não aparece
+    no Firefox, que ainda não suporta essa API — o restante do formulário continua funcionando
+    normalmente sem o botão).
+72. Clique em **Ditar**, fale a observação da tentativa e o texto transcrito é adicionado ao campo —
+    **sempre editável antes de salvar**, exatamente como a Seção 32.12 pede: nada é enviado
+    automaticamente, você pode corrigir a transcrição e só então clicar em "+ Adicionar tentativa".
+73. A transcrição roda inteiramente no navegador do profissional (nenhum áudio é enviado ao backend
+    do Behavior Hub nem a nenhum provedor cuja chave você precisaria configurar) — útil justamente
+    quando as mãos estão ocupadas conduzindo a sessão.
+
 ### Rodando os testes automatizados do backend
 
 ```bash
@@ -559,14 +572,15 @@ docker compose exec backend pytest -q
   provedor (Anthropic, OpenAI, etc.) e me passar a chave, trocamos só essa peça.
 - Seguindo o roadmap (Seção 31.1/31.2 do PRD): **as Fases 1 a 4b estão concluídas**, e a Fase 5 já
   entregou o **Portal da Família** (Seção 29.6/17.2), o **White-label por Clínica** (Seção 32.9), o
-  **Faturamento por Sessão** (Seção 32.10) e a **Lista de Espera** (Seção 32.11). As "ondas seguintes
-  de protocolos de avaliação" (AFLS, PEAK, ESDM, CARS, M-CHAT, IDADI, Vineland, Sensory Profile,
-  Portage, SRS-2, Socially Savvy) ficaram deliberadamente de fora desta rodada: a própria Seção 30.1
-  exige que cada protocolo seja "validado com profissional especialista no instrumento antes da
-  liberação" — implementá-los agora exigiria inventar o esquema de domínios/pontuação máxima de
-  instrumentos proprietários sem essa validação, o mesmo risco de fabricação de dado clínico já
-  evitado na decisão do ABLLS-R (Fase 4b). Restam da Fase 5: voice-to-text, ML preditivo e
-  internacionalização.
+  **Faturamento por Sessão** (Seção 32.10), a **Lista de Espera** (Seção 32.11) e a **Anotação por
+  Voz** (Seção 32.12). As "ondas seguintes de protocolos de avaliação" (AFLS, PEAK, ESDM, CARS,
+  M-CHAT, IDADI, Vineland, Sensory Profile, Portage, SRS-2, Socially Savvy) ficaram deliberadamente
+  de fora desta rodada: a própria Seção 30.1 exige que cada protocolo seja "validado com profissional
+  especialista no instrumento antes da liberação" — implementá-los agora exigiria inventar o esquema
+  de domínios/pontuação máxima de instrumentos proprietários sem essa validação, o mesmo risco de
+  fabricação de dado clínico já evitado na decisão do ABLLS-R (Fase 4b). Restam da Fase 5: ML
+  preditivo (explicitamente descrito na Seção 29.10 como "visão de futuro", sem critério de aceite
+  concreto) e internacionalização (sem seção dedicada no PRD).
 - **Portal da Família**: revogação de acesso é imediata via um contador `token_version` no usuário,
   embutido em todo JWT emitido e conferido a cada requisição — bumpar esse contador invalida
   instantaneamente qualquer token já emitido para aquele responsável, sem precisar de uma tabela de
@@ -612,6 +626,16 @@ docker compose exec backend pytest -q
   17.1) controla quem pode usar a lista de espera — não criamos uma permissão nova, já que triagem e
   admissão formal são, na prática, a mesma decisão de negócio sobre quem pode trazer um novo paciente
   para o sistema.
+- **Anotação por Voz**: usa a Web Speech API nativa do navegador (transcrição "local", no sentido de
+  que o Behavior Hub não processa nem armazena áudio algum — o próprio navegador decide como
+  transcrever), em vez de uma API de terceiros paga — a Seção 32.12 já cita "transcrição local ou via
+  API" como opções equivalentes, e a local evita depender de outra chave de provedor externo que
+  você ainda não configurou (mesmo padrão já adotado para o resumo de Reports e as Sugestões
+  Clínicas). Só funciona em navegadores com suporte a essa API (Chrome/Edge; não Firefox) — o botão
+  de ditado simplesmente não aparece quando não suportado, sem quebrar o restante do formulário.
+  Aplicado apenas ao campo de observação da tentativa, que é literalmente o que a Seção 32.12 pede
+  ("permitir ditar a observação da tentativa por voz"); outros campos de texto livre do produto
+  (comentários de objetivo, observações de sessão) não foram alterados nesta rodada.
 - **Biblioteca Inteligente**: a "recomendação automática" da Seção 29.7 é, nesta fase, um vínculo
   manual (tagueamento) com pontuação de relevância definida pelo profissional — o próprio PRD já
   antecipava isso ("não há dado histórico suficiente para a IA inferir a relação sozinha no

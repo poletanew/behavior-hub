@@ -3,6 +3,7 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 import { apiRequest, ApiError } from "../api/client";
 import { ClinicalSession, Patient, PaymentStatus, SessionCharge, SessionTrainingProgress, Training } from "../types";
 import { useAuth } from "../context/AuthContext";
+import VoiceDictationButton from "../components/VoiceDictationButton";
 import {
   flushQueue,
   getQueuedTrials,
@@ -294,11 +295,16 @@ function TrainingTrialsCard({
         </div>
         <div className="flex-1 min-w-[160px]">
           <label className="block text-xs font-medium mb-1">Observação (opcional)</label>
-          <input
-            value={notes}
-            onChange={(e) => setNotes(e.target.value)}
-            className="w-full h-9 rounded-btn border border-slate-300 px-2 text-sm"
-          />
+          <div className="flex gap-2">
+            <input
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              className="w-full h-9 rounded-btn border border-slate-300 px-2 text-sm"
+            />
+            <VoiceDictationButton
+              onTranscript={(transcript) => setNotes((prev) => (prev ? `${prev} ${transcript}` : transcript))}
+            />
+          </div>
         </div>
         <button onClick={addTrial} className="h-9 rounded-btn bg-brand-turquoise text-white px-4 text-sm font-medium">
           + Adicionar tentativa
