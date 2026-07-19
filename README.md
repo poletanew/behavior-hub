@@ -402,13 +402,32 @@ dados).
     white-label para de valer imediatamente nas próximas requisições — mesmo que os campos continuem
     salvos no banco, prontos para reativar sem reconfigurar tudo se a clínica voltar ao Enterprise.
 
+### Fase 5 (bloco 3) — Faturamento por Sessão (Premium/Enterprise)
+
+63. Abra um **Atendimento** já registrado: o card **Faturamento** (visível só para administrador de
+    clínica ou conta individual) mostra um formulário para lançar o valor cobrado por aquela sessão,
+    com vencimento e observações opcionais.
+64. Em qualquer plano abaixo de Premium, ao tentar salvar aparece o aviso "disponível apenas nos
+    planos Premium ou Enterprise" com um link para **Planos** — a tela de cobrança sempre aparece
+    (só o salvamento é bloqueado no backend), já que ver o formulário não expõe nenhum dado sensível.
+65. Depois de lançada, a cobrança mostra o status (Pendente/Pago/Em atraso) com um seletor para
+    trocar diretamente ali — marcar como Pago registra a data/hora automaticamente; voltar para
+    Pendente ou Em atraso limpa essa data.
+66. Acesse **Faturamento** no menu lateral para ver todas as cobranças de um paciente e trocar o
+    status em lote, e use **Exportar CSV** para baixar o "financeiro da clínica" inteiro (todos os
+    pacientes do tenant, com filtro opcional de período via querystring) — pedido explícito da Seção
+    32.10.
+67. Este faturamento é inteiramente independente da assinatura SaaS via Stripe (Seção 8): é só um
+    registro de controle interno da clínica para o que ela cobra dos próprios pacientes/convênios,
+    nunca processado por um gateway de pagamento real.
+
 ### Rodando os testes automatizados do backend
 
 ```bash
 docker compose exec backend pytest -q
 ```
 
-(ou localmente, sem Docker — ver `backend/README.md`). 230 testes cobrem, entre outros:
+(ou localmente, sem Docker — ver `backend/README.md`). 243 testes cobrem, entre outros:
 
 - **AC-01**: conta nova inicia com zero pacientes/sessões/dashboard.
 - **AC-02** / **AC-03**: limite de 3 pacientes e bloqueio de foto no plano Free.
@@ -506,6 +525,12 @@ docker compose exec backend pytest -q
   configuração aplicada corretamente refletida no Family Portal (branding liga/desliga junto com o
   status real da assinatura), acesso restrito a administrador de clínica (profissional e conta
   individual recebem 403), e isolamento de tenant.
+- Faturamento por Sessão: criação bloqueada fora do Premium/Enterprise e também quando o plano é
+  correto mas a assinatura está inativa, valor zero/negativo rejeitado, uma sessão nunca recebe duas
+  cobranças (conflito 409 na segunda tentativa), apenas administrador de clínica/conta individual
+  pode criar ou editar (profissional recebe 403), marcar como Pago preenche `paid_at` e voltar para
+  Pendente/Em atraso limpa esse campo, listagem por paciente e exportação CSV tenant-wide funcionam,
+  e isolamento de tenant tanto na listagem quanto na exportação.
 
 ## O que **não** está nesta fase
 
@@ -515,14 +540,14 @@ docker compose exec backend pytest -q
   estrutura de edição/aprovação/versionamento que a IA real usará depois. Quando você definir o
   provedor (Anthropic, OpenAI, etc.) e me passar a chave, trocamos só essa peça.
 - Seguindo o roadmap (Seção 31.1/31.2 do PRD): **as Fases 1 a 4b estão concluídas**, e a Fase 5 já
-  entregou o **Portal da Família** (Seção 29.6/17.2) e o **White-label por Clínica** (Seção 32.9).
-  As "ondas seguintes de protocolos de avaliação" (AFLS, PEAK, ESDM, CARS, M-CHAT, IDADI, Vineland,
-  Sensory Profile, Portage, SRS-2, Socially Savvy) ficaram deliberadamente de fora desta rodada: a
-  própria Seção 30.1 exige que cada protocolo seja "validado com profissional especialista no
-  instrumento antes da liberação" — implementá-los agora exigiria inventar o esquema de
-  domínios/pontuação máxima de instrumentos proprietários sem essa validação, o mesmo risco de
-  fabricação de dado clínico já evitado na decisão do ABLLS-R (Fase 4b). Restam da Fase 5:
-  faturamento por sessão, waitlist, voice-to-text, ML preditivo e internacionalização.
+  entregou o **Portal da Família** (Seção 29.6/17.2), o **White-label por Clínica** (Seção 32.9) e o
+  **Faturamento por Sessão** (Seção 32.10). As "ondas seguintes de protocolos de avaliação" (AFLS,
+  PEAK, ESDM, CARS, M-CHAT, IDADI, Vineland, Sensory Profile, Portage, SRS-2, Socially Savvy)
+  ficaram deliberadamente de fora desta rodada: a própria Seção 30.1 exige que cada protocolo seja
+  "validado com profissional especialista no instrumento antes da liberação" — implementá-los agora
+  exigiria inventar o esquema de domínios/pontuação máxima de instrumentos proprietários sem essa
+  validação, o mesmo risco de fabricação de dado clínico já evitado na decisão do ABLLS-R (Fase 4b).
+  Restam da Fase 5: waitlist, voice-to-text, ML preditivo e internacionalização.
 - **Portal da Família**: revogação de acesso é imediata via um contador `token_version` no usuário,
   embutido em todo JWT emitido e conferido a cada requisição — bumpar esse contador invalida
   instantaneamente qualquer token já emitido para aquele responsável, sem precisar de uma tabela de
@@ -549,6 +574,17 @@ docker compose exec backend pytest -q
   `subscription_status` ativo/trialing, então uma clínica que atrasar ou cancelar o Enterprise perde
   o white-label imediatamente, mas os campos salvos continuam no banco para reativar sem
   reconfigurar tudo se ela voltar ao plano.
+- **Faturamento por Sessão**: é um registro de controle interno da própria clínica — não integra com
+  nenhum gateway de pagamento real (nem o Stripe da assinatura SaaS, que é um produto totalmente
+  separado). O campo `due_date` é só informativo; o status "Em atraso" nunca é calculado
+  automaticamente a partir da data de vencimento — é sempre uma ação explícita de quem gerencia o
+  faturamento, já que o PRD não pede (nem faria sentido inventar) uma regra automática de quando
+  algo conta como atrasado. Só administrador de clínica ou conta individual podem lançar/editar
+  cobranças ou exportar o CSV (mesma restrição já usada para gestão de assinatura/Stripe em
+  `billing_service.py`); qualquer usuário autenticado pode *ver* se uma sessão já tem cobrança
+  (não é dado sensível por si só), mas a tentativa de criar uma nova sem o plano correto retorna 403
+  — por isso a tela de cobrança aparece sempre, e só o clique em salvar revela a exigência de
+  plano Premium/Enterprise.
 - **Biblioteca Inteligente**: a "recomendação automática" da Seção 29.7 é, nesta fase, um vínculo
   manual (tagueamento) com pontuação de relevância definida pelo profissional — o próprio PRD já
   antecipava isso ("não há dado histórico suficiente para a IA inferir a relação sozinha no
