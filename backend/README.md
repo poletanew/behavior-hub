@@ -330,6 +330,42 @@ tem nenhuma entidade de reforçador ou métrica de engajamento — não há dado
 regra, e inventá-lo seria fabricar um número. Fica para quando (e se) um módulo de registro de
 reforçadores for adicionado ao produto.
 
+## Nota sobre Avaliações Padronizadas (Fase 4b bloco 2 — Seção 30, AC-19)
+
+`app/services/assessment_protocols.py` é o `ProtocolDefinition` da Seção 30.1.1: um dicionário
+Python (não uma tabela) mapeando `domain_code` → `domain_label`/`max_value` por protocolo, permitindo
+adicionar protocolos novos sem alterar o schema do banco. Só reproduzimos aqui os **nomes** dos
+domínios/áreas de cada protocolo — terminologia padrão da análise do comportamento, já citada
+literalmente no próprio PRD (ex.: "mando", "tato") — nunca os itens/tarefas de avaliação em si, que
+pertencem ao manual oficial de cada instrumento comercial licenciado (Seção 30.3: "protocolos com
+exigência de licenciamento formal ficam marcados como 'requer licença' e não são distribuídos pelo
+sistema, apenas referenciados para registro de pontuação").
+
+Os `max_value` do **VB-MAPP** (16 domínios somando exatamente 170 pontos) são valores oficialmente
+publicados e amplamente documentados na literatura da área — usados aqui só como sugestão no
+formulário, sempre editável, já que a responsabilidade pela aplicação/pontuação é do profissional
+habilitado. O **ABLLS-R** não tem `max_value` padrão nenhum: o número de tarefas por domínio varia
+por edição/adaptação do instrumento, e preencher um valor sem certeza equivaleria a inventar dado —
+o profissional informa o `max_value` real do seu manual ao registrar cada avaliação (validado por
+`_build_raw_scores` em `assessment_service.py`, que rejeita quando falta e quando `raw_value` excede
+o `max_value`).
+
+`Assessment.raw_scores` é uma lista JSON (não colunas fixas), pelo mesmo motivo do `ProtocolDefinition`
+— protocolos diferentes têm domínios e escalas diferentes, e um schema rígido não escalaria. Um par
+(paciente, protocolo, data) nunca se repete (`uq_assessments_patient_protocol_date`, Seção 27.3).
+
+`compare_assessments` (Seção 30.2/AC-19) usa `normalized_pct` — não `raw_value` — para calcular ganho
+absoluto (diferença em pontos percentuais) e ganho relativo (variação percentual sobre a linha de
+base) entre a aplicação mais antiga e a mais recente do conjunto selecionado, restrito aos domínios
+em comum entre as duas. Isso é necessário porque `max_value` pode mudar entre aplicações (o
+profissional pode corrigir um valor, ou o próprio protocolo permitir isso) — comparar `raw_value`
+diretamente produziria números sem sentido se o máximo variar. O texto interpretativo é um rascunho
+determinístico (`generated_by` equivalente ao `rule_based_draft` de Reports — mesma nota de escopo
+das Sugestões Clínicas acima: nenhuma chamada a um provedor de IA real ainda).
+
+Assessment tem soft delete e está integrado a Dados Excluídos e à Timeline Clínica (evento
+`assessment_applied`), fechando a lacuna documentada no bloco anterior da Fase 4a.
+
 ## Estrutura
 
 - `app/models/` — entidades SQLAlchemy (Seção 18/27 do PRD).

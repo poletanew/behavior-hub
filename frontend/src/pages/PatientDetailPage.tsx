@@ -135,6 +135,9 @@ export default function PatientDetailPage() {
           <Link to={`/patients/${patientId}/timeline`} className="text-brand-blue underline">
             Timeline
           </Link>
+          <Link to={`/patients/${patientId}/assessments`} className="text-brand-blue underline">
+            Avaliações
+          </Link>
         </div>
       </div>
 

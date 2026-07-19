@@ -1,4 +1,5 @@
 from app.models.appointment import Appointment
+from app.models.assessment import Assessment
 from app.models.audit_log import AuditLog
 from app.models.clinic import Clinic
 from app.models.clinic_permission_settings import ClinicPermissionSettings
@@ -17,6 +18,8 @@ from app.models.treatment_plan import Objective, ObjectiveComment, ObjectiveTrai
 from app.models.user import User
 
 __all__ = [
+    "Appointment",
+    "Assessment",
     "AuditLog",
     "Clinic",
     "ClinicPermissionSettings",

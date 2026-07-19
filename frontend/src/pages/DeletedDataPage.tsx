@@ -7,6 +7,7 @@ const ENTITY_LABELS: Record<string, string> = {
   objective: "Objetivo do plano",
   resource: "Recurso terapêutico",
   appointment: "Compromisso da agenda",
+  assessment: "Avaliação padronizada",
 };
 
 export default function DeletedDataPage() {

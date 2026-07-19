@@ -256,7 +256,7 @@ export interface ResourceWithUrl extends ResourceItem {
 }
 
 export interface DeletedItem {
-  entity_type: "patient" | "objective" | "resource";
+  entity_type: "patient" | "objective" | "resource" | "appointment" | "assessment";
   id: string;
   label: string;
   deleted_at: string;
@@ -413,7 +413,7 @@ export interface TimelineEntry {
   event_type: string;
   occurred_at: string;
   label: string;
-  source_type: "session" | "objective" | "patient" | "report_summary";
+  source_type: "session" | "objective" | "patient" | "report_summary" | "assessment";
   source_id: string;
 }
 
@@ -438,6 +438,57 @@ export interface ManagerDashboardData {
   sessions_count: number;
   clinical_hours: number;
   occupancy_rate_pct: number | null;
+}
+
+export type AssessmentProtocol = "vb_mapp" | "ablls_r";
+
+export interface ProtocolDomainDefinition {
+  domain_code: string;
+  domain_label: string;
+  max_value: number | null;
+}
+
+export interface ProtocolDefinition {
+  protocol: AssessmentProtocol;
+  label: string;
+  requires_license: boolean;
+  domains: ProtocolDomainDefinition[];
+}
+
+export interface DomainScore {
+  domain_code: string;
+  domain_label: string;
+  raw_value: number;
+  max_value: number;
+  normalized_pct: number;
+}
+
+export interface Assessment {
+  id: string;
+  patient_id: string;
+  professional_id: string;
+  protocol: AssessmentProtocol;
+  applied_date: string;
+  raw_scores: DomainScore[];
+  summary: string | null;
+  created_at: string;
+}
+
+export interface DomainComparisonPoint {
+  domain_code: string;
+  domain_label: string;
+  earliest_pct: number;
+  latest_pct: number;
+  gain_absolute_pp: number;
+  gain_relative_pct: number | null;
+}
+
+export interface AssessmentComparison {
+  protocol: AssessmentProtocol;
+  assessment_ids: string[];
+  applied_dates: string[];
+  domains: DomainComparisonPoint[];
+  interpretive_summary: string;
 }
 
 export interface BillingStatus {

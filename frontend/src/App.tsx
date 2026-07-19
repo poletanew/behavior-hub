@@ -23,6 +23,7 @@ import AgendaPage from "./pages/AgendaPage";
 import SecurityPage from "./pages/SecurityPage";
 import SupervisorDashboardPage from "./pages/SupervisorDashboardPage";
 import ManagerDashboardPage from "./pages/ManagerDashboardPage";
+import AssessmentsPage from "./pages/AssessmentsPage";
 import PlansPage from "./pages/PlansPage";
 
 export default function App() {
@@ -45,6 +46,7 @@ export default function App() {
         <Route path="/patients/:patientId/treatment-plan" element={<TreatmentPlanPage />} />
         <Route path="/patients/:patientId/reports" element={<ReportsPage />} />
         <Route path="/patients/:patientId/timeline" element={<TimelinePage />} />
+        <Route path="/patients/:patientId/assessments" element={<AssessmentsPage />} />
         <Route path="/agenda" element={<AgendaPage />} />
         <Route path="/sessions" element={<SessionsPage />} />
         <Route path="/sessions/:sessionId" element={<SessionDetailPage />} />

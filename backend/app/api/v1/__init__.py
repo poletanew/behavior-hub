@@ -2,6 +2,7 @@ from fastapi import APIRouter
 
 from app.api.v1 import (
     appointments,
+    assessments,
     audit_logs,
     auth,
     billing,
@@ -29,6 +30,7 @@ api_router = APIRouter(prefix="/v1")
 api_router.include_router(auth.router)
 api_router.include_router(billing.router)
 api_router.include_router(appointments.router)
+api_router.include_router(assessments.router)
 api_router.include_router(clinical_alerts.router)
 api_router.include_router(clinical_suggestions.router)
 api_router.include_router(timeline.router)

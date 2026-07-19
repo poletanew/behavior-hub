@@ -197,3 +197,11 @@ class SuggestionStatus(str, enum.Enum):
     PENDING = "pending"
     APPROVED = "approved"
     DISMISSED = "dismissed"
+
+
+class AssessmentProtocol(str, enum.Enum):
+    """Seção 30.1 — protocolos-piloto (V3): VB-MAPP e ABLLS-R. Demais
+    protocolos (AFLS, PEAK, ESDM, etc.) entram em ondas futuras."""
+
+    VB_MAPP = "vb_mapp"
+    ABLLS_R = "ablls_r"

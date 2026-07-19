@@ -4,7 +4,7 @@ from typing import Literal
 
 from pydantic import BaseModel
 
-EntityType = Literal["patient", "objective", "resource", "appointment"]
+EntityType = Literal["patient", "objective", "resource", "appointment", "assessment"]
 
 
 class DeletedItemResponse(BaseModel):

@@ -1,7 +1,9 @@
+import datetime
 import uuid
 
 from sqlalchemy.orm import Session
 
+from app.models.assessment import Assessment
 from app.models.audit_log import AuditLog
 from app.models.patient import Patient
 from app.models.report_summary import ReportSummary
@@ -182,19 +184,39 @@ def _report_entries(db: Session, patient: Patient) -> list[dict]:
     ]
 
 
+def _assessment_entries(db: Session, patient: Patient) -> list[dict]:
+    """Seção 29.2 — "avaliações aplicadas"."""
+    assessments = (
+        db.query(Assessment)
+        .filter(Assessment.patient_id == patient.id, Assessment.deleted_at.is_(None))
+        .all()
+    )
+    return [
+        {
+            "id": assessment.id,
+            "event_type": "assessment_applied",
+            "occurred_at": datetime.datetime.combine(assessment.applied_date, datetime.time.min, tzinfo=datetime.timezone.utc),
+            "label": f"Avaliação {assessment.protocol.value.upper().replace('_', '-')} aplicada",
+            "source_type": "assessment",
+            "source_id": assessment.id,
+        }
+        for assessment in assessments
+    ]
+
+
 def get_patient_timeline(db: Session, patient: Patient) -> list[dict]:
     """Seção 29.2/AC-18 — timeline única consolidando, em ordem cronológica e
     sem duplicados, os eventos clínicos do paciente.
 
-    Avaliações padronizadas (Seção 30) e intercorrências registradas ainda
-    não existem no produto (nenhum modelo de dados para elas hoje) — não
-    alimentam a timeline nesta etapa; ver README para o registro dessa
-    lacuna."""
+    Intercorrências registradas ainda não existem no produto (nenhum modelo
+    de dados para elas hoje) — não alimentam a timeline nesta etapa; ver
+    README para o registro dessa lacuna."""
     entries = (
         _session_entries(db, patient)
         + _objective_entries(db, patient)
         + _assignment_entries(db, patient)
         + _report_entries(db, patient)
+        + _assessment_entries(db, patient)
     )
     entries.sort(key=lambda e: (e["occurred_at"], str(e["id"])))
     return entries

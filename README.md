@@ -61,6 +61,12 @@ Este repositório está sendo construído **por fases**, seguindo o roadmap da S
   trabalhada em nenhum objetivo ativo, mas com treinos disponíveis na Training Library. Toda
   sugestão é uma recomendação editável — aprovar ou descartar apenas registra a decisão do
   profissional (com auditoria), nunca aplica a mudança automaticamente nos dados clínicos.
+- **Fase 4b (bloco 2) — Módulo de Avaliações Padronizadas (Seção 30, AC-19)**: registro de
+  aplicações dos protocolos-piloto **VB-MAPP** e **ABLLS-R** (pontuação bruta por domínio,
+  `normalized_pct` calculado automaticamente), comparação entre duas ou mais aplicações do mesmo
+  protocolo com ganho absoluto/percentual por domínio, avaliações agora aparecem na Timeline Clínica
+  e em Dados Excluídos (soft delete/restauração), texto interpretativo da comparação gerado por
+  regra (não IA real — mesma nota de escopo do bloco anterior).
 
 ## Stack (Seção 4 do PRD)
 
@@ -320,13 +326,30 @@ dados).
     novos limiares (sessões e percentual de acerto para a sugestão de domínio) aparecem junto aos
     limiares de alerta já existentes, com a mesma regra de edição restrita ao plano Enterprise.
 
+### Fase 4b (bloco 2) — Módulo de Avaliações Padronizadas
+
+48. Na página de um paciente, acesse **Avaliações** (ao lado de Plano de Tratamento/Reports/
+    Timeline). Escolha VB-MAPP ou ABLLS-R, clique em **Nova avaliação**, informe a data de aplicação
+    e as pontuações por domínio — o VB-MAPP já vem com o máximo de cada domínio pré-preenchido
+    (16 domínios somando 170 pontos); o ABLLS-R exige que você informe o máximo de cada domínio, já
+    que a contagem de tarefas varia por edição do instrumento.
+49. Tentar registrar duas aplicações do mesmo protocolo na mesma data para o mesmo paciente é
+    bloqueado (Seção 27.3 — nunca há duplicidade de aplicação no mesmo dia).
+50. Com pelo menos duas aplicações do mesmo protocolo registradas, marque-as na lista e clique em
+    **Comparar selecionadas**: a tabela mostra o percentual inicial/final, o ganho absoluto (em
+    pontos percentuais) e o ganho relativo por domínio em comum entre a mais antiga e a mais recente,
+    junto com um texto interpretativo (rascunho por regras, claramente rotulado, nunca diagnóstico).
+51. Cada avaliação registrada passa a aparecer na **Timeline Clínica** do paciente ("Avaliação
+    VB-MAPP aplicada") e pode ser excluída/restaurada por **Dados Excluídos**, como qualquer outro
+    dado clínico do produto.
+
 ### Rodando os testes automatizados do backend
 
 ```bash
 docker compose exec backend pytest -q
 ```
 
-(ou localmente, sem Docker — ver `backend/README.md`). 186 testes cobrem, entre outros:
+(ou localmente, sem Docker — ver `backend/README.md`). 198 testes cobrem, entre outros:
 
 - **AC-01**: conta nova inicia com zero pacientes/sessões/dashboard.
 - **AC-02** / **AC-03**: limite de 3 pacientes e bloqueio de foto no plano Free.
@@ -397,6 +420,13 @@ docker compose exec backend pytest -q
   trabalhada (sem alertar já no primeiro objetivo do paciente) e nunca duplicada para o mesmo treino,
   aprovar/descartar registra a decisão sem alterar o objetivo automaticamente (verificado
   explicitamente), aprovar uma sugestão já decidida retorna conflito, e isolamento de tenant.
+- Avaliações Padronizadas: `normalized_pct` calculado corretamente a partir de `raw_value`/
+  `max_value`, protocolo sem domínio-padrão (ABLLS-R) exige `max_value` explícito e protocolo com
+  padrão (VB-MAPP, somando os 170 pontos oficiais em 16 domínios) aceita omissão, rejeição de
+  `domain_code` desconhecido e de `raw_value` acima do máximo, bloqueio de duplicidade de protocolo +
+  data (Seção 27.3), comparação entre duas aplicações produz ganho absoluto e percentual corretos
+  por domínio usando `normalized_pct` (AC-19), exigência de pelo menos duas avaliações para comparar,
+  soft delete/restauração via Dados Excluídos, presença na Timeline Clínica, e isolamento de tenant.
 
 ## O que **não** está nesta fase
 
@@ -406,9 +436,9 @@ docker compose exec backend pytest -q
   estrutura de edição/aprovação/versionamento que a IA real usará depois. Quando você definir o
   provedor (Anthropic, OpenAI, etc.) e me passar a chave, trocamos só essa peça.
 - Seguindo o roadmap (Seção 31.1 do PRD): **a Fase 4a — Inteligência Clínica básica está completa**
-  (Fase 1, 2 e 3 também). Dentro da Fase 4b, o módulo de avaliações (VB-MAPP/ABLLS-R) e a Biblioteca
-  Inteligente ainda não foram implementados — próximos blocos. A Fase 5 (Family Portal, ML
-  preditivo) continua para depois.
+  (Fase 1, 2 e 3 também). Dentro da Fase 4b, a Biblioteca Inteligente ainda não foi implementada
+  (depende do `ResourceLink`, Seção 29.7) — próximo bloco. A Fase 5 (Family Portal, ondas seguintes
+  de protocolos de avaliação, ML preditivo) continua para depois.
 - **Sugestões Clínicas (Fase 4b bloco 1)**: as "sugestões geradas por IA" da Seção 29.1 são, nesta
   fase, geradas por regra determinística — o mesmo motivo do resumo de Reports acima: você ainda não
   definiu um fornecedor de IA (Anthropic, OpenAI, etc.) nem a política de tratamento de dados
@@ -429,10 +459,20 @@ docker compose exec backend pytest -q
   derivados dos dados operacionais (pacientes, sessões, horas, ocupação) e deixa explícita a
   ausência dos financeiros, em vez de preenchê-los com um valor fictício.
 - **Timeline Clínica**: a linha do tempo é montada a partir de fontes já existentes (atendimentos,
-  log de auditoria de objetivos/atribuições, resumos de relatório) em vez de um novo modelo dedicado
-  de "evento" — evita duplicar armazenamento e manter tudo sincronizado. Como consequência,
-  avaliações formais (Seção 30, ainda não implementada) e intercorrências/notas livres não aparecem
-  na timeline ainda; entram quando esses módulos existirem.
+  avaliações, log de auditoria de objetivos/atribuições, resumos de relatório) em vez de um novo
+  modelo dedicado de "evento" — evita duplicar armazenamento e manter tudo sincronizado. Intercorrências/
+  notas livres (não implementadas, sem modelo de dados) ainda não aparecem na timeline; entram quando
+  esse módulo existir.
+- **Avaliações Padronizadas**: só os protocolos-piloto da Seção 30.1 (VB-MAPP e ABLLS-R) foram
+  implementados; as ondas seguintes (AFLS, PEAK, ESDM, CARS, M-CHAT, Vineland, etc.) ficam para a
+  Fase 5, conforme o próprio roadmap do PRD. Nenhum item/tarefa de avaliação em si (conteúdo
+  proprietário dos manuais oficiais) foi reproduzido no sistema — apenas os nomes de domínio/área
+  (terminologia padrão da análise do comportamento, já citada no próprio PRD) e, para o VB-MAPP, os
+  170 pontos oficiais em 16 domínios amplamente documentados na literatura. O ABLLS-R não tem
+  `max_value` padrão por domínio no sistema — o profissional que aplica o instrumento informa o
+  máximo do seu manual ao registrar cada avaliação, evitando qualquer número inventado. O texto
+  interpretativo da comparação entre avaliações (Seção 30.2) é um rascunho por regras, não um texto
+  gerado por IA real, pela mesma razão das Sugestões Clínicas (fornecedor de IA ainda não definido).
 - A importação de pacientes usa detecção automática de colunas por alias (cobrindo os cabeçalhos em
   português do próprio exemplo do PRD) em vez de uma UI de remapeamento manual coluna-a-coluna —
   uma simplificação de escopo deliberada, documentada em `csv_import_service.py`.
