@@ -23,6 +23,8 @@ DEFAULT_THRESHOLDS = {
     "stagnation_band_pp": 5,
     "fading_session_count": 3,
     "fading_independence_pct": 80,
+    "mastery_suggestion_session_count": 3,
+    "mastery_suggestion_accuracy_pct": 80,
 }
 
 THRESHOLD_FIELDS = tuple(DEFAULT_THRESHOLDS.keys())

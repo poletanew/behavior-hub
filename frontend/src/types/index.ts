@@ -303,6 +303,8 @@ export interface ClinicPermissionSettings {
   stagnation_band_pp: number;
   fading_session_count: number;
   fading_independence_pct: number;
+  mastery_suggestion_session_count: number;
+  mastery_suggestion_accuracy_pct: number;
 }
 
 export interface AuditLogEntry {
@@ -386,6 +388,24 @@ export interface ClinicalAlert {
   detail: Record<string, unknown> | null;
   triggered_at: string;
   resolved_at: string | null;
+}
+
+export type SuggestionType = "new_program" | "fading" | "mastery_ready";
+export type SuggestionStatus = "pending" | "approved" | "dismissed";
+
+export interface ClinicalSuggestion {
+  id: string;
+  patient_id: string;
+  objective_id: string | null;
+  objective_title: string | null;
+  training_id: string | null;
+  training_title: string | null;
+  suggestion_type: SuggestionType;
+  message: string;
+  detail: Record<string, unknown> | null;
+  status: SuggestionStatus;
+  created_at: string;
+  decided_at: string | null;
 }
 
 export interface TimelineEntry {

@@ -52,6 +52,15 @@ Este repositório está sendo construído **por fases**, seguindo o roadmap da S
   horas clínicas registradas e taxa de ocupação, filtráveis por período (mês corrente por padrão) —
   **fecha o roadmap da Fase 4a — Inteligência Clínica básica**. Indicadores de receita/faturamento
   não estão incluídos por não haver um módulo de cobrança por paciente (ver nota de escopo abaixo).
+- **Fase 4b (bloco 1) — Sugestões Clínicas (Seção 29.1)**: início da **Fase 4b — Inteligência
+  avançada**. Três recomendações geradas por regra (não por um provedor de IA real — ver nota de
+  escopo abaixo): sugestão de **fading** (reduzir o nível de ajuda) quando a independência já
+  atingiu o limiar de candidato a fading; sugestão de **"objetivo pode ser considerado dominado"**
+  (Seção 29.9) quando o percentual de acerto se mantém acima de um limiar configurável por N
+  sessões; e sugestão de **novo programa** quando o paciente tem uma área de habilidade ainda não
+  trabalhada em nenhum objetivo ativo, mas com treinos disponíveis na Training Library. Toda
+  sugestão é uma recomendação editável — aprovar ou descartar apenas registra a decisão do
+  profissional (com auditoria), nunca aplica a mudança automaticamente nos dados clínicos.
 
 ## Stack (Seção 4 do PRD)
 
@@ -289,13 +298,35 @@ dados).
     compromisso associado conta para "sessões realizadas" mas não tem duração conhecida, então não
     entra na soma de horas.
 
+### Fase 4b (bloco 1) — Sugestões Clínicas
+
+43. Na página de um paciente, cadastre um objetivo vinculado a um treino da Training Library e
+    registre 3 atendimentos consecutivos com tentativas sempre "Independente" — além do alerta de
+    candidato a fading já existente (Fase 4a), agora também aparece uma **sugestão de Fading** no
+    novo card "Sugestões clínicas", com os botões Aprovar/Descartar.
+44. Registre 3 atendimentos consecutivos com pelo menos 80% de acerto para o mesmo objetivo (ainda
+    não marcado como dominado): uma sugestão de **"Objetivo dominado"** aparece, com o texto exato
+    do exemplo da Seção 29.9 do PRD ("Objetivo pode ser considerado dominado com base no critério
+    configurado").
+45. Se o paciente já tem um objetivo ativo em uma área (por exemplo, Comunicação) mas nunca teve
+    nenhum objetivo em outra área com treinos cadastrados na Training Library (por exemplo, Motor),
+    uma sugestão de **Novo programa** aparece recomendando um treino dessa área ainda não trabalhada.
+46. Clicar em **Aprovar** ou **Descartar** apenas registra a decisão (com data e autor, auditável) —
+    nenhuma sugestão altera automaticamente o plano de tratamento, o status do objetivo ou os níveis
+    de ajuda; a ação real (marcar como dominado, criar o novo objetivo, reduzir a ajuda na próxima
+    sessão) continua sendo feita pelo profissional nos fluxos já existentes. Uma vez decidida, a
+    mesma sugestão nunca reaparece.
+47. Como administrador, em **Configurações**, role até "Alertas Clínicos Inteligentes": os dois
+    novos limiares (sessões e percentual de acerto para a sugestão de domínio) aparecem junto aos
+    limiares de alerta já existentes, com a mesma regra de edição restrita ao plano Enterprise.
+
 ### Rodando os testes automatizados do backend
 
 ```bash
 docker compose exec backend pytest -q
 ```
 
-(ou localmente, sem Docker — ver `backend/README.md`). 178 testes cobrem, entre outros:
+(ou localmente, sem Docker — ver `backend/README.md`). 186 testes cobrem, entre outros:
 
 - **AC-01**: conta nova inicia com zero pacientes/sessões/dashboard.
 - **AC-02** / **AC-03**: limite de 3 pacientes e bloqueio de foto no plano Free.
@@ -360,6 +391,12 @@ docker compose exec backend pytest -q
   excluídos e inativos), sessões e horas clínicas somadas apenas dentro do período informado, taxa
   de ocupação calculada corretamente (completas / (completas + faltas + canceladas)), período padrão
   igual ao mês corrente quando nenhum filtro é informado, e isolamento de tenant.
+- Sugestões Clínicas: sugestão de fading gerada e nunca duplicada mesmo após recálculos repetidos,
+  sugestão de "objetivo dominado" com o texto exato do exemplo do PRD e ausente quando o objetivo já
+  está marcado como dominado, sugestão de novo programa apenas quando há uma área de referência já
+  trabalhada (sem alertar já no primeiro objetivo do paciente) e nunca duplicada para o mesmo treino,
+  aprovar/descartar registra a decisão sem alterar o objetivo automaticamente (verificado
+  explicitamente), aprovar uma sugestão já decidida retorna conflito, e isolamento de tenant.
 
 ## O que **não** está nesta fase
 
@@ -369,8 +406,20 @@ docker compose exec backend pytest -q
   estrutura de edição/aprovação/versionamento que a IA real usará depois. Quando você definir o
   provedor (Anthropic, OpenAI, etc.) e me passar a chave, trocamos só essa peça.
 - Seguindo o roadmap (Seção 31.1 do PRD): **a Fase 4a — Inteligência Clínica básica está completa**
-  (Fase 1, 2 e 3 também). A Fase 4b (sugestões geradas por IA, módulo de avaliações VB-MAPP/ABLLS-R,
-  Biblioteca Inteligente) e a Fase 5 (Family Portal, ML preditivo) continuam para depois.
+  (Fase 1, 2 e 3 também). Dentro da Fase 4b, o módulo de avaliações (VB-MAPP/ABLLS-R) e a Biblioteca
+  Inteligente ainda não foram implementados — próximos blocos. A Fase 5 (Family Portal, ML
+  preditivo) continua para depois.
+- **Sugestões Clínicas (Fase 4b bloco 1)**: as "sugestões geradas por IA" da Seção 29.1 são, nesta
+  fase, geradas por regra determinística — o mesmo motivo do resumo de Reports acima: você ainda não
+  definiu um fornecedor de IA (Anthropic, OpenAI, etc.) nem a política de tratamento de dados
+  associada (Seção 34 do PRD lista isso como uma decisão pendente do Product Owner). Em vez de
+  inventar uma integração ou fabricar uma chave, a lógica de sugestão hoje reaproveita exatamente os
+  mesmos limiares/série histórica dos Alertas Clínicos (Fase 4a) — quando você definir o provedor,
+  trocamos apenas a camada de geração de texto, mantendo o mesmo modelo de dados e fluxo de
+  aprovação/descarte. A sugestão de **troca de reforçador** (também citada na Seção 29.1) não foi
+  implementada: o produto não tem nenhum conceito de "reforçador" ou "engajamento" no modelo de
+  dados atual, então não há dado real para basear essa sugestão — implementá-la exigiria antes um
+  novo módulo de registro de reforçadores, fora do escopo deste bloco.
 - **Dashboard para Gestor**: não inclui indicadores de receita ou taxa de faturamento (Seção 29.5
   os pede). O Behavior Hub não tem — e nunca teve no escopo definido até aqui — um módulo de
   cobrança por paciente/sessão; a única integração de pagamento existente (Stripe) é a assinatura

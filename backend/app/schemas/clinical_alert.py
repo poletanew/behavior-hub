@@ -16,6 +16,8 @@ class ClinicalAlertThresholdsUpdateRequest(BaseModel):
     stagnation_band_pp: int | None = Field(default=None, ge=1, le=100)
     fading_session_count: int | None = Field(default=None, ge=1)
     fading_independence_pct: int | None = Field(default=None, ge=1, le=100)
+    mastery_suggestion_session_count: int | None = Field(default=None, ge=1)
+    mastery_suggestion_accuracy_pct: int | None = Field(default=None, ge=1, le=100)
 
 
 class ClinicalAlertResponse(BaseModel):

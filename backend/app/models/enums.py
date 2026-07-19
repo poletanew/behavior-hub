@@ -179,3 +179,21 @@ class ClinicalAlertType(str, enum.Enum):
     REGRESSION = "regression"
     STAGNATION = "stagnation"
     FADING_CANDIDATE = "fading_candidate"
+
+
+class SuggestionType(str, enum.Enum):
+    """Seção 29.1 (Fase 4b) — sugestões geradas por regra (não por um modelo de
+    IA real ainda — ver nota de escopo em clinical_suggestion_service.py)."""
+
+    NEW_PROGRAM = "new_program"
+    FADING = "fading"
+    MASTERY_READY = "mastery_ready"
+
+
+class SuggestionStatus(str, enum.Enum):
+    """Seção 29.1 — toda sugestão é uma recomendação editável: o profissional
+    aprova ou descarta, nunca é aplicada automaticamente."""
+
+    PENDING = "pending"
+    APPROVED = "approved"
+    DISMISSED = "dismissed"

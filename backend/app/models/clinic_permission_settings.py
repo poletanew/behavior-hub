@@ -38,3 +38,8 @@ class ClinicPermissionSettings(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     stagnation_band_pp: Mapped[int] = mapped_column(Integer, default=5, nullable=False)
     fading_session_count: Mapped[int] = mapped_column(Integer, default=3, nullable=False)
     fading_independence_pct: Mapped[int] = mapped_column(Integer, default=80, nullable=False)
+
+    # Seção 29.1 (Fase 4b) — limiar da sugestão de "objetivo pode ser considerado
+    # dominado" (Seção 29.9), mesma lógica de configuração das demais.
+    mastery_suggestion_session_count: Mapped[int] = mapped_column(Integer, default=3, nullable=False)
+    mastery_suggestion_accuracy_pct: Mapped[int] = mapped_column(Integer, default=80, nullable=False)

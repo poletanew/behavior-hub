@@ -6,6 +6,7 @@ from app.api.v1 import (
     auth,
     billing,
     clinical_alerts,
+    clinical_suggestions,
     dashboard,
     deleted_data,
     invitations,
@@ -29,6 +30,7 @@ api_router.include_router(auth.router)
 api_router.include_router(billing.router)
 api_router.include_router(appointments.router)
 api_router.include_router(clinical_alerts.router)
+api_router.include_router(clinical_suggestions.router)
 api_router.include_router(timeline.router)
 api_router.include_router(invitations.router)
 api_router.include_router(manager_dashboard.router)

@@ -9,7 +9,14 @@ from app.models.session import ClinicalSession, SessionTraining, Trial
 from app.models.training import Training
 from app.models.user import User
 from app.schemas.session import SessionCreateRequest, TrialCreateRequest, TrialUpdateRequest
-from app.services import appointment_service, audit_service, clinical_alert_service, patient_service, rbac_service
+from app.services import (
+    appointment_service,
+    audit_service,
+    clinical_alert_service,
+    clinical_suggestion_service,
+    patient_service,
+    rbac_service,
+)
 from app.services.calculations import accuracy_pct, independence_pct
 from app.services.plan_service import current_plan
 
@@ -125,6 +132,7 @@ def _recompute_alerts_after_trial_change(db: DbSession, session_training: Sessio
     session = db.get(ClinicalSession, session_training.session_id)
     if session is not None:
         clinical_alert_service.recompute_alerts_for_training(db, session.patient_id, session_training.training_id)
+        clinical_suggestion_service.recompute_suggestions_for_training(db, session.patient_id, session_training.training_id)
 
 
 def add_trial(

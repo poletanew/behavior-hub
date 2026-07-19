@@ -292,6 +292,44 @@ integração de pagamento existente é o Stripe da assinatura SaaS que a clínic
 armazenado em algum lugar, qualquer número aqui seria inventado; a decisão foi omitir esses dois
 indicadores e documentar a lacuna explicitamente, em vez de preencher com um placeholder.
 
+## Nota sobre Sugestões Clínicas (Fase 4b bloco 1 — Seção 29.1)
+
+`app/services/clinical_suggestion_service.py` implementa 3 das recomendações da Seção 29.1 com
+regras determinísticas — **não** chamadas a um provedor de IA real, já que o fornecedor e a política
+de tratamento de dados ainda não foram definidos (Seção 34 do PRD lista isso como pendência do
+Product Owner). A "sugestão de fading" reaproveita literalmente
+`clinical_alert_service._evaluate_fading_candidate` e `_objective_session_series` (mesma série
+histórica e limiares dos Alertas Clínicos da Fase 4a) — decisão deliberada de não duplicar a fórmula
+de detecção em dois lugares. A "sugestão de objetivo dominado" é uma regra nova
+(`_evaluate_mastery_ready`), mas segue exatamente o mesmo padrão: N sessões consecutivas com
+percentual de acerto acima de um limiar configurável por clínica (`mastery_suggestion_session_count`/
+`mastery_suggestion_accuracy_pct`, reaproveitando `ClinicPermissionSettings` e o mesmo endpoint
+`PATCH /clinic/alert-thresholds` já existente).
+
+A "sugestão de novo programa" (`recompute_new_program_suggestions`) parte do mesmo conceito de "área"
+já usado pelo radar e pelo heatmap (`TrainingCategory`, não o enum `TreatmentArea` do `Objective`):
+compara as categorias de treino já trabalhadas ativamente pelo paciente contra a Training Library
+visível a ele, e sugere um treino de uma categoria ainda descoberta. Só gera sugestão quando o
+paciente já tem pelo menos uma categoria "trabalhada" — sem isso não há uma "área de referência" para
+identificar uma lacuna, e paciente novo receberia sugestões arbitrárias logo no primeiro objetivo.
+
+Diferente do `ClinicalAlert` (que reabre sempre que a condição volta a ser verdadeira),
+`ClinicalSuggestion` é gerada no máximo uma vez por (objetivo, tipo) ou (paciente, treino, tipo) —
+garantido por dois índices únicos parciais (`objective_id IS NOT NULL` / `training_id IS NOT NULL`).
+Uma vez que o profissional aprova ou descarta, essa decisão é definitiva e a sugestão nunca
+reaparece, mesmo que a condição subjacente continue verdadeira depois — decisão de produto
+deliberada, coerente com a frase da Seção 29.1 ("o profissional aprova, ajusta ou descarta"): não
+insistir depois de uma decisão já tomada. Por simetria com esse mesmo princípio, **aprovar uma
+sugestão nunca muda dado clínico algum automaticamente** — `approve_suggestion`/`dismiss_suggestion`
+apenas gravam a decisão (com auditoria via `audit_service`); marcar o objetivo como dominado, criar
+o novo objetivo ou reduzir o nível de ajuda continuam sendo ações do profissional nos fluxos já
+existentes (Plano de Tratamento, registro de sessão), agora só informadas pela sugestão.
+
+A "sugestão de troca de reforçador" da Seção 29.1 não foi implementada: o modelo de dados atual não
+tem nenhuma entidade de reforçador ou métrica de engajamento — não há dado real para basear essa
+regra, e inventá-lo seria fabricar um número. Fica para quando (e se) um módulo de registro de
+reforçadores for adicionado ao produto.
+
 ## Estrutura
 
 - `app/models/` — entidades SQLAlchemy (Seção 18/27 do PRD).
