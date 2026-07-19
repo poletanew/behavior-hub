@@ -243,6 +243,311 @@ Diferente dos demais gráficos de Reports, a janela do heatmap é sempre "hoje m
 (`get_report_data` busca as linhas do heatmap com sua própria chamada a `_fetch_rows`, independente
 da consulta filtrada usada pelos outros gráficos).
 
+## Nota sobre Dashboard para Supervisor (Fase 4a bloco 4 — Seção 29.4)
+
+`app/services/supervisor_dashboard_service.py` reaproveita deliberadamente duas peças de
+infraestrutura já existentes em vez de introduzir novos conceitos:
+
+- **Percentual de sessões completas por terapeuta** usa exatamente a mesma fórmula de
+  `appointment_service.attendance_rate` (completas / (completas + faltas)), só que agrupada por
+  `professional_id` em vez de por paciente — mantendo as duas métricas de "taxa de comparecimento"
+  consistentes entre si.
+- **Adesão ao plano de tratamento** é definida como a fração dos objetivos ativos (não
+  iniciado/em andamento, não excluídos) de pacientes atribuídos ao terapeuta que **não** têm um
+  alerta de "sem coleta" (`ClinicalAlertType.NO_COLLECTION`) ativo no momento — reaproveitando o
+  mecanismo de alertas já construído na Seção 29.1 em vez de duplicar a lógica de "há quanto tempo
+  não é registrada uma tentativa". Isso também significa que a adesão só reflete a realidade depois
+  que os alertas tiverem sido recalculados (em tempo real a cada tentativa salva, ou pela varredura
+  diária) — mesma limitação já documentada para os próprios alertas.
+- O alerta de **baixa adesão** dispara quando essa adesão cai abaixo de 70% (`LOW_ADHERENCE_THRESHOLD_PCT`,
+  um valor fixo nesta fase — diferente dos limiares de alerta clínico, este não é configurável por
+  clínica, já que o PRD não pede isso explicitamente para o dashboard do supervisor).
+- O alerta de **ausência de registro** reaproveita o mesmo `no_collection_days` configurável por
+  clínica (`ClinicPermissionSettings`) já usado pelos alertas clínicos: dispara quando o terapeuta
+  tem pelo menos um paciente atribuído mas nenhum atendimento registrado dentro dessa janela.
+
+O acesso é restrito a `CLINIC_ADMIN` e `SUPERVISOR` de uma clínica (contas individuais não têm uma
+"equipe" e recebem 403), mesmo padrão de gate já usado por `rbac_service`/`ClinicPermissionSettings`.
+
+## Nota sobre Dashboard para Gestor (Fase 4a bloco 5 — Seção 29.5, fecha a Fase 4a)
+
+`app/services/manager_dashboard_service.py` é restrito somente a `CLINIC_ADMIN` (nem supervisor, nem
+profissional, nem conta individual) — é uma visão de negócio da clínica, distinta do painel de
+equipe do bloco anterior. Todos os indicadores são somas/contagens diretas sobre `Patient`,
+`User`, `ClinicalSession` e `Appointment` já existentes, filtráveis por período (padrão: do dia 1 do
+mês corrente até hoje).
+
+**Horas clínicas** soma apenas a duração (`scheduled_end - scheduled_start`) de `Appointment`s com
+status `completed` — porque `ClinicalSession` não tem um campo de duração próprio (só
+`occurred_at`, um instante). Uma sessão registrada sem vínculo com um compromisso da Agenda conta
+para `sessions_count` mas não contribui `clinical_hours`, porque não há como derivar sua duração sem
+inventar um valor. **Taxa de ocupação** é `completas / (completas + faltas + canceladas)` dentro do
+período — mesmo raciocínio de "outcome conhecido" já usado por `attendance_rate` e pelo dashboard do
+supervisor, apenas agregado por clínica em vez de por paciente/terapeuta.
+
+**Indicadores de receita e taxa de faturamento** (pedidos pela Seção 29.5) foram deliberadamente
+**não implementados**: o produto não tem um módulo de cobrança por paciente/sessão — a única
+integração de pagamento existente é o Stripe da assinatura SaaS que a clínica paga ao Behavior Hub
+(Seção 8), que não é "receita operacional da clínica". Sem um dado real de faturamento por sessão
+armazenado em algum lugar, qualquer número aqui seria inventado; a decisão foi omitir esses dois
+indicadores e documentar a lacuna explicitamente, em vez de preencher com um placeholder.
+
+## Nota sobre Sugestões Clínicas (Fase 4b bloco 1 — Seção 29.1)
+
+`app/services/clinical_suggestion_service.py` implementa 3 das recomendações da Seção 29.1 com
+regras determinísticas — **não** chamadas a um provedor de IA real, já que o fornecedor e a política
+de tratamento de dados ainda não foram definidos (Seção 34 do PRD lista isso como pendência do
+Product Owner). A "sugestão de fading" reaproveita literalmente
+`clinical_alert_service._evaluate_fading_candidate` e `_objective_session_series` (mesma série
+histórica e limiares dos Alertas Clínicos da Fase 4a) — decisão deliberada de não duplicar a fórmula
+de detecção em dois lugares. A "sugestão de objetivo dominado" é uma regra nova
+(`_evaluate_mastery_ready`), mas segue exatamente o mesmo padrão: N sessões consecutivas com
+percentual de acerto acima de um limiar configurável por clínica (`mastery_suggestion_session_count`/
+`mastery_suggestion_accuracy_pct`, reaproveitando `ClinicPermissionSettings` e o mesmo endpoint
+`PATCH /clinic/alert-thresholds` já existente).
+
+A "sugestão de novo programa" (`recompute_new_program_suggestions`) parte do mesmo conceito de "área"
+já usado pelo radar e pelo heatmap (`TrainingCategory`, não o enum `TreatmentArea` do `Objective`):
+compara as categorias de treino já trabalhadas ativamente pelo paciente contra a Training Library
+visível a ele, e sugere um treino de uma categoria ainda descoberta. Só gera sugestão quando o
+paciente já tem pelo menos uma categoria "trabalhada" — sem isso não há uma "área de referência" para
+identificar uma lacuna, e paciente novo receberia sugestões arbitrárias logo no primeiro objetivo.
+
+Diferente do `ClinicalAlert` (que reabre sempre que a condição volta a ser verdadeira),
+`ClinicalSuggestion` é gerada no máximo uma vez por (objetivo, tipo) ou (paciente, treino, tipo) —
+garantido por dois índices únicos parciais (`objective_id IS NOT NULL` / `training_id IS NOT NULL`).
+Uma vez que o profissional aprova ou descarta, essa decisão é definitiva e a sugestão nunca
+reaparece, mesmo que a condição subjacente continue verdadeira depois — decisão de produto
+deliberada, coerente com a frase da Seção 29.1 ("o profissional aprova, ajusta ou descarta"): não
+insistir depois de uma decisão já tomada. Por simetria com esse mesmo princípio, **aprovar uma
+sugestão nunca muda dado clínico algum automaticamente** — `approve_suggestion`/`dismiss_suggestion`
+apenas gravam a decisão (com auditoria via `audit_service`); marcar o objetivo como dominado, criar
+o novo objetivo ou reduzir o nível de ajuda continuam sendo ações do profissional nos fluxos já
+existentes (Plano de Tratamento, registro de sessão), agora só informadas pela sugestão.
+
+A "sugestão de troca de reforçador" da Seção 29.1 não foi implementada: o modelo de dados atual não
+tem nenhuma entidade de reforçador ou métrica de engajamento — não há dado real para basear essa
+regra, e inventá-lo seria fabricar um número. Fica para quando (e se) um módulo de registro de
+reforçadores for adicionado ao produto.
+
+## Nota sobre Avaliações Padronizadas (Fase 4b bloco 2 — Seção 30, AC-19)
+
+`app/services/assessment_protocols.py` é o `ProtocolDefinition` da Seção 30.1.1: um dicionário
+Python (não uma tabela) mapeando `domain_code` → `domain_label`/`max_value` por protocolo, permitindo
+adicionar protocolos novos sem alterar o schema do banco. Só reproduzimos aqui os **nomes** dos
+domínios/áreas de cada protocolo — terminologia padrão da análise do comportamento, já citada
+literalmente no próprio PRD (ex.: "mando", "tato") — nunca os itens/tarefas de avaliação em si, que
+pertencem ao manual oficial de cada instrumento comercial licenciado (Seção 30.3: "protocolos com
+exigência de licenciamento formal ficam marcados como 'requer licença' e não são distribuídos pelo
+sistema, apenas referenciados para registro de pontuação").
+
+Os `max_value` do **VB-MAPP** (16 domínios somando exatamente 170 pontos) são valores oficialmente
+publicados e amplamente documentados na literatura da área — usados aqui só como sugestão no
+formulário, sempre editável, já que a responsabilidade pela aplicação/pontuação é do profissional
+habilitado. O **ABLLS-R** não tem `max_value` padrão nenhum: o número de tarefas por domínio varia
+por edição/adaptação do instrumento, e preencher um valor sem certeza equivaleria a inventar dado —
+o profissional informa o `max_value` real do seu manual ao registrar cada avaliação (validado por
+`_build_raw_scores` em `assessment_service.py`, que rejeita quando falta e quando `raw_value` excede
+o `max_value`).
+
+`Assessment.raw_scores` é uma lista JSON (não colunas fixas), pelo mesmo motivo do `ProtocolDefinition`
+— protocolos diferentes têm domínios e escalas diferentes, e um schema rígido não escalaria. Um par
+(paciente, protocolo, data) nunca se repete (`uq_assessments_patient_protocol_date`, Seção 27.3).
+
+`compare_assessments` (Seção 30.2/AC-19) usa `normalized_pct` — não `raw_value` — para calcular ganho
+absoluto (diferença em pontos percentuais) e ganho relativo (variação percentual sobre a linha de
+base) entre a aplicação mais antiga e a mais recente do conjunto selecionado, restrito aos domínios
+em comum entre as duas. Isso é necessário porque `max_value` pode mudar entre aplicações (o
+profissional pode corrigir um valor, ou o próprio protocolo permitir isso) — comparar `raw_value`
+diretamente produziria números sem sentido se o máximo variar. O texto interpretativo é um rascunho
+determinístico (`generated_by` equivalente ao `rule_based_draft` de Reports — mesma nota de escopo
+das Sugestões Clínicas acima: nenhuma chamada a um provedor de IA real ainda).
+
+Assessment tem soft delete e está integrado a Dados Excluídos e à Timeline Clínica (evento
+`assessment_applied`), fechando a lacuna documentada no bloco anterior da Fase 4a.
+
+## Nota sobre Biblioteca Inteligente (Fase 4b bloco 3 — Seção 29.7, fecha a Fase 4b)
+
+`ResourceLink` (`app/models/resource_link.py`) é exatamente a "dependência bloqueante" que a Seção
+29.7 do PRD descrevia: "a tabela de associação ResourceLink (resource_id, training_id ou
+objective_id, relevance_score)". Um `ResourceLink` aponta para exatamente um alvo — `training_id` OU
+`objective_id`, nunca os dois nem nenhum (`ck_resource_links_single_target`, mesmo padrão do XOR já
+usado em `Appointment.clinic_id`/`individual_owner_id`) — e nunca se repete para o mesmo par
+recurso+alvo (dois índices únicos parciais). Populado manualmente pelo profissional (tagueamento com
+uma pontuação de relevância de 1 a 5), nunca inferido automaticamente: o próprio PRD já antecipava
+essa limitação ("não há dado histórico suficiente para a IA inferir a relação sozinha no
+lançamento").
+
+`resource_link_service.list_links_for_objective` é a peça central da "recomendação": agrega os
+vínculos diretos ao objetivo com os vínculos de qualquer treino que o objetivo usa
+(`ObjectiveTraining`), deduplicando por recurso (mantendo a maior pontuação de relevância quando o
+mesmo recurso aparece nas duas fontes) — realizando literalmente "ao trabalhar um objetivo
+específico, a IA recomenda automaticamente atividades... relacionadas ao mesmo objetivo" (Seção
+29.7), exceto que a fonte da recomendação é o vínculo manual, não uma IA. A visibilidade de recursos
+privados de outros profissionais é reaplicada aqui (`_resource_visible`, mesma regra de
+`resource_service.list_resources`) para que um vínculo não vaze um recurso privado de outra pessoa
+na lista agregada.
+
+## Nota sobre Portal da Família (Fase 5 bloco 1 — Seção 29.6/17.2)
+
+**Revogação imediata sem tabela de sessões.** A Seção 17.2 exige que "revogação de acesso do Family
+Portal seja imediata... com encerramento de sessões ativas do responsável", mas a autenticação do
+Behavior Hub é inteiramente stateless (JWT sem registro de sessão no banco). Em vez de reescrever
+toda a arquitetura de auth para um modelo de sessão server-side, adicionamos um único contador
+`token_version` em `User` (`app/models/user.py`), embutido como claim `"ver"` em todo token emitido
+(`auth_service.issue_tokens`) e conferido a cada request (`core/deps.get_current_user`) e a cada
+refresh (`auth_service.refresh_access_token`). `family_access_service.revoke_access` incrementa esse
+contador do usuário responsável ao revogar — qualquer token (access ou refresh) emitido antes disso
+passa a falhar com 401 na próxima requisição, mesmo que ainda não tenha expirado pela data. Isso
+invalida **todas** as sessões ativas daquele responsável (não só o acesso a um paciente específico),
+o que é a leitura mais literal de "sessões ativas do responsável" na Seção 17.2.
+
+**Whitelist, nunca blacklist.** `FamilyAccess` (`app/models/family_access.py`) tem cinco booleanos
+(`can_view_evolution_charts`, `can_view_upcoming_appointments`, `can_view_team_guidance`,
+`can_view_home_materials`, `can_use_messaging`), todos `default=False`. O convite de um responsável
+(papel novo `UserType.FAMILY`, reaproveitando o fluxo existente de `Invitation`/`accept_invitation`
+em vez de um sistema de convite paralelo) cria o `FamilyAccess` já com tudo desligado; cada categoria
+só liga com uma ação explícita do administrador (`family_access_service.update_whitelist`). Isso
+satisfaz literalmente a Seção 17.2: "o portal só exibe o que foi explicitamente liberado, e qualquer
+campo novo... fica oculto ao responsável até ser revisado e autorizado" — qualquer categoria futura
+nasce como um novo booleano `False`, nunca como uma exclusão de uma blacklist.
+
+**Consentimento registrado.** `FamilyAccess.consent_given_at` é gravado no momento em que o convite é
+aceito — o mesmo `accept_terms=True` que já serve de registro de aceite de termos para qualquer outro
+tipo de conta é reaproveitado como o "consentimento explícito e registrado" da Seção 17.2, em vez de
+inventar um fluxo de consentimento paralelo.
+
+**Bloqueio de contas `family` num único ponto.** Em vez de auditar e alterar todas as ~30 rotas
+escopadas a paciente para excluir explicitamente `UserType.FAMILY`, endurecemos o gate mais
+reaproveitado do sistema: `patient_service.get_patient_or_404`/`list_patients` (usado por
+praticamente todo endpoint de paciente — Reports, Plano de Tratamento, Avaliações, Agenda, etc.)
+agora rejeita `user_type == FAMILY` com 403 logo no início. Isso cobre a esmagadora maioria da
+superfície de API com uma mudança cirúrgica. Exposição residual conhecida e aceita: endpoints que
+**não** são escopados a paciente (Training Library, listagem de Recursos, listagem de Profissionais)
+não têm essa checagem explícita — uma conta `family` que os chamasse via API direta ainda esbarraria
+na ausência de `clinic_id`/atribuições compatíveis na prática (o usuário nem pertence à mesma
+listagem tenant-scoped de nada relevante), mas isso não tem teste automatizado dedicado nesta rodada.
+Todo acesso real do Portal da Família passa por `family_portal_service.py`, que nunca reaproveita os
+gates normais de paciente — cada método confere a `FamilyAccess` (existência + não revogado + a flag
+da categoria) antes de devolver qualquer dado.
+
+**Reuso de dados já existentes, sem inventar módulos novos.** "Orientações da equipe" mostra apenas
+`ReportSummary` com `status == APPROVED` (Seção 14.5) — nunca um rascunho em edição. "Materiais para
+casa" reaproveita a mesma agregação direto+via-treino de `resource_link_service.list_links_for_objective`
+(Fase 4b, Biblioteca Inteligente), restrita aos objetivos ativos do plano de tratamento do paciente.
+"Evolução" reaproveita as funções puras de `report_service` (`_fetch_rows`, `build_line_series`,
+`build_radar_data`, `build_cumulative_data`) diretamente, sem passar por `get_report_data` (que
+chama `patient_service.get_patient_or_404` com o usuário logado — inadequado aqui, já que quem
+acessa é uma conta `family`). `FamilyMessage` é uma lista simples sem threading (nenhuma menção a
+conversas aninhadas na Seção 29.6) — profissionais também podem ler/responder pelo mesmo canal via
+`GET/POST /patients/{id}/family-messages`.
+
+**Convite de responsável para tenant individual.** `Invitation.clinic_id` passou a ser opcional
+(antes obrigatório): um profissional individual (sem clínica) também tem pacientes e precisa poder
+convidar um responsável para eles. `Invitation.patient_id` (novo, opcional, obrigatório apenas
+quando `role == FAMILY`) reaproveita o mesmo gate de acesso a paciente do convidante
+(`patient_service.get_patient_or_404`) como controle de permissão — só quem já enxerga o paciente
+pode convidar um responsável para ele, sem precisar de uma nova regra de RBAC dedicada.
+
+## Nota sobre White-label por Clínica (Fase 5 bloco 2 — Seção 32.9)
+
+Três campos novos e nada mais em `Clinic` (`white_label_logo_url`, `white_label_brand_color`,
+`white_label_display_name`), todos nulos por padrão. `white_label_service._is_enterprise_and_active`
+é o único ponto de decisão sobre "o white-label vale ou não agora": exige
+`subscription_plan == ENTERPRISE` **e** `has_paid_access` (status ativo/trialing) — nunca confiar
+apenas no rótulo do plano salvo (Seção 8.3), então uma clínica que atrasar/cancelar o Enterprise
+perde a marca personalizada na próxima requisição, mesmo com os três campos ainda preenchidos no
+banco (útil se ela reativar depois: não precisa reconfigurar nada).
+
+`white_label_service.get_branding_for_clinic` é a função pública (sem exigir permissão de admin)
+reaproveitada por duas superfícies diferentes: `report_export_service.export_pdf` (troca o título e
+a cor do cabeçalho da tabela) e `family_portal_service.get_branding` (endpoint
+`GET /family-portal/patients/{id}/branding`, acessível a qualquer conta `family` com pelo menos um
+`FamilyAccess` ativo para aquele paciente — a marca visual não é uma das cinco categorias de dados
+clínicos da whitelist da Seção 17.2, então não exige nenhuma flag específica).
+
+**Decisão de escopo deliberada: o logo não é embutido no PDF.** Embutir a imagem exigiria o backend
+baixar uma URL fornecida pelo cliente no momento da exportação — uma superfície clássica de SSRF
+(Server-Side Request Forgery) sem um proxy de imagem dedicado para mitigá-la, o que estava fora do
+escopo deste bloco. Nome exibido e cor de destaque não têm esse problema (são só texto/cor) e por
+isso aparecem normalmente no PDF. Já no Portal da Família, o logo aparece normalmente via `<img>`
+no navegador do próprio responsável — quem busca a URL ali é o navegador dele, não o nosso backend,
+então não há esse risco. O rodapé "Powered by Behavior Hub" é adicionado incondicionalmente ao PDF,
+com ou sem white-label ativo, conforme a Seção 32.9 exige.
+
+## Nota sobre Faturamento por Sessão (Fase 5 bloco 3 — Seção 32.10)
+
+`SessionCharge` (`app/models/session_charge.py`) segue o mesmo padrão de tenant denormalizado já
+usado em `Patient`/`Appointment`/`Assessment` (`clinic_id` XOR `individual_owner_id` via
+`CheckConstraint`), com `session_id` único — no máximo uma cobrança por sessão registrada
+(`ck_session_charges_amount_positive` garante `amount > 0` também no nível do banco). O gate de
+plano usa `plan_service.current_plan(user)` (o helper canônico já existente para "nunca confiar
+apenas no rótulo do plano salvo" — Seção 8.3) em vez de checar `clinic.subscription_plan`
+diretamente como fazem `two_factor_service`/`clinical_alert_service`: aqui faz sentido usar o
+helper porque o recurso também precisa funcionar para tenants individuais (Premium/Enterprise não é
+exclusivo de clínica), e `current_plan` já resolve isso corretamente para os dois tipos de tenant.
+
+`_require_admin` restringe criação/edição/exportação a `CLINIC_ADMIN`/`INDIVIDUAL` — a mesma
+restrição que `billing_service` já aplica à gestão de assinatura/Stripe, já que é dado financeiro
+sensível. **Leitura é mais permissiva de propósito**: `get_charge_for_session` não exige plano
+Premium/Enterprise nem permissão de admin (além do gate normal de acesso ao paciente via
+`patient_service.get_patient_or_404`) porque só informa se uma sessão já tem cobrança — não é em si
+um dado sensível, e esconder esse formulário atrás do plano exigiria uma segunda chamada só para
+decidir se mostra a tela, sem ganho real de segurança. A UI mostra sempre o formulário de cobrança;
+é a tentativa de `POST` que retorna 403 se o plano não for Premium/Enterprise.
+
+Sem due_date automático virando "em atraso": o campo `due_date` é só informativo. O status
+`overdue` é sempre setado por uma ação explícita da equipe financeira da clínica — o PRD não define
+uma regra de quando algo "conta" como atrasado (tolerância de dias, fuso horário, feriados etc.), e
+inventar essa regra seria fabricar um comportamento não pedido; por isso não há nenhum job Celery
+recalculando status por data.
+
+## Nota sobre Lista de Espera (Fase 5 bloco 4 — Seção 32.11, fecha os itens buildáveis da Fase 5)
+
+`WaitlistEntry` (`app/models/waitlist_entry.py`) segue o mesmo padrão de tenant denormalizado já
+usado em `Patient`/`Appointment`/`SessionCharge`. A única particularidade em relação a esses modelos:
+`birth_date` é opcional aqui (nullable), já que a Seção 32.11 descreve a lista de espera como um
+"cadastro simplificado... antes da admissão formal" — a data de nascimento pode não estar disponível
+ainda na triagem, diferente de `Patient.birth_date`, que é obrigatório desde a Fase 1.
+
+`waitlist_service.convert_entry` é a peça central de "conversão em paciente completo sem
+redigitação": reaproveita `patient_service.create_patient` diretamente (mesmo `PatientCreateRequest`
+que a Fase 1 já usa), passando `name`/`guardian_name`/`notes` da entrada da lista de espera sem pedir
+esses campos de novo — só pede o que ainda falta (`birth_date`, se ainda não capturado; `diagnosis`,
+opcional, já que não é um campo típico de triagem pré-admissão). Isso significa que `convert_entry`
+herda de graça todas as regras de `create_patient` (limite de paciente do plano Free, permissão RBAC
+configurável) sem precisar duplicá-las.
+
+Conversão e descarte são ações terminais: `status` só sai de `WAITING` uma vez (para `CONVERTED` ou
+`DISCARDED`), verificado explicitamente antes de qualquer edição/nova conversão (conflito 409) — uma
+entrada já processada não deveria mudar de estado retroativamente, já que `converted_patient_id`
+passaria a apontar para um histórico inconsistente.
+
+**Decisão de escopo deliberada: sem campos de convênio/plano de saúde.** O modelo de dados do
+Behavior Hub não tem nenhum conceito de convênio médico ainda (mesma lacuna já documentada para o
+Dashboard do Gestor e Faturamento por Sessão); a Seção 32.11 pede "campos mínimos", então adicionar
+esse campo agora seria inventar um requisito não pedido pelo PRD. A permissão de acesso reaproveita
+`rbac_service.can_create_patient` (a mesma regra configurável de "Cadastrar paciente" da Seção
+17.1) em vez de criar uma permissão nova — decisão consistente com o fato de que a Lista de Espera é,
+na prática, o mesmo tipo de decisão de negócio ("quem pode trazer um paciente novo para o sistema"),
+só que em duas etapas.
+
+## Fechamento do roadmap (Seção 31 do PRD)
+
+Com a Lista de Espera (bloco 4), a Fase 5 — e o roadmap detalhado da Seção 31 como um todo — chegou
+ao fim do que dá para construir sem inventar requisito ou dado clínico que o PRD não especifica. A
+Anotação por Voz (bloco 5, Seção 32.12) fechou a última peça, mas é puramente frontend (Web Speech
+API do navegador, sem nenhuma mudança de backend) — ver `README.md` na raiz do repositório para os
+detalhes de implementação. Três itens do escopo original ficaram deliberadamente de fora, cada um
+com um motivo diferente e documentado (ondas seguintes de protocolos de avaliação — exigem validação
+de especialista por instrumento antes da liberação, Seção 30.1; Machine Learning preditivo — a
+própria Seção 29.10 descreve isso como "visão de futuro" condicionada a volume de dados que só existe
+após meses de uso real em produção; internacionalização — a Seção 20 pede só "interface preparada
+para tradução", não o lançamento efetivo de outro idioma, e o frontend não tem hoje nenhuma
+biblioteca de i18n para justificar uma extração retroativa sem um segundo idioma real para validar).
+O detalhamento completo de cada decisão está na seção "O que não está nesta fase" do `README.md` da
+raiz.
+
 ## Estrutura
 
 - `app/models/` — entidades SQLAlchemy (Seção 18/27 do PRD).

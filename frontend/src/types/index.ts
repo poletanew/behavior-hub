@@ -1,4 +1,4 @@
-export type UserType = "clinic_admin" | "professional" | "individual" | "supervisor";
+export type UserType = "clinic_admin" | "professional" | "individual" | "supervisor" | "family";
 
 export interface User {
   id: string;
@@ -256,7 +256,7 @@ export interface ResourceWithUrl extends ResourceItem {
 }
 
 export interface DeletedItem {
-  entity_type: "patient" | "objective" | "resource";
+  entity_type: "patient" | "objective" | "resource" | "appointment" | "assessment";
   id: string;
   label: string;
   deleted_at: string;
@@ -303,6 +303,8 @@ export interface ClinicPermissionSettings {
   stagnation_band_pp: number;
   fading_session_count: number;
   fading_independence_pct: number;
+  mastery_suggestion_session_count: number;
+  mastery_suggestion_accuracy_pct: number;
 }
 
 export interface AuditLogEntry {
@@ -388,13 +390,176 @@ export interface ClinicalAlert {
   resolved_at: string | null;
 }
 
+export type SuggestionType = "new_program" | "fading" | "mastery_ready";
+export type SuggestionStatus = "pending" | "approved" | "dismissed";
+
+export interface ClinicalSuggestion {
+  id: string;
+  patient_id: string;
+  objective_id: string | null;
+  objective_title: string | null;
+  training_id: string | null;
+  training_title: string | null;
+  suggestion_type: SuggestionType;
+  message: string;
+  detail: Record<string, unknown> | null;
+  status: SuggestionStatus;
+  created_at: string;
+  decided_at: string | null;
+}
+
 export interface TimelineEntry {
   id: string;
   event_type: string;
   occurred_at: string;
   label: string;
-  source_type: "session" | "objective" | "patient" | "report_summary";
+  source_type: "session" | "objective" | "patient" | "report_summary" | "assessment";
   source_id: string;
+}
+
+export interface SupervisorDashboardTherapistRow {
+  professional_id: string;
+  professional_name: string;
+  assigned_patients_count: number;
+  completed_sessions_count: number;
+  no_show_count: number;
+  session_completion_pct: number | null;
+  active_objectives_count: number;
+  treatment_plan_adherence_pct: number | null;
+  low_adherence_alert: boolean;
+  no_recent_registration_alert: boolean;
+}
+
+export interface ManagerDashboardData {
+  period_start: string;
+  period_end: string;
+  active_patients_count: number;
+  active_professionals_count: number;
+  sessions_count: number;
+  clinical_hours: number;
+  occupancy_rate_pct: number | null;
+}
+
+export type AssessmentProtocol = "vb_mapp" | "ablls_r";
+
+export interface ProtocolDomainDefinition {
+  domain_code: string;
+  domain_label: string;
+  max_value: number | null;
+}
+
+export interface ProtocolDefinition {
+  protocol: AssessmentProtocol;
+  label: string;
+  requires_license: boolean;
+  domains: ProtocolDomainDefinition[];
+}
+
+export interface DomainScore {
+  domain_code: string;
+  domain_label: string;
+  raw_value: number;
+  max_value: number;
+  normalized_pct: number;
+}
+
+export interface Assessment {
+  id: string;
+  patient_id: string;
+  professional_id: string;
+  protocol: AssessmentProtocol;
+  applied_date: string;
+  raw_scores: DomainScore[];
+  summary: string | null;
+  created_at: string;
+}
+
+export interface DomainComparisonPoint {
+  domain_code: string;
+  domain_label: string;
+  earliest_pct: number;
+  latest_pct: number;
+  gain_absolute_pp: number;
+  gain_relative_pct: number | null;
+}
+
+export interface AssessmentComparison {
+  protocol: AssessmentProtocol;
+  assessment_ids: string[];
+  applied_dates: string[];
+  domains: DomainComparisonPoint[];
+  interpretive_summary: string;
+}
+
+export interface ResourceLink {
+  id: string;
+  resource_id: string;
+  resource_title: string;
+  resource_type: ResourceType;
+  training_id: string | null;
+  objective_id: string | null;
+  relevance_score: number;
+  created_by_user_id: string;
+  created_at: string;
+}
+
+export interface FamilyAccess {
+  id: string;
+  patient_id: string;
+  patient_name: string;
+  family_user_id: string;
+  family_user_name: string;
+  family_user_email: string;
+  granted_by_user_id: string;
+  consent_given_at: string;
+  can_view_evolution_charts: boolean;
+  can_view_upcoming_appointments: boolean;
+  can_view_team_guidance: boolean;
+  can_view_home_materials: boolean;
+  can_use_messaging: boolean;
+  revoked_at: string | null;
+  created_at: string;
+}
+
+export interface FamilyMyAccess {
+  patient_id: string;
+  patient_name: string;
+  can_view_evolution_charts: boolean;
+  can_view_upcoming_appointments: boolean;
+  can_view_team_guidance: boolean;
+  can_view_home_materials: boolean;
+  can_use_messaging: boolean;
+}
+
+export interface FamilyEvolution {
+  line: LineSeries[];
+  radar: RadarPoint[];
+  cumulative: CumulativePoint[];
+}
+
+export interface FamilyAppointment {
+  id: string;
+  professional_name: string;
+  scheduled_start: string;
+  scheduled_end: string;
+  status: AppointmentStatus;
+}
+
+export interface FamilyGuidance {
+  id: string;
+  period_start: string;
+  period_end: string;
+  content: string;
+  created_at: string;
+}
+
+export interface FamilyMessage {
+  id: string;
+  patient_id: string;
+  sender_user_id: string;
+  sender_name: string;
+  body: string;
+  created_at: string;
 }
 
 export interface BillingStatus {
@@ -403,4 +568,44 @@ export interface BillingStatus {
   subscription_current_period_end: string | null;
   has_paid_access: boolean;
   stripe_configured: boolean;
+}
+
+export interface WhiteLabelSettings {
+  enabled: boolean;
+  logo_url: string | null;
+  brand_color: string | null;
+  display_name: string | null;
+}
+
+export type PaymentStatus = "pending" | "paid" | "overdue";
+
+export interface SessionCharge {
+  id: string;
+  session_id: string;
+  patient_id: string;
+  patient_name: string;
+  session_date: string;
+  amount: number;
+  due_date: string | null;
+  payment_status: PaymentStatus;
+  paid_at: string | null;
+  notes: string | null;
+  created_by_user_id: string;
+  created_at: string;
+}
+
+export type WaitlistStatus = "waiting" | "converted" | "discarded";
+
+export interface WaitlistEntry {
+  id: string;
+  name: string;
+  birth_date: string | null;
+  guardian_name: string | null;
+  contact_phone: string | null;
+  contact_email: string | null;
+  notes: string | null;
+  status: WaitlistStatus;
+  converted_patient_id: string | null;
+  created_by_user_id: string;
+  created_at: string;
 }

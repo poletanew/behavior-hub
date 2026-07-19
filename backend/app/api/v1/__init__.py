@@ -2,43 +2,63 @@ from fastapi import APIRouter
 
 from app.api.v1 import (
     appointments,
+    assessments,
     audit_logs,
     auth,
     billing,
     clinical_alerts,
+    clinical_suggestions,
     dashboard,
     deleted_data,
+    family_access,
+    family_portal,
     invitations,
+    manager_dashboard,
     notifications,
     patients,
     professionals,
     rbac,
     reports,
+    resource_links,
     resources,
+    session_charges,
     session_templates,
     sessions,
+    supervisor_dashboard,
     timeline,
     trainings,
     treatment_plans,
+    waitlist,
+    white_label,
 )
 
 api_router = APIRouter(prefix="/v1")
 api_router.include_router(auth.router)
 api_router.include_router(billing.router)
 api_router.include_router(appointments.router)
+api_router.include_router(assessments.router)
 api_router.include_router(clinical_alerts.router)
+api_router.include_router(clinical_suggestions.router)
 api_router.include_router(timeline.router)
 api_router.include_router(invitations.router)
+api_router.include_router(manager_dashboard.router)
 api_router.include_router(patients.router)
 api_router.include_router(professionals.router)
 api_router.include_router(sessions.router)
 api_router.include_router(session_templates.router)
+api_router.include_router(session_charges.router)
 api_router.include_router(trainings.router)
 api_router.include_router(dashboard.router)
 api_router.include_router(treatment_plans.router)
 api_router.include_router(reports.router)
 api_router.include_router(resources.router)
+api_router.include_router(resource_links.router)
 api_router.include_router(deleted_data.router)
 api_router.include_router(notifications.router)
 api_router.include_router(rbac.router)
 api_router.include_router(audit_logs.router)
+api_router.include_router(supervisor_dashboard.router)
+api_router.include_router(family_access.router)
+api_router.include_router(family_portal.router)
+api_router.include_router(white_label.router)
+api_router.include_router(waitlist.router)

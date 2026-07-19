@@ -13,6 +13,7 @@ const EVENT_LABELS: Record<string, string> = {
   patient_assignment_upserted: "Profissional vinculado",
   patient_assignment_removed: "Profissional desvinculado",
   report_generated: "Relatório gerado",
+  assessment_applied: "Avaliação aplicada",
 };
 
 const EVENT_COLORS: Record<string, string> = {
@@ -25,6 +26,7 @@ const EVENT_COLORS: Record<string, string> = {
   patient_assignment_upserted: "bg-brand-blueLight text-brand-navy",
   patient_assignment_removed: "bg-slate-200 text-neutralState",
   report_generated: "bg-success/10 text-success",
+  assessment_applied: "bg-brand-turquoise/20 text-brand-navy",
 };
 
 function sourceLink(patientId: string, entry: TimelineEntry): string | null {
@@ -35,6 +37,8 @@ function sourceLink(patientId: string, entry: TimelineEntry): string | null {
       return `/patients/${patientId}/treatment-plan`;
     case "report_summary":
       return `/patients/${patientId}/reports`;
+    case "assessment":
+      return `/patients/${patientId}/assessments`;
     default:
       return null;
   }

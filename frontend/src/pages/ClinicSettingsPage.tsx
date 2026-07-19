@@ -54,6 +54,18 @@ const THRESHOLD_FIELDS: { key: NumberSettingKey; label: string; help: string; su
     help: "Percentual de independência mínimo nessas sessões.",
     suffix: "%",
   },
+  {
+    key: "mastery_suggestion_session_count",
+    label: "Sessões consecutivas para sugestão de domínio",
+    help: "Quantas sessões consecutivas de alto acerto sugerem considerar o objetivo dominado.",
+    suffix: "sessões",
+  },
+  {
+    key: "mastery_suggestion_accuracy_pct",
+    label: "Acerto mínimo para sugestão de domínio",
+    help: "Percentual de acerto mínimo nessas sessões.",
+    suffix: "%",
+  },
 ];
 
 const TOGGLES: { key: BooleanSettingKey; label: string; help: string }[] = [

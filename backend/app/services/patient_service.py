@@ -31,7 +31,20 @@ def _accessible_patient_ids_stmt(user: User):
     return select(PatientAssignment.patient_id).where(PatientAssignment.professional_id == user.id)
 
 
+def _reject_family_user(user: User) -> None:
+    """Seção 17.2 — o Portal da Família nunca acessa as rotas normais de
+    paciente (nem sequer o RBAC de leitura); ele só enxerga o que passar pelo
+    whitelist explícito de FamilyAccess (ver family_portal_service). Este é o
+    gate central reaproveitado por praticamente todo endpoint escopado a
+    paciente, então bloquear aqui cobre a esmagadora maioria da superfície —
+    ver nota de escopo sobre exposição residual em endpoints não escopados a
+    paciente (Training Library, Resources, Professionals) no README."""
+    if user.user_type == UserType.FAMILY:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Family accounts cannot access this resource")
+
+
 def list_patients(db: Session, user: User, *, include_deleted: bool = False) -> list[Patient]:
+    _reject_family_user(user)
     query = db.query(Patient).filter(_tenant_scope_filter(user))
     if not include_deleted:
         query = query.filter(Patient.deleted_at.is_(None))
@@ -45,6 +58,7 @@ def list_patients(db: Session, user: User, *, include_deleted: bool = False) -> 
 
 def get_patient_or_404(db: Session, user: User, patient_id: uuid.UUID, *, include_deleted: bool = False) -> Patient:
     """Seção 17 / AC-14 — usuario de outra clinica nunca acessa paciente por URL direta."""
+    _reject_family_user(user)
     query = db.query(Patient).filter(Patient.id == patient_id, _tenant_scope_filter(user))
     if not include_deleted:
         query = query.filter(Patient.deleted_at.is_(None))

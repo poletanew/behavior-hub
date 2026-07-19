@@ -1,6 +1,9 @@
 import { Navigate, Route, Routes } from "react-router-dom";
 import Layout from "./components/Layout";
+import FamilyPortalLayout from "./components/FamilyPortalLayout";
 import ProtectedRoute from "./components/ProtectedRoute";
+import FamilyProtectedRoute from "./components/FamilyProtectedRoute";
+import FamilyPortalPage from "./pages/family/FamilyPortalPage";
 import LoginPage from "./pages/LoginPage";
 import RegisterPage from "./pages/RegisterPage";
 import DashboardPage from "./pages/DashboardPage";
@@ -21,7 +24,14 @@ import AuditLogPage from "./pages/AuditLogPage";
 import PatientImportPage from "./pages/PatientImportPage";
 import AgendaPage from "./pages/AgendaPage";
 import SecurityPage from "./pages/SecurityPage";
+import SupervisorDashboardPage from "./pages/SupervisorDashboardPage";
+import ManagerDashboardPage from "./pages/ManagerDashboardPage";
+import AssessmentsPage from "./pages/AssessmentsPage";
 import PlansPage from "./pages/PlansPage";
+import FamilyAccessAdminPage from "./pages/FamilyAccessAdminPage";
+import WhiteLabelSettingsPage from "./pages/WhiteLabelSettingsPage";
+import BillingSessionsPage from "./pages/BillingSessionsPage";
+import WaitlistPage from "./pages/WaitlistPage";
 
 export default function App() {
   return (
@@ -29,6 +39,16 @@ export default function App() {
       <Route path="/login" element={<LoginPage />} />
       <Route path="/register" element={<RegisterPage />} />
       <Route path="/invitations/:token/accept" element={<AcceptInvitationPage />} />
+
+      <Route
+        element={
+          <FamilyProtectedRoute>
+            <FamilyPortalLayout />
+          </FamilyProtectedRoute>
+        }
+      >
+        <Route path="/family-portal" element={<FamilyPortalPage />} />
+      </Route>
 
       <Route
         element={
@@ -43,6 +63,8 @@ export default function App() {
         <Route path="/patients/:patientId/treatment-plan" element={<TreatmentPlanPage />} />
         <Route path="/patients/:patientId/reports" element={<ReportsPage />} />
         <Route path="/patients/:patientId/timeline" element={<TimelinePage />} />
+        <Route path="/patients/:patientId/assessments" element={<AssessmentsPage />} />
+        <Route path="/patients/:patientId/family-portal-admin" element={<FamilyAccessAdminPage />} />
         <Route path="/agenda" element={<AgendaPage />} />
         <Route path="/sessions" element={<SessionsPage />} />
         <Route path="/sessions/:sessionId" element={<SessionDetailPage />} />
@@ -54,7 +76,12 @@ export default function App() {
         <Route path="/audit-log" element={<AuditLogPage />} />
         <Route path="/patients/import" element={<PatientImportPage />} />
         <Route path="/security" element={<SecurityPage />} />
+        <Route path="/supervisor-dashboard" element={<SupervisorDashboardPage />} />
+        <Route path="/manager-dashboard" element={<ManagerDashboardPage />} />
         <Route path="/plans" element={<PlansPage />} />
+        <Route path="/white-label" element={<WhiteLabelSettingsPage />} />
+        <Route path="/billing-sessions" element={<BillingSessionsPage />} />
+        <Route path="/waitlist" element={<WaitlistPage />} />
       </Route>
 
       <Route path="/" element={<Navigate to="/dashboard" replace />} />

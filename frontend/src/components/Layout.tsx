@@ -18,6 +18,7 @@ export default function Layout() {
   const isAdmin = user?.user_type === "clinic_admin" || user?.user_type === "individual";
   const canSeeClinicSettings = user?.user_type === "clinic_admin" || user?.user_type === "supervisor";
   const canSeeAuditLog = user?.user_type === "clinic_admin" || user?.user_type === "individual";
+  const canSeeManagerDashboard = user?.user_type === "clinic_admin";
   const [requires2fa, setRequires2fa] = useState(false);
 
   useEffect(() => {
@@ -74,6 +75,16 @@ export default function Layout() {
             </NavLink>
           )}
           <NavLink
+            to="/waitlist"
+            className={({ isActive }) =>
+              `block rounded-btn px-3 py-2 text-sm font-medium transition-colors ${
+                isActive ? "bg-brand-turquoise text-white" : "text-slate-200 hover:bg-white/10"
+              }`
+            }
+          >
+            Lista de Espera
+          </NavLink>
+          <NavLink
             to="/patients/import"
             className={({ isActive }) =>
               `block rounded-btn px-3 py-2 text-sm font-medium transition-colors ${
@@ -83,6 +94,30 @@ export default function Layout() {
           >
             Importar Pacientes
           </NavLink>
+          {canSeeClinicSettings && (
+            <NavLink
+              to="/supervisor-dashboard"
+              className={({ isActive }) =>
+                `block rounded-btn px-3 py-2 text-sm font-medium transition-colors ${
+                  isActive ? "bg-brand-turquoise text-white" : "text-slate-200 hover:bg-white/10"
+                }`
+              }
+            >
+              Painel de Supervisão
+            </NavLink>
+          )}
+          {canSeeManagerDashboard && (
+            <NavLink
+              to="/manager-dashboard"
+              className={({ isActive }) =>
+                `block rounded-btn px-3 py-2 text-sm font-medium transition-colors ${
+                  isActive ? "bg-brand-turquoise text-white" : "text-slate-200 hover:bg-white/10"
+                }`
+              }
+            >
+              Painel de Gestão
+            </NavLink>
+          )}
           {canSeeAuditLog && (
             <NavLink
               to="/audit-log"
@@ -117,6 +152,30 @@ export default function Layout() {
           >
             Segurança
           </NavLink>
+          {user?.user_type === "clinic_admin" && (
+            <NavLink
+              to="/white-label"
+              className={({ isActive }) =>
+                `block rounded-btn px-3 py-2 text-sm font-medium transition-colors ${
+                  isActive ? "bg-brand-turquoise text-white" : "text-slate-200 hover:bg-white/10"
+                }`
+              }
+            >
+              White-label
+            </NavLink>
+          )}
+          {isAdmin && (
+            <NavLink
+              to="/billing-sessions"
+              className={({ isActive }) =>
+                `block rounded-btn px-3 py-2 text-sm font-medium transition-colors ${
+                  isActive ? "bg-brand-turquoise text-white" : "text-slate-200 hover:bg-white/10"
+                }`
+              }
+            >
+              Faturamento
+            </NavLink>
+          )}
           {isAdmin && (
             <NavLink
               to="/plans"

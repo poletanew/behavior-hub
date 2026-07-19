@@ -35,6 +35,7 @@ def create_invitation(
         email=invitation.email,
         specialty=invitation.specialty,
         role=invitation.role,
+        patient_id=invitation.patient_id,
         status=invitation.status,
         expires_at=invitation.expires_at,
         created_at=invitation.created_at,

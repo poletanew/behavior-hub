@@ -10,7 +10,14 @@ from app.models.patient import Patient
 from app.models.resource import Resource
 from app.models.treatment_plan import Objective, TreatmentPlan
 from app.models.user import User
-from app.services import appointment_service, patient_service, rbac_service, resource_service, treatment_plan_service
+from app.services import (
+    appointment_service,
+    assessment_service,
+    patient_service,
+    rbac_service,
+    resource_service,
+    treatment_plan_service,
+)
 
 settings = get_settings()
 
@@ -95,6 +102,19 @@ def list_deleted_items(db: Session, user: User) -> list[dict]:
             }
         )
 
+    for assessment in assessment_service.list_deleted_assessments(db, user):
+        patient = db.get(Patient, assessment.patient_id)
+        items.append(
+            {
+                "entity_type": "assessment",
+                "id": assessment.id,
+                "label": f"Avaliação {assessment.protocol.value.upper()} - {patient.name if patient else '?'} ({assessment.applied_date.strftime('%d/%m/%Y')})",
+                "deleted_at": assessment.deleted_at,
+                "deleted_by": assessment.deleted_by,
+                "days_remaining": _days_remaining(assessment.deleted_at),
+            }
+        )
+
     items.sort(key=lambda i: i["deleted_at"], reverse=True)
     return items
 
@@ -109,4 +129,6 @@ def restore_item(db: Session, user: User, entity_type: str, item_id: uuid.UUID):
         return resource_service.restore_resource(db, user, item_id)
     if entity_type == "appointment":
         return appointment_service.restore_appointment(db, user, item_id)
+    if entity_type == "assessment":
+        return assessment_service.restore_assessment(db, user, item_id)
     raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Unknown entity type")

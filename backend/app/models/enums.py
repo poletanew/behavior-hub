@@ -6,6 +6,7 @@ class UserType(str, enum.Enum):
     PROFESSIONAL = "professional"
     INDIVIDUAL = "individual"
     SUPERVISOR = "supervisor"
+    FAMILY = "family"
 
 
 class UserStatus(str, enum.Enum):
@@ -179,3 +180,48 @@ class ClinicalAlertType(str, enum.Enum):
     REGRESSION = "regression"
     STAGNATION = "stagnation"
     FADING_CANDIDATE = "fading_candidate"
+
+
+class SuggestionType(str, enum.Enum):
+    """Seção 29.1 (Fase 4b) — sugestões geradas por regra (não por um modelo de
+    IA real ainda — ver nota de escopo em clinical_suggestion_service.py)."""
+
+    NEW_PROGRAM = "new_program"
+    FADING = "fading"
+    MASTERY_READY = "mastery_ready"
+
+
+class SuggestionStatus(str, enum.Enum):
+    """Seção 29.1 — toda sugestão é uma recomendação editável: o profissional
+    aprova ou descarta, nunca é aplicada automaticamente."""
+
+    PENDING = "pending"
+    APPROVED = "approved"
+    DISMISSED = "dismissed"
+
+
+class AssessmentProtocol(str, enum.Enum):
+    """Seção 30.1 — protocolos-piloto (V3): VB-MAPP e ABLLS-R. Demais
+    protocolos (AFLS, PEAK, ESDM, etc.) entram em ondas futuras."""
+
+    VB_MAPP = "vb_mapp"
+    ABLLS_R = "ablls_r"
+
+
+class PaymentStatus(str, enum.Enum):
+    """Seção 32.10 — Faturamento por Sessão: status de pagamento que a clínica
+    controla para o que ela mesma cobra do paciente/convênio (nunca é
+    calculado/atualizado automaticamente; sempre uma ação explícita da equipe)."""
+
+    PENDING = "pending"
+    PAID = "paid"
+    OVERDUE = "overdue"
+
+
+class WaitlistStatus(str, enum.Enum):
+    """Seção 32.11 — Lista de Espera: cadastro simplificado antes da admissão
+    formal. "Convertido" cria o paciente completo sem redigitação."""
+
+    WAITING = "waiting"
+    CONVERTED = "converted"
+    DISCARDED = "discarded"

@@ -1,6 +1,6 @@
-import { useEffect, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import { apiRequest } from "../api/client";
-import { Training, TrainingCategory } from "../types";
+import { ResourceItem, ResourceLink, Training, TrainingCategory } from "../types";
 
 export default function TrainingLibraryPage() {
   const [categories, setCategories] = useState<TrainingCategory[]>([]);
@@ -8,9 +8,14 @@ export default function TrainingLibraryPage() {
   const [categoryId, setCategoryId] = useState("");
   const [search, setSearch] = useState("");
   const [selected, setSelected] = useState<Training | null>(null);
+  const [resources, setResources] = useState<ResourceItem[]>([]);
+  const [resourceLinks, setResourceLinks] = useState<ResourceLink[]>([]);
+  const [linkResourceId, setLinkResourceId] = useState("");
+  const [linkRelevance, setLinkRelevance] = useState(3);
 
   useEffect(() => {
     apiRequest<TrainingCategory[]>("/training-categories").then(setCategories);
+    apiRequest<ResourceItem[]>("/resources").then(setResources);
   }, []);
 
   useEffect(() => {
@@ -19,6 +24,33 @@ export default function TrainingLibraryPage() {
     if (search) params.set("search", search);
     apiRequest<Training[]>(`/trainings?${params.toString()}`).then(setTrainings);
   }, [categoryId, search]);
+
+  function loadResourceLinks(trainingId: string) {
+    apiRequest<ResourceLink[]>(`/trainings/${trainingId}/resource-links`).then(setResourceLinks);
+  }
+
+  function selectTraining(training: Training) {
+    setSelected(training);
+    loadResourceLinks(training.id);
+  }
+
+  async function handleLinkResource(e: FormEvent) {
+    e.preventDefault();
+    if (!selected || !linkResourceId) return;
+    await apiRequest("/resource-links", {
+      method: "POST",
+      body: { resource_id: linkResourceId, training_id: selected.id, relevance_score: linkRelevance },
+    });
+    setLinkResourceId("");
+    setLinkRelevance(3);
+    loadResourceLinks(selected.id);
+  }
+
+  async function handleUnlinkResource(linkId: string) {
+    if (!selected) return;
+    await apiRequest(`/resource-links/${linkId}`, { method: "DELETE" });
+    loadResourceLinks(selected.id);
+  }
 
   return (
     <div>
@@ -50,7 +82,7 @@ export default function TrainingLibraryPage() {
           {trainings.map((training) => (
             <button
               key={training.id}
-              onClick={() => setSelected(training)}
+              onClick={() => selectTraining(training)}
               className={`text-left bg-white rounded-card shadow-sm p-4 hover:ring-2 hover:ring-brand-turquoise transition ${
                 selected?.id === training.id ? "ring-2 ring-brand-turquoise" : ""
               }`}
@@ -89,6 +121,55 @@ export default function TrainingLibraryPage() {
                   <span className="font-medium">Critério de domínio:</span> {selected.mastery_criteria}
                 </p>
               )}
+
+              <div className="pt-3 border-t border-slate-100 mt-2">
+                <div className="font-medium text-xs uppercase text-neutralState mb-2">
+                  Recursos vinculados (Biblioteca Inteligente)
+                </div>
+                <ul className="space-y-2 mb-3">
+                  {resourceLinks.map((link) => (
+                    <li key={link.id} className="flex items-center justify-between bg-slate-50 rounded-btn px-3 py-2 text-xs">
+                      <span>
+                        {link.resource_title} — relevância {link.relevance_score}/5
+                      </span>
+                      <button onClick={() => handleUnlinkResource(link.id)} className="text-danger">
+                        Remover
+                      </button>
+                    </li>
+                  ))}
+                  {resourceLinks.length === 0 && (
+                    <li className="text-xs text-neutralState">Nenhum recurso vinculado ainda.</li>
+                  )}
+                </ul>
+                <form onSubmit={handleLinkResource} className="flex gap-2">
+                  <select
+                    value={linkResourceId}
+                    onChange={(e) => setLinkResourceId(e.target.value)}
+                    className="h-8 text-xs rounded-btn border border-slate-300 px-2 flex-1"
+                  >
+                    <option value="">Vincular um recurso...</option>
+                    {resources.map((r) => (
+                      <option key={r.id} value={r.id}>
+                        {r.title}
+                      </option>
+                    ))}
+                  </select>
+                  <select
+                    value={linkRelevance}
+                    onChange={(e) => setLinkRelevance(Number(e.target.value))}
+                    className="h-8 text-xs rounded-btn border border-slate-300 px-2"
+                  >
+                    {[1, 2, 3, 4, 5].map((n) => (
+                      <option key={n} value={n}>
+                        Relevância {n}
+                      </option>
+                    ))}
+                  </select>
+                  <button type="submit" className="h-8 rounded-btn bg-brand-turquoise text-white px-3 text-xs font-medium">
+                    Vincular
+                  </button>
+                </form>
+              </div>
             </div>
           ) : (
             <div className="bg-white rounded-card shadow-sm p-6 text-neutralState text-sm">

@@ -1,7 +1,15 @@
 import { FormEvent, useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { apiRequest } from "../api/client";
-import { ClinicalAlert, ClinicalSession, Patient, SessionTemplate, Training, TrainingCategory } from "../types";
+import {
+  ClinicalAlert,
+  ClinicalSession,
+  ClinicalSuggestion,
+  Patient,
+  SessionTemplate,
+  Training,
+  TrainingCategory,
+} from "../types";
 import { useAuth } from "../context/AuthContext";
 
 function formatDateTime(value: string) {
@@ -22,6 +30,18 @@ const ALERT_COLORS: Record<string, string> = {
   fading_candidate: "bg-success/10 text-success",
 };
 
+const SUGGESTION_LABELS: Record<string, string> = {
+  new_program: "Novo programa",
+  fading: "Fading",
+  mastery_ready: "Objetivo dominado",
+};
+
+const SUGGESTION_COLORS: Record<string, string> = {
+  new_program: "bg-brand-blueLight text-brand-navy",
+  fading: "bg-success/10 text-success",
+  mastery_ready: "bg-amber-100 text-amber-700",
+};
+
 export default function PatientDetailPage() {
   const { patientId } = useParams<{ patientId: string }>();
   const { user } = useAuth();
@@ -29,6 +49,7 @@ export default function PatientDetailPage() {
 
   const [patient, setPatient] = useState<Patient | null>(null);
   const [alerts, setAlerts] = useState<ClinicalAlert[]>([]);
+  const [suggestions, setSuggestions] = useState<ClinicalSuggestion[]>([]);
   const [sessions, setSessions] = useState<ClinicalSession[]>([]);
   const [categories, setCategories] = useState<TrainingCategory[]>([]);
   const [trainings, setTrainings] = useState<Training[]>([]);
@@ -43,6 +64,7 @@ export default function PatientDetailPage() {
     if (!patientId) return;
     apiRequest<Patient>(`/patients/${patientId}`).then(setPatient);
     apiRequest<ClinicalAlert[]>(`/patients/${patientId}/alerts`).then(setAlerts);
+    apiRequest<ClinicalSuggestion[]>(`/patients/${patientId}/suggestions`).then(setSuggestions);
     apiRequest<ClinicalSession[]>(`/sessions?patient_id=${patientId}`).then(setSessions);
     apiRequest<SessionTemplate[]>(`/session-templates?patient_id=${patientId}`).then(setTemplates);
   }
@@ -81,6 +103,11 @@ export default function PatientDetailPage() {
     }
   }
 
+  async function decideSuggestion(suggestionId: string, action: "approve" | "dismiss") {
+    await apiRequest<ClinicalSuggestion>(`/suggestions/${suggestionId}/${action}`, { method: "POST" });
+    setSuggestions((prev) => prev.filter((s) => s.id !== suggestionId));
+  }
+
   function toggleTraining(id: string) {
     setSelectedTrainingIds((prev) => (prev.includes(id) ? prev.filter((t) => t !== id) : [...prev, id]));
   }
@@ -108,6 +135,12 @@ export default function PatientDetailPage() {
           <Link to={`/patients/${patientId}/timeline`} className="text-brand-blue underline">
             Timeline
           </Link>
+          <Link to={`/patients/${patientId}/assessments`} className="text-brand-blue underline">
+            Avaliações
+          </Link>
+          <Link to={`/patients/${patientId}/family-portal-admin`} className="text-brand-blue underline">
+            Portal da Família
+          </Link>
         </div>
       </div>
 
@@ -126,6 +159,51 @@ export default function PatientDetailPage() {
                 </div>
               </div>
             ))}
+          </div>
+        </div>
+      )}
+
+      {suggestions.filter((s) => s.status === "pending").length > 0 && (
+        <div className="bg-white rounded-card shadow-sm p-4 mb-6">
+          <h2 className="font-semibold text-brand-navy mb-1">Sugestões clínicas</h2>
+          <p className="text-xs text-neutralState mb-3">
+            Recomendações geradas por regra (Seção 29.1) — revise e aprove ou descarte; nenhuma ação é
+            aplicada automaticamente.
+          </p>
+          <div className="space-y-3">
+            {suggestions
+              .filter((s) => s.status === "pending")
+              .map((suggestion) => (
+                <div key={suggestion.id} className="flex items-start justify-between gap-3 text-sm">
+                  <div className="flex items-start gap-3">
+                    <span
+                      className={`shrink-0 rounded px-2 py-0.5 text-xs font-medium ${SUGGESTION_COLORS[suggestion.suggestion_type]}`}
+                    >
+                      {SUGGESTION_LABELS[suggestion.suggestion_type] ?? suggestion.suggestion_type}
+                    </span>
+                    <div>
+                      <span>{suggestion.message}</span>
+                      {suggestion.objective_title && (
+                        <span className="text-neutralState"> — objetivo: {suggestion.objective_title}</span>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex gap-2 shrink-0">
+                    <button
+                      onClick={() => decideSuggestion(suggestion.id, "approve")}
+                      className="rounded-btn bg-success text-white px-3 py-1 text-xs font-medium"
+                    >
+                      Aprovar
+                    </button>
+                    <button
+                      onClick={() => decideSuggestion(suggestion.id, "dismiss")}
+                      className="rounded-btn bg-white border border-slate-300 px-3 py-1 text-xs font-medium"
+                    >
+                      Descartar
+                    </button>
+                  </div>
+                </div>
+              ))}
           </div>
         </div>
       )}

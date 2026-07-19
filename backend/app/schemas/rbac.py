@@ -18,6 +18,8 @@ class ClinicPermissionSettingsResponse(BaseModel):
     stagnation_band_pp: int
     fading_session_count: int
     fading_independence_pct: int
+    mastery_suggestion_session_count: int
+    mastery_suggestion_accuracy_pct: int
 
     class Config:
         from_attributes = True
