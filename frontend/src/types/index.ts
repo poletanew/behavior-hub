@@ -593,3 +593,19 @@ export interface SessionCharge {
   created_by_user_id: string;
   created_at: string;
 }
+
+export type WaitlistStatus = "waiting" | "converted" | "discarded";
+
+export interface WaitlistEntry {
+  id: string;
+  name: string;
+  birth_date: string | null;
+  guardian_name: string | null;
+  contact_phone: string | null;
+  contact_email: string | null;
+  notes: string | null;
+  status: WaitlistStatus;
+  converted_patient_id: string | null;
+  created_by_user_id: string;
+  created_at: string;
+}

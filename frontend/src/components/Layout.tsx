@@ -75,6 +75,16 @@ export default function Layout() {
             </NavLink>
           )}
           <NavLink
+            to="/waitlist"
+            className={({ isActive }) =>
+              `block rounded-btn px-3 py-2 text-sm font-medium transition-colors ${
+                isActive ? "bg-brand-turquoise text-white" : "text-slate-200 hover:bg-white/10"
+              }`
+            }
+          >
+            Lista de Espera
+          </NavLink>
+          <NavLink
             to="/patients/import"
             className={({ isActive }) =>
               `block rounded-btn px-3 py-2 text-sm font-medium transition-colors ${

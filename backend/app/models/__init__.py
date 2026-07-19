@@ -19,6 +19,7 @@ from app.models.stripe_webhook_event import StripeWebhookEvent
 from app.models.training import Training, TrainingCategory
 from app.models.treatment_plan import Objective, ObjectiveComment, ObjectiveTraining, TreatmentPlan
 from app.models.user import User
+from app.models.waitlist_entry import WaitlistEntry
 
 __all__ = [
     "Appointment",
@@ -51,4 +52,5 @@ __all__ = [
     "ObjectiveComment",
     "ObjectiveTraining",
     "User",
+    "WaitlistEntry",
 ]

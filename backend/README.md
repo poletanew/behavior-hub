@@ -502,6 +502,36 @@ uma regra de quando algo "conta" como atrasado (tolerância de dias, fuso horár
 inventar essa regra seria fabricar um comportamento não pedido; por isso não há nenhum job Celery
 recalculando status por data.
 
+## Nota sobre Lista de Espera (Fase 5 bloco 4 — Seção 32.11, fecha os itens buildáveis da Fase 5)
+
+`WaitlistEntry` (`app/models/waitlist_entry.py`) segue o mesmo padrão de tenant denormalizado já
+usado em `Patient`/`Appointment`/`SessionCharge`. A única particularidade em relação a esses modelos:
+`birth_date` é opcional aqui (nullable), já que a Seção 32.11 descreve a lista de espera como um
+"cadastro simplificado... antes da admissão formal" — a data de nascimento pode não estar disponível
+ainda na triagem, diferente de `Patient.birth_date`, que é obrigatório desde a Fase 1.
+
+`waitlist_service.convert_entry` é a peça central de "conversão em paciente completo sem
+redigitação": reaproveita `patient_service.create_patient` diretamente (mesmo `PatientCreateRequest`
+que a Fase 1 já usa), passando `name`/`guardian_name`/`notes` da entrada da lista de espera sem pedir
+esses campos de novo — só pede o que ainda falta (`birth_date`, se ainda não capturado; `diagnosis`,
+opcional, já que não é um campo típico de triagem pré-admissão). Isso significa que `convert_entry`
+herda de graça todas as regras de `create_patient` (limite de paciente do plano Free, permissão RBAC
+configurável) sem precisar duplicá-las.
+
+Conversão e descarte são ações terminais: `status` só sai de `WAITING` uma vez (para `CONVERTED` ou
+`DISCARDED`), verificado explicitamente antes de qualquer edição/nova conversão (conflito 409) — uma
+entrada já processada não deveria mudar de estado retroativamente, já que `converted_patient_id`
+passaria a apontar para um histórico inconsistente.
+
+**Decisão de escopo deliberada: sem campos de convênio/plano de saúde.** O modelo de dados do
+Behavior Hub não tem nenhum conceito de convênio médico ainda (mesma lacuna já documentada para o
+Dashboard do Gestor e Faturamento por Sessão); a Seção 32.11 pede "campos mínimos", então adicionar
+esse campo agora seria inventar um requisito não pedido pelo PRD. A permissão de acesso reaproveita
+`rbac_service.can_create_patient` (a mesma regra configurável de "Cadastrar paciente" da Seção
+17.1) em vez de criar uma permissão nova — decisão consistente com o fato de que a Lista de Espera é,
+na prática, o mesmo tipo de decisão de negócio ("quem pode trazer um paciente novo para o sistema"),
+só que em duas etapas.
+
 ## Estrutura
 
 - `app/models/` — entidades SQLAlchemy (Seção 18/27 do PRD).

@@ -421,13 +421,26 @@ dados).
     registro de controle interno da clínica para o que ela cobra dos próprios pacientes/convênios,
     nunca processado por um gateway de pagamento real.
 
+### Fase 5 (bloco 4) — Lista de Espera (Waitlist)
+
+68. Acesse **Lista de Espera** no menu lateral e clique em **+ Adicionar à lista**: cadastre um nome
+    e, opcionalmente, data de nascimento, responsável, telefone/e-mail de contato e observações — os
+    únicos campos realmente mínimos para uma triagem antes da admissão formal (Seção 32.11).
+69. Em uma entrada com status **Aguardando**, use **Converter em paciente**: se a data de nascimento
+    já tiver sido capturada na triagem, ela é reaproveitada automaticamente; senão, o formulário pede
+    só o que falta. Ao confirmar, um paciente completo é criado (nome, responsável e observações
+    reaproveitados sem redigitar) e você é levado direto à página dele.
+70. **Descartar** marca a entrada como encerrada sem criar paciente (por exemplo, quando a família
+    desiste da triagem) — tanto conversão quanto descarte são ações finais: uma entrada já
+    convertida/descartada não pode ser editada nem convertida de novo.
+
 ### Rodando os testes automatizados do backend
 
 ```bash
 docker compose exec backend pytest -q
 ```
 
-(ou localmente, sem Docker — ver `backend/README.md`). 243 testes cobrem, entre outros:
+(ou localmente, sem Docker — ver `backend/README.md`). 253 testes cobrem, entre outros:
 
 - **AC-01**: conta nova inicia com zero pacientes/sessões/dashboard.
 - **AC-02** / **AC-03**: limite de 3 pacientes e bloqueio de foto no plano Free.
@@ -531,6 +544,11 @@ docker compose exec backend pytest -q
   pode criar ou editar (profissional recebe 403), marcar como Pago preenche `paid_at` e voltar para
   Pendente/Em atraso limpa esse campo, listagem por paciente e exportação CSV tenant-wide funcionam,
   e isolamento de tenant tanto na listagem quanto na exportação.
+- Lista de Espera: conversão sem data de nascimento capturada na triagem exige o campo no momento da
+  conversão (422 se ausente), conversão reaproveita a data já capturada quando presente, entrada
+  descartada ou já convertida não pode ser editada nem convertida de novo (conflito 409), filtro por
+  status funciona, profissional sem a permissão configurável de "cadastrar paciente" recebe 403,
+  conta individual também consegue usar a lista de espera, e isolamento de tenant.
 
 ## O que **não** está nesta fase
 
@@ -540,14 +558,15 @@ docker compose exec backend pytest -q
   estrutura de edição/aprovação/versionamento que a IA real usará depois. Quando você definir o
   provedor (Anthropic, OpenAI, etc.) e me passar a chave, trocamos só essa peça.
 - Seguindo o roadmap (Seção 31.1/31.2 do PRD): **as Fases 1 a 4b estão concluídas**, e a Fase 5 já
-  entregou o **Portal da Família** (Seção 29.6/17.2), o **White-label por Clínica** (Seção 32.9) e o
-  **Faturamento por Sessão** (Seção 32.10). As "ondas seguintes de protocolos de avaliação" (AFLS,
-  PEAK, ESDM, CARS, M-CHAT, IDADI, Vineland, Sensory Profile, Portage, SRS-2, Socially Savvy)
-  ficaram deliberadamente de fora desta rodada: a própria Seção 30.1 exige que cada protocolo seja
-  "validado com profissional especialista no instrumento antes da liberação" — implementá-los agora
-  exigiria inventar o esquema de domínios/pontuação máxima de instrumentos proprietários sem essa
-  validação, o mesmo risco de fabricação de dado clínico já evitado na decisão do ABLLS-R (Fase 4b).
-  Restam da Fase 5: waitlist, voice-to-text, ML preditivo e internacionalização.
+  entregou o **Portal da Família** (Seção 29.6/17.2), o **White-label por Clínica** (Seção 32.9), o
+  **Faturamento por Sessão** (Seção 32.10) e a **Lista de Espera** (Seção 32.11). As "ondas seguintes
+  de protocolos de avaliação" (AFLS, PEAK, ESDM, CARS, M-CHAT, IDADI, Vineland, Sensory Profile,
+  Portage, SRS-2, Socially Savvy) ficaram deliberadamente de fora desta rodada: a própria Seção 30.1
+  exige que cada protocolo seja "validado com profissional especialista no instrumento antes da
+  liberação" — implementá-los agora exigiria inventar o esquema de domínios/pontuação máxima de
+  instrumentos proprietários sem essa validação, o mesmo risco de fabricação de dado clínico já
+  evitado na decisão do ABLLS-R (Fase 4b). Restam da Fase 5: voice-to-text, ML preditivo e
+  internacionalização.
 - **Portal da Família**: revogação de acesso é imediata via um contador `token_version` no usuário,
   embutido em todo JWT emitido e conferido a cada requisição — bumpar esse contador invalida
   instantaneamente qualquer token já emitido para aquele responsável, sem precisar de uma tabela de
@@ -585,6 +604,14 @@ docker compose exec backend pytest -q
   (não é dado sensível por si só), mas a tentativa de criar uma nova sem o plano correto retorna 403
   — por isso a tela de cobrança aparece sempre, e só o clique em salvar revela a exigência de
   plano Premium/Enterprise.
+- **Lista de Espera**: sem campos de convênio/plano de saúde ou fila com posição numérica — a Seção
+  32.11 pede só "campos mínimos" e conversão sem redigitação, e o produto ainda não tem nenhum
+  conceito de convênio/plano de saúde no modelo de dados (o mesmo tipo de lacuna já documentado para
+  Faturamento por Sessão e o Dashboard do Gestor); adicionar esses campos agora seria inventar um
+  requisito que a Seção 32.11 não pede. A mesma permissão configurável de "Cadastrar paciente" (Seção
+  17.1) controla quem pode usar a lista de espera — não criamos uma permissão nova, já que triagem e
+  admissão formal são, na prática, a mesma decisão de negócio sobre quem pode trazer um novo paciente
+  para o sistema.
 - **Biblioteca Inteligente**: a "recomendação automática" da Seção 29.7 é, nesta fase, um vínculo
   manual (tagueamento) com pontuação de relevância definida pelo profissional — o próprio PRD já
   antecipava isso ("não há dado histórico suficiente para a IA inferir a relação sozinha no

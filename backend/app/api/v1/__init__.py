@@ -28,6 +28,7 @@ from app.api.v1 import (
     timeline,
     trainings,
     treatment_plans,
+    waitlist,
     white_label,
 )
 
@@ -60,3 +61,4 @@ api_router.include_router(supervisor_dashboard.router)
 api_router.include_router(family_access.router)
 api_router.include_router(family_portal.router)
 api_router.include_router(white_label.router)
+api_router.include_router(waitlist.router)

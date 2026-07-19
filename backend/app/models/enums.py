@@ -216,3 +216,12 @@ class PaymentStatus(str, enum.Enum):
     PENDING = "pending"
     PAID = "paid"
     OVERDUE = "overdue"
+
+
+class WaitlistStatus(str, enum.Enum):
+    """Seção 32.11 — Lista de Espera: cadastro simplificado antes da admissão
+    formal. "Convertido" cria o paciente completo sem redigitação."""
+
+    WAITING = "waiting"
+    CONVERTED = "converted"
+    DISCARDED = "discarded"

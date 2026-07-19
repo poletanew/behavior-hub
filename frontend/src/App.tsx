@@ -31,6 +31,7 @@ import PlansPage from "./pages/PlansPage";
 import FamilyAccessAdminPage from "./pages/FamilyAccessAdminPage";
 import WhiteLabelSettingsPage from "./pages/WhiteLabelSettingsPage";
 import BillingSessionsPage from "./pages/BillingSessionsPage";
+import WaitlistPage from "./pages/WaitlistPage";
 
 export default function App() {
   return (
@@ -80,6 +81,7 @@ export default function App() {
         <Route path="/plans" element={<PlansPage />} />
         <Route path="/white-label" element={<WhiteLabelSettingsPage />} />
         <Route path="/billing-sessions" element={<BillingSessionsPage />} />
+        <Route path="/waitlist" element={<WaitlistPage />} />
       </Route>
 
       <Route path="/" element={<Navigate to="/dashboard" replace />} />
