@@ -5,6 +5,7 @@ from app.models.clinic import Clinic
 from app.models.clinic_permission_settings import ClinicPermissionSettings
 from app.models.clinical_alert import ClinicalAlert
 from app.models.clinical_suggestion import ClinicalSuggestion
+from app.models.family_access import FamilyAccess, FamilyMessage
 from app.models.invitation import Invitation
 from app.models.notification import Notification
 from app.models.patient import Patient, PatientAssignment
@@ -26,6 +27,8 @@ __all__ = [
     "ClinicPermissionSettings",
     "ClinicalAlert",
     "ClinicalSuggestion",
+    "FamilyAccess",
+    "FamilyMessage",
     "Invitation",
     "Notification",
     "Patient",

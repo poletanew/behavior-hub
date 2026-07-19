@@ -37,6 +37,10 @@ def get_current_user(
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found")
     if user.status != UserStatus.ACTIVE:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Account is inactive")
+    if payload.get("ver") != user.token_version:
+        # Seção 17.2 — revogação (ex.: Family Portal) bumpa token_version, invalidando
+        # imediatamente qualquer access token já emitido, mesmo antes de expirar.
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token has been revoked")
 
     return user
 

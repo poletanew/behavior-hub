@@ -1,7 +1,7 @@
 import datetime
 import uuid
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, String
+from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base, StripeBillingMixin, TimestampMixin, UUIDPrimaryKeyMixin
@@ -21,6 +21,11 @@ class User(Base, UUIDPrimaryKeyMixin, TimestampMixin, StripeBillingMixin):
     # Seção 32.8 — Autenticação de Dois Fatores (TOTP).
     totp_secret: Mapped[str | None] = mapped_column(String(64), nullable=True)
     is_2fa_enabled: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+
+    # Seção 17.2 — incrementado para invalidar imediatamente todos os tokens já
+    # emitidos (ex.: revogação de acesso do Family Portal), sem precisar de uma
+    # tabela de sessões: o valor é embutido no JWT ("ver") e comparado a cada request.
+    token_version: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
 
     # Tenant isolation (Seção 6.2 / 17): a user belongs either to a clinic OR is an
     # individual tenant (clinic_id is NULL). Every clinical query must filter by this.

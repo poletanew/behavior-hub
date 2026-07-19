@@ -1,6 +1,9 @@
 import { Navigate, Route, Routes } from "react-router-dom";
 import Layout from "./components/Layout";
+import FamilyPortalLayout from "./components/FamilyPortalLayout";
 import ProtectedRoute from "./components/ProtectedRoute";
+import FamilyProtectedRoute from "./components/FamilyProtectedRoute";
+import FamilyPortalPage from "./pages/family/FamilyPortalPage";
 import LoginPage from "./pages/LoginPage";
 import RegisterPage from "./pages/RegisterPage";
 import DashboardPage from "./pages/DashboardPage";
@@ -25,6 +28,7 @@ import SupervisorDashboardPage from "./pages/SupervisorDashboardPage";
 import ManagerDashboardPage from "./pages/ManagerDashboardPage";
 import AssessmentsPage from "./pages/AssessmentsPage";
 import PlansPage from "./pages/PlansPage";
+import FamilyAccessAdminPage from "./pages/FamilyAccessAdminPage";
 
 export default function App() {
   return (
@@ -32,6 +36,16 @@ export default function App() {
       <Route path="/login" element={<LoginPage />} />
       <Route path="/register" element={<RegisterPage />} />
       <Route path="/invitations/:token/accept" element={<AcceptInvitationPage />} />
+
+      <Route
+        element={
+          <FamilyProtectedRoute>
+            <FamilyPortalLayout />
+          </FamilyProtectedRoute>
+        }
+      >
+        <Route path="/family-portal" element={<FamilyPortalPage />} />
+      </Route>
 
       <Route
         element={
@@ -47,6 +61,7 @@ export default function App() {
         <Route path="/patients/:patientId/reports" element={<ReportsPage />} />
         <Route path="/patients/:patientId/timeline" element={<TimelinePage />} />
         <Route path="/patients/:patientId/assessments" element={<AssessmentsPage />} />
+        <Route path="/patients/:patientId/family-portal-admin" element={<FamilyAccessAdminPage />} />
         <Route path="/agenda" element={<AgendaPage />} />
         <Route path="/sessions" element={<SessionsPage />} />
         <Route path="/sessions/:sessionId" element={<SessionDetailPage />} />

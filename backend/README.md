@@ -388,6 +388,67 @@ privados de outros profissionais é reaplicada aqui (`_resource_visible`, mesma 
 `resource_service.list_resources`) para que um vínculo não vaze um recurso privado de outra pessoa
 na lista agregada.
 
+## Nota sobre Portal da Família (Fase 5 bloco 1 — Seção 29.6/17.2)
+
+**Revogação imediata sem tabela de sessões.** A Seção 17.2 exige que "revogação de acesso do Family
+Portal seja imediata... com encerramento de sessões ativas do responsável", mas a autenticação do
+Behavior Hub é inteiramente stateless (JWT sem registro de sessão no banco). Em vez de reescrever
+toda a arquitetura de auth para um modelo de sessão server-side, adicionamos um único contador
+`token_version` em `User` (`app/models/user.py`), embutido como claim `"ver"` em todo token emitido
+(`auth_service.issue_tokens`) e conferido a cada request (`core/deps.get_current_user`) e a cada
+refresh (`auth_service.refresh_access_token`). `family_access_service.revoke_access` incrementa esse
+contador do usuário responsável ao revogar — qualquer token (access ou refresh) emitido antes disso
+passa a falhar com 401 na próxima requisição, mesmo que ainda não tenha expirado pela data. Isso
+invalida **todas** as sessões ativas daquele responsável (não só o acesso a um paciente específico),
+o que é a leitura mais literal de "sessões ativas do responsável" na Seção 17.2.
+
+**Whitelist, nunca blacklist.** `FamilyAccess` (`app/models/family_access.py`) tem cinco booleanos
+(`can_view_evolution_charts`, `can_view_upcoming_appointments`, `can_view_team_guidance`,
+`can_view_home_materials`, `can_use_messaging`), todos `default=False`. O convite de um responsável
+(papel novo `UserType.FAMILY`, reaproveitando o fluxo existente de `Invitation`/`accept_invitation`
+em vez de um sistema de convite paralelo) cria o `FamilyAccess` já com tudo desligado; cada categoria
+só liga com uma ação explícita do administrador (`family_access_service.update_whitelist`). Isso
+satisfaz literalmente a Seção 17.2: "o portal só exibe o que foi explicitamente liberado, e qualquer
+campo novo... fica oculto ao responsável até ser revisado e autorizado" — qualquer categoria futura
+nasce como um novo booleano `False`, nunca como uma exclusão de uma blacklist.
+
+**Consentimento registrado.** `FamilyAccess.consent_given_at` é gravado no momento em que o convite é
+aceito — o mesmo `accept_terms=True` que já serve de registro de aceite de termos para qualquer outro
+tipo de conta é reaproveitado como o "consentimento explícito e registrado" da Seção 17.2, em vez de
+inventar um fluxo de consentimento paralelo.
+
+**Bloqueio de contas `family` num único ponto.** Em vez de auditar e alterar todas as ~30 rotas
+escopadas a paciente para excluir explicitamente `UserType.FAMILY`, endurecemos o gate mais
+reaproveitado do sistema: `patient_service.get_patient_or_404`/`list_patients` (usado por
+praticamente todo endpoint de paciente — Reports, Plano de Tratamento, Avaliações, Agenda, etc.)
+agora rejeita `user_type == FAMILY` com 403 logo no início. Isso cobre a esmagadora maioria da
+superfície de API com uma mudança cirúrgica. Exposição residual conhecida e aceita: endpoints que
+**não** são escopados a paciente (Training Library, listagem de Recursos, listagem de Profissionais)
+não têm essa checagem explícita — uma conta `family` que os chamasse via API direta ainda esbarraria
+na ausência de `clinic_id`/atribuições compatíveis na prática (o usuário nem pertence à mesma
+listagem tenant-scoped de nada relevante), mas isso não tem teste automatizado dedicado nesta rodada.
+Todo acesso real do Portal da Família passa por `family_portal_service.py`, que nunca reaproveita os
+gates normais de paciente — cada método confere a `FamilyAccess` (existência + não revogado + a flag
+da categoria) antes de devolver qualquer dado.
+
+**Reuso de dados já existentes, sem inventar módulos novos.** "Orientações da equipe" mostra apenas
+`ReportSummary` com `status == APPROVED` (Seção 14.5) — nunca um rascunho em edição. "Materiais para
+casa" reaproveita a mesma agregação direto+via-treino de `resource_link_service.list_links_for_objective`
+(Fase 4b, Biblioteca Inteligente), restrita aos objetivos ativos do plano de tratamento do paciente.
+"Evolução" reaproveita as funções puras de `report_service` (`_fetch_rows`, `build_line_series`,
+`build_radar_data`, `build_cumulative_data`) diretamente, sem passar por `get_report_data` (que
+chama `patient_service.get_patient_or_404` com o usuário logado — inadequado aqui, já que quem
+acessa é uma conta `family`). `FamilyMessage` é uma lista simples sem threading (nenhuma menção a
+conversas aninhadas na Seção 29.6) — profissionais também podem ler/responder pelo mesmo canal via
+`GET/POST /patients/{id}/family-messages`.
+
+**Convite de responsável para tenant individual.** `Invitation.clinic_id` passou a ser opcional
+(antes obrigatório): um profissional individual (sem clínica) também tem pacientes e precisa poder
+convidar um responsável para eles. `Invitation.patient_id` (novo, opcional, obrigatório apenas
+quando `role == FAMILY`) reaproveita o mesmo gate de acesso a paciente do convidante
+(`patient_service.get_patient_or_404`) como controle de permissão — só quem já enxerga o paciente
+pode convidar um responsável para ele, sem precisar de uma nova regra de RBAC dedicada.
+
 ## Estrutura
 
 - `app/models/` — entidades SQLAlchemy (Seção 18/27 do PRD).

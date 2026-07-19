@@ -119,8 +119,11 @@ def authenticate(db: Session, payload: LoginRequest) -> User:
 
 
 def issue_tokens(user: User) -> tuple[str, str]:
-    access = create_token(str(user.id), TokenType.ACCESS)
-    refresh = create_token(str(user.id), TokenType.REFRESH)
+    # Seção 17.2 — "ver" (token_version) embutido no JWT para permitir revogação
+    # imediata (ex.: Family Portal) sem precisar de uma tabela de sessões.
+    extra_claims = {"ver": user.token_version}
+    access = create_token(str(user.id), TokenType.ACCESS, extra_claims=extra_claims)
+    refresh = create_token(str(user.id), TokenType.REFRESH, extra_claims=extra_claims)
     return access, refresh
 
 
@@ -157,19 +160,31 @@ def refresh_access_token(db: Session, refresh_token: str) -> tuple[str, str]:
     user = db.get(User, uuid.UUID(payload["sub"]))
     if user is None or user.status != UserStatus.ACTIVE:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid refresh token")
+    if payload.get("ver") != user.token_version:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid refresh token")
 
     return issue_tokens(user)
 
 
 def create_invitation(db: Session, inviter: User, payload: InvitationCreateRequest) -> tuple[Invitation, str]:
     """Seção 7.1 — gerar link unico com token criptograficamente seguro, expiracao padrao 7 dias.
-    Seção 17.1 — "Gerar convite" é Sim para admin e Configurável para supervisor."""
+    Seção 17.1 — "Gerar convite" é Sim para admin e Configurável para supervisor.
+    Seção 29.6 — convite de responsável (FAMILY) usa um gate diferente: em vez do
+    RBAC de convite de equipe, exige que o convidante já tenha acesso ao paciente
+    (mesmo gate de app.services.patient_service, que isola tenant e atribuição)."""
     from app.schemas.invitation import INVITABLE_ROLES
     from app.services import rbac_service
 
     if payload.role not in INVITABLE_ROLES:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid role for invitation")
-    if not rbac_service.can_generate_invitation(db, inviter):
+
+    patient_id = None
+    if payload.role == UserType.FAMILY:
+        from app.services import patient_service
+
+        patient = patient_service.get_patient_or_404(db, inviter, payload.patient_id)
+        patient_id = patient.id
+    elif not rbac_service.can_generate_invitation(db, inviter):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized to generate invitations")
 
     raw_token, token_hash = generate_invitation_token()
@@ -181,6 +196,7 @@ def create_invitation(db: Session, inviter: User, payload: InvitationCreateReque
         email=payload.email.lower(),
         specialty=payload.specialty,
         role=payload.role,
+        patient_id=patient_id,
         token_hash=token_hash,
         expires_at=expires_at,
         created_by_user_id=inviter.id,
@@ -244,6 +260,7 @@ def accept_invitation(db: Session, raw_token: str, payload: InvitationAcceptRequ
     invitation = _find_invitation_by_token(db, raw_token)
     _ensure_email_available(db, invitation.email)
 
+    now = datetime.datetime.now(datetime.timezone.utc)
     user = User(
         email=invitation.email,
         password_hash=hash_password(payload.password),
@@ -252,14 +269,29 @@ def accept_invitation(db: Session, raw_token: str, payload: InvitationAcceptRequ
         specialty=invitation.specialty,
         status=UserStatus.ACTIVE,
         clinic_id=invitation.clinic_id,
-        terms_accepted_at=datetime.datetime.now(datetime.timezone.utc),
+        terms_accepted_at=now,
     )
     db.add(user)
     db.flush()
 
     invitation.status = InvitationStatus.ACCEPTED
-    invitation.accepted_at = datetime.datetime.now(datetime.timezone.utc)
+    invitation.accepted_at = now
     invitation.accepted_by_user_id = user.id
+
+    if invitation.role == UserType.FAMILY:
+        # Seção 17.2 — o aceite do convite (accept_terms=True) É o registro do
+        # consentimento explícito do responsável; o acesso nasce com todas as
+        # flags de whitelist em False (nada liberado por padrão).
+        from app.models.family_access import FamilyAccess
+
+        db.add(
+            FamilyAccess(
+                patient_id=invitation.patient_id,
+                family_user_id=user.id,
+                granted_by_user_id=invitation.created_by_user_id,
+                consent_given_at=now,
+            )
+        )
 
     audit_service.record(
         db,

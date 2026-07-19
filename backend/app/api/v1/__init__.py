@@ -10,6 +10,8 @@ from app.api.v1 import (
     clinical_suggestions,
     dashboard,
     deleted_data,
+    family_access,
+    family_portal,
     invitations,
     manager_dashboard,
     notifications,
@@ -52,3 +54,5 @@ api_router.include_router(notifications.router)
 api_router.include_router(rbac.router)
 api_router.include_router(audit_logs.router)
 api_router.include_router(supervisor_dashboard.router)
+api_router.include_router(family_access.router)
+api_router.include_router(family_portal.router)

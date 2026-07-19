@@ -13,11 +13,16 @@ class Invitation(Base, UUIDPrimaryKeyMixin, TimestampMixin):
 
     __tablename__ = "invitations"
 
-    clinic_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("clinics.id"), nullable=False, index=True)
+    # Nullable porque um profissional individual (sem clinic_id) também pode
+    # convidar um responsável (Family Portal) para um paciente seu.
+    clinic_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("clinics.id"), nullable=True, index=True)
     email: Mapped[str] = mapped_column(String(320), nullable=False)
     specialty: Mapped[Specialty | None] = mapped_column(nullable=True)
-    # Seção 17.1 — permite convidar tanto profissionais quanto supervisores.
+    # Seção 17.1 — permite convidar profissionais, supervisores ou (Seção 29.6) responsáveis.
     role: Mapped[UserType] = mapped_column(default=UserType.PROFESSIONAL, nullable=False)
+    # Seção 29.6 — obrigatório apenas quando role == FAMILY: o paciente ao qual o
+    # responsável convidado terá acesso restrito e consentido.
+    patient_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("patients.id"), nullable=True, index=True)
 
     token_hash: Mapped[str] = mapped_column(String(255), unique=True, nullable=False)
     status: Mapped[InvitationStatus] = mapped_column(default=InvitationStatus.PENDING, nullable=False)

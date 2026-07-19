@@ -138,6 +138,9 @@ export default function PatientDetailPage() {
           <Link to={`/patients/${patientId}/assessments`} className="text-brand-blue underline">
             Avaliações
           </Link>
+          <Link to={`/patients/${patientId}/family-portal-admin`} className="text-brand-blue underline">
+            Portal da Família
+          </Link>
         </div>
       </div>
 

@@ -6,6 +6,7 @@ class UserType(str, enum.Enum):
     PROFESSIONAL = "professional"
     INDIVIDUAL = "individual"
     SUPERVISOR = "supervisor"
+    FAMILY = "family"
 
 
 class UserStatus(str, enum.Enum):

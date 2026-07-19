@@ -1,4 +1,4 @@
-export type UserType = "clinic_admin" | "professional" | "individual" | "supervisor";
+export type UserType = "clinic_admin" | "professional" | "individual" | "supervisor" | "family";
 
 export interface User {
   id: string;
@@ -500,6 +500,65 @@ export interface ResourceLink {
   objective_id: string | null;
   relevance_score: number;
   created_by_user_id: string;
+  created_at: string;
+}
+
+export interface FamilyAccess {
+  id: string;
+  patient_id: string;
+  patient_name: string;
+  family_user_id: string;
+  family_user_name: string;
+  family_user_email: string;
+  granted_by_user_id: string;
+  consent_given_at: string;
+  can_view_evolution_charts: boolean;
+  can_view_upcoming_appointments: boolean;
+  can_view_team_guidance: boolean;
+  can_view_home_materials: boolean;
+  can_use_messaging: boolean;
+  revoked_at: string | null;
+  created_at: string;
+}
+
+export interface FamilyMyAccess {
+  patient_id: string;
+  patient_name: string;
+  can_view_evolution_charts: boolean;
+  can_view_upcoming_appointments: boolean;
+  can_view_team_guidance: boolean;
+  can_view_home_materials: boolean;
+  can_use_messaging: boolean;
+}
+
+export interface FamilyEvolution {
+  line: LineSeries[];
+  radar: RadarPoint[];
+  cumulative: CumulativePoint[];
+}
+
+export interface FamilyAppointment {
+  id: string;
+  professional_name: string;
+  scheduled_start: string;
+  scheduled_end: string;
+  status: AppointmentStatus;
+}
+
+export interface FamilyGuidance {
+  id: string;
+  period_start: string;
+  period_end: string;
+  content: string;
+  created_at: string;
+}
+
+export interface FamilyMessage {
+  id: string;
+  patient_id: string;
+  sender_user_id: string;
+  sender_name: string;
+  body: string;
   created_at: string;
 }
 

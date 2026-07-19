@@ -365,13 +365,34 @@ dados).
     suficiente para a IA inferir a relação sozinha no lançamento"). Clicar em **Remover** desfaz o
     vínculo a qualquer momento.
 
+### Fase 5 (bloco 1) — Portal da Família
+
+55. Na página de um paciente, acesse **Portal da Família** (ao lado de Avaliações). Convide um
+    responsável informando o e-mail: um link de convite é gerado (mesmo fluxo de convite de
+    profissionais, agora com um novo papel `family` e obrigatoriamente vinculado a este paciente).
+56. Ao aceitar o convite, a conta nasce **sem nenhuma categoria liberada** — cinco caixas de
+    seleção (Evolução, Próximos agendamentos, Orientações da equipe, Materiais para casa, Mensagens)
+    controlam exatamente o que aparece para o responsável, sempre por whitelist explícita (Seção
+    17.2: "o portal só exibe o que foi explicitamente liberado"). Marque as categorias desejadas.
+57. Faça login com a conta do responsável: você é levado a uma área totalmente separada
+    (`/family-portal`, sem a barra lateral clínica) com abas apenas para as categorias liberadas.
+    Evolução mostra os mesmos dados de Reports (mas resumidos); Agenda mostra só compromissos
+    futuros; Orientações mostra apenas resumos de relatório já **aprovados** pela equipe (nunca um
+    rascunho); Materiais mostra os recursos recomendados dos objetivos ativos do paciente
+    (reaproveitando a Biblioteca Inteligente); Mensagens é um canal simples de texto entre a família
+    e a equipe.
+58. Volte como administrador/profissional em **Portal da Família** e clique em **Revogar acesso**: a
+    sessão do responsável é invalidada imediatamente (não apenas na próxima expiração de token) — ao
+    recarregar a página, ele é deslogado na hora, mesmo com um token de acesso ainda "válido" pela
+    data de expiração.
+
 ### Rodando os testes automatizados do backend
 
 ```bash
 docker compose exec backend pytest -q
 ```
 
-(ou localmente, sem Docker — ver `backend/README.md`). 207 testes cobrem, entre outros:
+(ou localmente, sem Docker — ver `backend/README.md`). 221 testes cobrem, entre outros:
 
 - **AC-01**: conta nova inicia com zero pacientes/sessões/dashboard.
 - **AC-02** / **AC-03**: limite de 3 pacientes e bloqueio de foto no plano Free.
@@ -455,6 +476,15 @@ docker compose exec backend pytest -q
   objetivo, nunca os dois nem nenhum), limite de pontuação de relevância (1–5), permissão de remoção
   restrita ao autor do vínculo ou administrador, recurso privado de outro profissional nunca aparece
   na recomendação (mesma regra de visibilidade da Biblioteca de Recursos), e isolamento de tenant.
+- Portal da Família: convite exige `patient_id` (e rejeita `patient_id` em convites de outros
+  papéis), aceite cria `FamilyAccess` com todas as flags em `False` e `consent_given_at` preenchido,
+  conta `family` recebe 403 em qualquer rota normal de paciente, cada categoria (evolução,
+  agendamentos, orientações, materiais, mensagens) só responde depois de liberada explicitamente,
+  orientações mostram apenas resumos com status aprovado, mensagens funcionam nos dois sentidos
+  (família ↔ equipe), revogação bumpa `token_version` e invalida imediatamente o token de acesso já
+  emitido (mesmo antes de expirar), convite de responsável só é permitido para quem já tem acesso ao
+  paciente (isolamento de tenant no convite), e profissional individual (sem clínica) também
+  consegue convidar um responsável para seus próprios pacientes.
 
 ## O que **não** está nesta fase
 
@@ -463,10 +493,26 @@ docker compose exec backend pytest -q
   (baseado em regras, não em um modelo de linguagem), claramente rotulado como tal, com a mesma
   estrutura de edição/aprovação/versionamento que a IA real usará depois. Quando você definir o
   provedor (Anthropic, OpenAI, etc.) e me passar a chave, trocamos só essa peça.
-- Seguindo o roadmap (Seção 31.1 do PRD): **a Fase 4a e a Fase 4b — Inteligência Clínica completa —
-  estão concluídas** (Fase 1, 2 e 3 também). A Fase 5 (Family Portal, ondas seguintes de protocolos
-  de avaliação, white-label, faturamento por sessão, waitlist, ML preditivo) é o que resta do
-  roadmap.
+- Seguindo o roadmap (Seção 31.1 do PRD): **as Fases 1 a 4b estão concluídas**, e a Fase 5 começou
+  pelo **Portal da Família** (Seção 29.6/17.2), o primeiro bloco listado na própria descrição da
+  fase. Restam da Fase 5: ondas seguintes de protocolos de avaliação, white-label, faturamento por
+  sessão, waitlist, voice-to-text, ML preditivo e internacionalização.
+- **Portal da Família**: revogação de acesso é imediata via um contador `token_version` no usuário,
+  embutido em todo JWT emitido e conferido a cada requisição — bumpar esse contador invalida
+  instantaneamente qualquer token já emitido para aquele responsável, sem precisar de uma tabela de
+  sessões ativas completa (decisão registrada em detalhe no `backend/README.md`). O bloqueio de
+  contas `family` nas rotas normais de paciente foi feito num único ponto central
+  (`patient_service.get_patient_or_404`/`list_patients`, reaproveitado por quase todo endpoint
+  escopado a paciente) em vez de auditar cada rota individualmente; como exposição residual
+  conhecida e aceita, endpoints não escopados a paciente (Training Library, Recursos, lista de
+  Profissionais) não têm essa checagem explícita — uma conta `family` que tentasse chamá-los via API
+  direta ainda seria bloqueada por não ter `clinic_id`/atribuições compatíveis na prática, mas isso
+  não foi coberto por teste automatizado dedicado nesta rodada. "Orientações da equipe" reaproveita
+  os `ReportSummary` já existentes (Seção 14.5), mostrando apenas os com status `approved`; "materiais
+  para casa" reaproveita a agregação de `resource_link_service` já construída na Biblioteca
+  Inteligente (Fase 4b), restrita aos objetivos ativos do paciente. Mensagens são uma lista simples
+  sem threading — suficiente para o MVP descrito no PRD, sem inventar um sistema de conversas
+  aninhadas que a Seção 29.6 não pede.
 - **Biblioteca Inteligente**: a "recomendação automática" da Seção 29.7 é, nesta fase, um vínculo
   manual (tagueamento) com pontuação de relevância definida pelo profissional — o próprio PRD já
   antecipava isso ("não há dado histórico suficiente para a IA inferir a relação sozinha no

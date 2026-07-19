@@ -177,11 +177,18 @@ def invite_and_accept_professional(client, admin_headers: dict, specialty: str =
     return invite_and_accept(client, admin_headers, role="professional", specialty=specialty)
 
 
-def invite_and_accept(client, admin_headers: dict, role: str = "professional", specialty: str | None = None) -> dict:
+def invite_and_accept(
+    client,
+    admin_headers: dict,
+    role: str = "professional",
+    specialty: str | None = None,
+    patient_id: str | None = None,
+) -> dict:
     email = unique_email(role)
-    invite_response = client.post(
-        "/v1/invitations", json={"email": email, "specialty": specialty, "role": role}, headers=admin_headers
-    )
+    payload = {"email": email, "specialty": specialty, "role": role}
+    if patient_id is not None:
+        payload["patient_id"] = patient_id
+    invite_response = client.post("/v1/invitations", json=payload, headers=admin_headers)
     assert invite_response.status_code == 201, invite_response.text
     raw_token = invite_response.json()["raw_token"]
 
