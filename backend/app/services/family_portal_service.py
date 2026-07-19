@@ -13,7 +13,7 @@ from app.models.resource import Resource
 from app.models.resource_link import ResourceLink
 from app.models.treatment_plan import Objective, ObjectiveTraining, TreatmentPlan
 from app.models.user import User
-from app.services import audit_service, report_service
+from app.services import audit_service, report_service, white_label_service
 from app.services.resource_link_service import _to_response as _resource_link_response
 
 # Seção 17.2 — o Family Portal nunca reaproveita os gates normais de paciente
@@ -65,6 +65,16 @@ def list_my_accesses(db: Session, family_user: User) -> list[dict]:
         }
         for access, patient in rows
     ]
+
+
+def get_branding(db: Session, family_user: User, patient_id: uuid.UUID) -> dict:
+    """Seção 32.9 — a marca (logo/cor/nome) não é uma categoria de dados
+    clínicos da whitelist (Seção 17.2); basta o responsável ter algum acesso
+    ativo a este paciente para ver a identidade visual da clínica dele."""
+    _get_active_access(db, family_user, patient_id)
+    patient = db.get(Patient, patient_id)
+    clinic_id = patient.clinic_id if patient is not None else None
+    return white_label_service.get_branding_for_clinic(db, clinic_id)
 
 
 def get_evolution(db: Session, family_user: User, patient_id: uuid.UUID) -> dict:

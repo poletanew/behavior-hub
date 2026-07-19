@@ -569,3 +569,10 @@ export interface BillingStatus {
   has_paid_access: boolean;
   stripe_configured: boolean;
 }
+
+export interface WhiteLabelSettings {
+  enabled: boolean;
+  logo_url: string | null;
+  brand_color: string | null;
+  display_name: string | null;
+}

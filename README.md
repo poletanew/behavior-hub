@@ -386,13 +386,29 @@ dados).
     recarregar a página, ele é deslogado na hora, mesmo com um token de acesso ainda "válido" pela
     data de expiração.
 
+### Fase 5 (bloco 2) — White-label por Clínica (Enterprise)
+
+59. Acesse **White-label** no menu lateral (administrador de clínica). Em qualquer plano abaixo do
+    Enterprise ativo, o formulário aparece desabilitado com um aviso explicando o requisito e um link
+    para **Planos**.
+60. Depois que a clínica estiver no plano Enterprise com assinatura ativa, defina um **nome exibido**
+    e uma **cor de destaque** e salve — eles passam a aparecer no PDF exportado de Reports (título e
+    cor do cabeçalho da tabela) e, se a clínica tiver responsáveis com Portal da Família, na faixa de
+    identidade visual do topo do portal deles.
+61. A **URL do logo** só é exibida no Portal da Família (via `<img>` no navegador do responsável) —
+    o PDF exportado no backend nunca busca essa URL, para não abrir uma superfície de SSRF ao
+    servidor. O rodapé "Powered by Behavior Hub" nunca desaparece, com ou sem white-label ativo.
+62. Se a clínica perder o status Enterprise ativo (downgrade, assinatura em atraso/cancelada), o
+    white-label para de valer imediatamente nas próximas requisições — mesmo que os campos continuem
+    salvos no banco, prontos para reativar sem reconfigurar tudo se a clínica voltar ao Enterprise.
+
 ### Rodando os testes automatizados do backend
 
 ```bash
 docker compose exec backend pytest -q
 ```
 
-(ou localmente, sem Docker — ver `backend/README.md`). 221 testes cobrem, entre outros:
+(ou localmente, sem Docker — ver `backend/README.md`). 230 testes cobrem, entre outros:
 
 - **AC-01**: conta nova inicia com zero pacientes/sessões/dashboard.
 - **AC-02** / **AC-03**: limite de 3 pacientes e bloqueio de foto no plano Free.
@@ -485,6 +501,11 @@ docker compose exec backend pytest -q
   emitido (mesmo antes de expirar), convite de responsável só é permitido para quem já tem acesso ao
   paciente (isolamento de tenant no convite), e profissional individual (sem clínica) também
   consegue convidar um responsável para seus próprios pacientes.
+- White-label: configuração rejeitada fora do plano Enterprise e também quando Enterprise mas com
+  assinatura inativa (nunca confiar apenas no rótulo do plano), cor hexadecimal inválida rejeitada,
+  configuração aplicada corretamente refletida no Family Portal (branding liga/desliga junto com o
+  status real da assinatura), acesso restrito a administrador de clínica (profissional e conta
+  individual recebem 403), e isolamento de tenant.
 
 ## O que **não** está nesta fase
 
@@ -493,10 +514,15 @@ docker compose exec backend pytest -q
   (baseado em regras, não em um modelo de linguagem), claramente rotulado como tal, com a mesma
   estrutura de edição/aprovação/versionamento que a IA real usará depois. Quando você definir o
   provedor (Anthropic, OpenAI, etc.) e me passar a chave, trocamos só essa peça.
-- Seguindo o roadmap (Seção 31.1 do PRD): **as Fases 1 a 4b estão concluídas**, e a Fase 5 começou
-  pelo **Portal da Família** (Seção 29.6/17.2), o primeiro bloco listado na própria descrição da
-  fase. Restam da Fase 5: ondas seguintes de protocolos de avaliação, white-label, faturamento por
-  sessão, waitlist, voice-to-text, ML preditivo e internacionalização.
+- Seguindo o roadmap (Seção 31.1/31.2 do PRD): **as Fases 1 a 4b estão concluídas**, e a Fase 5 já
+  entregou o **Portal da Família** (Seção 29.6/17.2) e o **White-label por Clínica** (Seção 32.9).
+  As "ondas seguintes de protocolos de avaliação" (AFLS, PEAK, ESDM, CARS, M-CHAT, IDADI, Vineland,
+  Sensory Profile, Portage, SRS-2, Socially Savvy) ficaram deliberadamente de fora desta rodada: a
+  própria Seção 30.1 exige que cada protocolo seja "validado com profissional especialista no
+  instrumento antes da liberação" — implementá-los agora exigiria inventar o esquema de
+  domínios/pontuação máxima de instrumentos proprietários sem essa validação, o mesmo risco de
+  fabricação de dado clínico já evitado na decisão do ABLLS-R (Fase 4b). Restam da Fase 5:
+  faturamento por sessão, waitlist, voice-to-text, ML preditivo e internacionalização.
 - **Portal da Família**: revogação de acesso é imediata via um contador `token_version` no usuário,
   embutido em todo JWT emitido e conferido a cada requisição — bumpar esse contador invalida
   instantaneamente qualquer token já emitido para aquele responsável, sem precisar de uma tabela de
@@ -513,6 +539,16 @@ docker compose exec backend pytest -q
   Inteligente (Fase 4b), restrita aos objetivos ativos do paciente. Mensagens são uma lista simples
   sem threading — suficiente para o MVP descrito no PRD, sem inventar um sistema de conversas
   aninhadas que a Seção 29.6 não pede.
+- **White-label**: o logo (URL) só é exibido no Portal da Família — renderizado como `<img>` no
+  navegador do responsável, nunca buscado pelo backend. Optamos por não embutir a imagem no PDF de
+  Reports exportado justamente para não abrir uma rota de SSRF (o servidor baixando uma URL arbitrária
+  fornecida pelo cliente); nome exibido e cor de destaque, por serem só texto/cor, aplicam-se
+  normalmente também no PDF. O rodapé "Powered by Behavior Hub" nunca é removido, mesmo com
+  white-label ativo, conforme a própria Seção 32.9 pede. O toggle de habilitação nunca confia apenas
+  no rótulo do plano salvo (`subscription_plan == ENTERPRISE`): também exige
+  `subscription_status` ativo/trialing, então uma clínica que atrasar ou cancelar o Enterprise perde
+  o white-label imediatamente, mas os campos salvos continuam no banco para reativar sem
+  reconfigurar tudo se ela voltar ao plano.
 - **Biblioteca Inteligente**: a "recomendação automática" da Seção 29.7 é, nesta fase, um vínculo
   manual (tagueamento) com pontuação de relevância definida pelo profissional — o próprio PRD já
   antecipava isso ("não há dado histórico suficiente para a IA inferir a relação sozinha no

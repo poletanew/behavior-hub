@@ -13,7 +13,7 @@ from sqlalchemy.orm import Session
 from app.models.session import ClinicalSession, SessionTraining, Trial
 from app.models.training import Training, TrainingCategory
 from app.models.user import User
-from app.services import patient_service, report_service
+from app.services import patient_service, report_service, white_label_service
 
 
 def _fetch_export_rows(db, patient_id, **filters):
@@ -78,17 +78,24 @@ def export_pdf(
     summary_text: str | None,
 ) -> bytes:
     """Seção 14.6 — relatório consolidado em PDF, com identificação, filtros
-    aplicados e data de geração (o logo da clínica fica para o White-label da
-    Fase 5 — Seção 32.9)."""
+    aplicados e data de geração. Seção 32.9 — clínicas Enterprise podem trocar
+    o nome exibido e a cor de destaque; o logo em si não é embutido no PDF
+    (evitaria o backend precisar buscar uma URL externa arbitrária no
+    momento da exportação — risco de SSRF sem benefício real, já que o nome/
+    cor já cobrem a necessidade de identidade visual em texto). O rodapé
+    "Powered by Behavior Hub" nunca é removido, mesmo com white-label ativo."""
     patient = patient_service.get_patient_or_404(db, user, patient_id)
     data = report_service.get_report_data(db, user, patient_id, date_from=date_from, date_to=date_to)
+    branding = white_label_service.get_branding_for_clinic(db, patient.clinic_id)
+    accent_color = branding["brand_color"] if branding["enabled"] and branding["brand_color"] else "#1D4ED8"
+    title = branding["display_name"] if branding["enabled"] and branding["display_name"] else "Behavior Hub"
 
     buffer = io.BytesIO()
     doc = SimpleDocTemplate(buffer, pagesize=A4, topMargin=20 * mm, bottomMargin=20 * mm)
     styles = getSampleStyleSheet()
     elements = []
 
-    elements.append(Paragraph("Behavior Hub — Relatório Consolidado", styles["Title"]))
+    elements.append(Paragraph(f"{title} — Relatório Consolidado", styles["Title"]))
     elements.append(Spacer(1, 6))
     elements.append(Paragraph(f"Paciente: {patient.name}", styles["Normal"]))
     period_label = (
@@ -118,7 +125,7 @@ def export_pdf(
     table.setStyle(
         TableStyle(
             [
-                ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#1D4ED8")),
+                ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor(accent_color)),
                 ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
                 ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#CBD5E1")),
                 ("FONTSIZE", (0, 0), (-1, -1), 9),
@@ -126,6 +133,8 @@ def export_pdf(
         )
     )
     elements.append(table)
+    elements.append(Spacer(1, 24))
+    elements.append(Paragraph("Powered by Behavior Hub", styles["Normal"]))
 
     doc.build(elements)
     return buffer.getvalue()

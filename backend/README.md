@@ -449,6 +449,32 @@ quando `role == FAMILY`) reaproveita o mesmo gate de acesso a paciente do convid
 (`patient_service.get_patient_or_404`) como controle de permissão — só quem já enxerga o paciente
 pode convidar um responsável para ele, sem precisar de uma nova regra de RBAC dedicada.
 
+## Nota sobre White-label por Clínica (Fase 5 bloco 2 — Seção 32.9)
+
+Três campos novos e nada mais em `Clinic` (`white_label_logo_url`, `white_label_brand_color`,
+`white_label_display_name`), todos nulos por padrão. `white_label_service._is_enterprise_and_active`
+é o único ponto de decisão sobre "o white-label vale ou não agora": exige
+`subscription_plan == ENTERPRISE` **e** `has_paid_access` (status ativo/trialing) — nunca confiar
+apenas no rótulo do plano salvo (Seção 8.3), então uma clínica que atrasar/cancelar o Enterprise
+perde a marca personalizada na próxima requisição, mesmo com os três campos ainda preenchidos no
+banco (útil se ela reativar depois: não precisa reconfigurar nada).
+
+`white_label_service.get_branding_for_clinic` é a função pública (sem exigir permissão de admin)
+reaproveitada por duas superfícies diferentes: `report_export_service.export_pdf` (troca o título e
+a cor do cabeçalho da tabela) e `family_portal_service.get_branding` (endpoint
+`GET /family-portal/patients/{id}/branding`, acessível a qualquer conta `family` com pelo menos um
+`FamilyAccess` ativo para aquele paciente — a marca visual não é uma das cinco categorias de dados
+clínicos da whitelist da Seção 17.2, então não exige nenhuma flag específica).
+
+**Decisão de escopo deliberada: o logo não é embutido no PDF.** Embutir a imagem exigiria o backend
+baixar uma URL fornecida pelo cliente no momento da exportação — uma superfície clássica de SSRF
+(Server-Side Request Forgery) sem um proxy de imagem dedicado para mitigá-la, o que estava fora do
+escopo deste bloco. Nome exibido e cor de destaque não têm esse problema (são só texto/cor) e por
+isso aparecem normalmente no PDF. Já no Portal da Família, o logo aparece normalmente via `<img>`
+no navegador do próprio responsável — quem busca a URL ali é o navegador dele, não o nosso backend,
+então não há esse risco. O rodapé "Powered by Behavior Hub" é adicionado incondicionalmente ao PDF,
+com ou sem white-label ativo, conforme a Seção 32.9 exige.
+
 ## Estrutura
 
 - `app/models/` — entidades SQLAlchemy (Seção 18/27 do PRD).

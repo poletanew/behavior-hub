@@ -29,6 +29,7 @@ import ManagerDashboardPage from "./pages/ManagerDashboardPage";
 import AssessmentsPage from "./pages/AssessmentsPage";
 import PlansPage from "./pages/PlansPage";
 import FamilyAccessAdminPage from "./pages/FamilyAccessAdminPage";
+import WhiteLabelSettingsPage from "./pages/WhiteLabelSettingsPage";
 
 export default function App() {
   return (
@@ -76,6 +77,7 @@ export default function App() {
         <Route path="/supervisor-dashboard" element={<SupervisorDashboardPage />} />
         <Route path="/manager-dashboard" element={<ManagerDashboardPage />} />
         <Route path="/plans" element={<PlansPage />} />
+        <Route path="/white-label" element={<WhiteLabelSettingsPage />} />
       </Route>
 
       <Route path="/" element={<Navigate to="/dashboard" replace />} />

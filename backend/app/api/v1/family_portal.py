@@ -15,6 +15,7 @@ from app.schemas.family import (
     FamilyMyAccessResponse,
 )
 from app.schemas.resource_link import ResourceLinkResponse
+from app.schemas.white_label import PublicBrandingResponse
 from app.services import family_portal_service
 
 router = APIRouter(prefix="/family-portal", tags=["family-portal"])
@@ -24,6 +25,12 @@ router = APIRouter(prefix="/family-portal", tags=["family-portal"])
 def list_my_accesses(db: Session = Depends(get_db), user: User = Depends(get_current_user)):
     """Seção 29.6 — pacientes (e categorias liberadas) visíveis para este responsável."""
     return family_portal_service.list_my_accesses(db, user)
+
+
+@router.get("/patients/{patient_id}/branding", response_model=PublicBrandingResponse)
+def get_patient_branding(patient_id: uuid.UUID, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+    """Seção 32.9 — identidade visual (logo/cor/nome) da clínica do paciente, quando Enterprise."""
+    return family_portal_service.get_branding(db, user, patient_id)
 
 
 @router.get("/patients/{patient_id}/evolution", response_model=FamilyEvolutionResponse)

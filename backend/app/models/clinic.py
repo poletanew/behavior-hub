@@ -21,6 +21,13 @@ class Clinic(Base, UUIDPrimaryKeyMixin, TimestampMixin, StripeBillingMixin):
         default=SubscriptionStatus.NONE, nullable=False
     )
 
+    # Seção 32.9 — White-label (Enterprise): logo, cor de destaque e nome exibido
+    # em relatórios exportados e no Family Portal. Nunca altera a marca dentro do
+    # próprio produto (Seção 23 permanece a identidade oficial do sistema).
+    white_label_logo_url: Mapped[str | None] = mapped_column(String(1024), nullable=True)
+    white_label_brand_color: Mapped[str | None] = mapped_column(String(7), nullable=True)
+    white_label_display_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
+
     users: Mapped[list["User"]] = relationship(  # noqa: F821
         back_populates="clinic", foreign_keys="User.clinic_id"
     )

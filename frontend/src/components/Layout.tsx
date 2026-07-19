@@ -142,6 +142,18 @@ export default function Layout() {
           >
             Segurança
           </NavLink>
+          {user?.user_type === "clinic_admin" && (
+            <NavLink
+              to="/white-label"
+              className={({ isActive }) =>
+                `block rounded-btn px-3 py-2 text-sm font-medium transition-colors ${
+                  isActive ? "bg-brand-turquoise text-white" : "text-slate-200 hover:bg-white/10"
+                }`
+              }
+            >
+              White-label
+            </NavLink>
+          )}
           {isAdmin && (
             <NavLink
               to="/plans"

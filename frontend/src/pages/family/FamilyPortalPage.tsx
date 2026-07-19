@@ -6,6 +6,7 @@ import {
   FamilyGuidance,
   FamilyMessage,
   FamilyMyAccess,
+  WhiteLabelSettings,
 } from "../../types";
 
 type TabKey = "evolution" | "appointments" | "guidance" | "materials" | "messages";
@@ -37,6 +38,7 @@ export default function FamilyPortalPage() {
   const [patientId, setPatientId] = useState<string>("");
   const [tab, setTab] = useState<TabKey | null>(null);
   const [loaded, setLoaded] = useState(false);
+  const [branding, setBranding] = useState<WhiteLabelSettings | null>(null);
 
   useEffect(() => {
     apiRequest<FamilyMyAccess[]>("/family-portal/my-accesses").then((data) => {
@@ -45,6 +47,11 @@ export default function FamilyPortalPage() {
       if (data.length > 0) setPatientId(data[0].patient_id);
     });
   }, []);
+
+  useEffect(() => {
+    if (!patientId) return;
+    apiRequest<WhiteLabelSettings>(`/family-portal/patients/${patientId}/branding`).then(setBranding);
+  }, [patientId]);
 
   const currentAccess = accesses.find((a) => a.patient_id === patientId) ?? null;
   const tabs = currentAccess ? tabsFor(currentAccess) : [];
@@ -72,10 +79,23 @@ export default function FamilyPortalPage() {
 
   return (
     <div className="p-8 max-w-3xl mx-auto">
+      {branding?.enabled && (
+        <div
+          className="flex items-center gap-3 rounded-card px-4 py-3 mb-4 text-white"
+          style={{ backgroundColor: branding.brand_color ?? "#1D4ED8" }}
+        >
+          {branding.logo_url && (
+            // eslint-disable-next-line jsx-a11y/alt-text
+            <img src={branding.logo_url} className="h-8 w-8 rounded object-contain bg-white/10" />
+          )}
+          <span className="font-semibold">{branding.display_name ?? "Portal da Família"}</span>
+        </div>
+      )}
       <h1 className="text-2xl font-bold text-brand-navy mb-1">Portal da Família</h1>
-      <p className="text-sm text-neutralState mb-6">
+      <p className="text-sm text-neutralState mb-1">
         Você só enxerga aqui o que foi explicitamente liberado pela equipe clínica.
       </p>
+      <p className="text-xs text-neutralState mb-6">{branding?.enabled ? "Powered by Behavior Hub" : ""}</p>
 
       {accesses.length > 1 && (
         <select
