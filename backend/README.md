@@ -532,6 +532,22 @@ esse campo agora seria inventar um requisito não pedido pelo PRD. A permissão 
 na prática, o mesmo tipo de decisão de negócio ("quem pode trazer um paciente novo para o sistema"),
 só que em duas etapas.
 
+## Fechamento do roadmap (Seção 31 do PRD)
+
+Com a Lista de Espera (bloco 4), a Fase 5 — e o roadmap detalhado da Seção 31 como um todo — chegou
+ao fim do que dá para construir sem inventar requisito ou dado clínico que o PRD não especifica. A
+Anotação por Voz (bloco 5, Seção 32.12) fechou a última peça, mas é puramente frontend (Web Speech
+API do navegador, sem nenhuma mudança de backend) — ver `README.md` na raiz do repositório para os
+detalhes de implementação. Três itens do escopo original ficaram deliberadamente de fora, cada um
+com um motivo diferente e documentado (ondas seguintes de protocolos de avaliação — exigem validação
+de especialista por instrumento antes da liberação, Seção 30.1; Machine Learning preditivo — a
+própria Seção 29.10 descreve isso como "visão de futuro" condicionada a volume de dados que só existe
+após meses de uso real em produção; internacionalização — a Seção 20 pede só "interface preparada
+para tradução", não o lançamento efetivo de outro idioma, e o frontend não tem hoje nenhuma
+biblioteca de i18n para justificar uma extração retroativa sem um segundo idioma real para validar).
+O detalhamento completo de cada decisão está na seção "O que não está nesta fase" do `README.md` da
+raiz.
+
 ## Estrutura
 
 - `app/models/` — entidades SQLAlchemy (Seção 18/27 do PRD).

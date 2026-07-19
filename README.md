@@ -74,6 +74,24 @@ Este repositório está sendo construído **por fases**, seguindo o roadmap da S
   (vincular a um objetivo). Ao abrir um objetivo, os recursos recomendados agregam os vínculos
   diretos do objetivo com os vínculos dos treinos que ele usa — **fecha o roadmap da Fase 4b —
   Inteligência Clínica avançada**.
+- **Fase 5 (bloco 1) — Portal da Família (Seção 29.6/17.2)**: novo tipo de conta `family`, com acesso
+  restrito por paciente via whitelist explícita (evolução, agendamentos, orientações, materiais,
+  mensagens — tudo começando desligado). Revogação imediata via contador `token_version` embutido no
+  JWT, sem precisar de uma tabela de sessões.
+- **Fase 5 (bloco 2) — White-label por Clínica (Seção 32.9)**: nome exibido, cor de destaque e logo
+  personalizáveis por clínicas Enterprise ativas, aplicados nos relatórios exportados e no Portal da
+  Família, sem alterar a marca dentro do próprio produto.
+- **Fase 5 (bloco 3) — Faturamento por Sessão (Seção 32.10)**: registro de controle interno do que a
+  clínica cobra por sessão realizada (valor, vencimento, status pendente/pago/em atraso), totalmente
+  independente da assinatura SaaS via Stripe, disponível nos planos Premium/Enterprise.
+- **Fase 5 (bloco 4) — Lista de Espera (Seção 32.11)**: cadastro simplificado de pacientes em
+  triagem antes da admissão formal, com conversão em paciente completo sem redigitação.
+- **Fase 5 (bloco 5) — Anotação por Voz (Seção 32.12)**: ditado por voz da observação da tentativa
+  via Web Speech API nativa do navegador, sempre editável antes de salvar — **fecha os itens da Fase
+  5 e do roadmap detalhado da Seção 31 que dá para construir sem inventar requisito ou dado clínico
+  que o PRD não especifica** (ver "O que não está nesta fase" para o detalhamento dos três itens
+  conscientemente deixados de fora: ondas seguintes de protocolos de avaliação, ML preditivo e
+  internacionalização).
 
 ## Stack (Seção 4 do PRD)
 
@@ -434,7 +452,7 @@ dados).
     desiste da triagem) — tanto conversão quanto descarte são ações finais: uma entrada já
     convertida/descartada não pode ser editada nem convertida de novo.
 
-### Fase 5 (bloco 5) — Anotação por Voz (Voice-to-Text)
+### Fase 5 (bloco 5) — Anotação por Voz (Voice-to-Text), fecha os itens buildáveis da Fase 5 e do roadmap
 
 71. Em um **Atendimento**, ao lado do campo "Observação (opcional)" de qualquer treino, um botão
     **Ditar** aparece nos navegadores que suportam a Web Speech API nativa (Chrome/Edge; não aparece
@@ -570,17 +588,36 @@ docker compose exec backend pytest -q
   (baseado em regras, não em um modelo de linguagem), claramente rotulado como tal, com a mesma
   estrutura de edição/aprovação/versionamento que a IA real usará depois. Quando você definir o
   provedor (Anthropic, OpenAI, etc.) e me passar a chave, trocamos só essa peça.
-- Seguindo o roadmap (Seção 31.1/31.2 do PRD): **as Fases 1 a 4b estão concluídas**, e a Fase 5 já
-  entregou o **Portal da Família** (Seção 29.6/17.2), o **White-label por Clínica** (Seção 32.9), o
-  **Faturamento por Sessão** (Seção 32.10), a **Lista de Espera** (Seção 32.11) e a **Anotação por
-  Voz** (Seção 32.12). As "ondas seguintes de protocolos de avaliação" (AFLS, PEAK, ESDM, CARS,
-  M-CHAT, IDADI, Vineland, Sensory Profile, Portage, SRS-2, Socially Savvy) ficaram deliberadamente
-  de fora desta rodada: a própria Seção 30.1 exige que cada protocolo seja "validado com profissional
-  especialista no instrumento antes da liberação" — implementá-los agora exigiria inventar o esquema
-  de domínios/pontuação máxima de instrumentos proprietários sem essa validação, o mesmo risco de
-  fabricação de dado clínico já evitado na decisão do ABLLS-R (Fase 4b). Restam da Fase 5: ML
-  preditivo (explicitamente descrito na Seção 29.10 como "visão de futuro", sem critério de aceite
-  concreto) e internacionalização (sem seção dedicada no PRD).
+- Seguindo o roadmap (Seção 31.1/31.2 do PRD): **as Fases 1 a 4b estão concluídas**, e a Fase 5
+  entregou tudo o que tinha um requisito concreto e implementável — **Portal da Família** (Seção
+  29.6/17.2), **White-label por Clínica** (Seção 32.9), **Faturamento por Sessão** (Seção 32.10),
+  **Lista de Espera** (Seção 32.11) e **Anotação por Voz** (Seção 32.12). Isso fecha o roadmap
+  detalhado da Seção 31 até onde ele pode ser construído sem inventar requisito ou dado que o PRD não
+  especifica. Três itens do escopo original da Fase 5 ficaram deliberadamente de fora, cada um por um
+  motivo diferente, documentado aqui em vez de silenciosamente ignorado:
+  - **Ondas seguintes de protocolos de avaliação** (AFLS, PEAK, ESDM, CARS, M-CHAT, IDADI, Vineland,
+    Sensory Profile, Portage, SRS-2, Socially Savvy) — a própria Seção 30.1 exige que cada protocolo
+    seja "validado com profissional especialista no instrumento antes da liberação". Implementá-los
+    agora exigiria inventar o esquema de domínios/pontuação máxima de instrumentos proprietários sem
+    essa validação — o mesmo risco de fabricação de dado clínico já evitado na decisão do ABLLS-R
+    (Fase 4b). Fica pronto para entrar assim que você validar um protocolo por vez com um
+    especialista, reaproveitando a mesma arquitetura `ProtocolDefinition` já construída.
+  - **Machine Learning preditivo** (Seção 29.10) — a própria seção descreve isso como "visão de
+    futuro": modelos que estimem risco de regressão, velocidade esperada de aprendizagem e
+    efetividade histórica de estratégias, condicionados a "volume suficiente de coletas acumuladas na
+    base". Não há critério de aceite, schema de features, nem um provedor/framework de ML definido —
+    apenas uma direção declarada. Treinar (ou fingir que treinamos) um modelo agora seria inventar
+    tanto o método quanto os resultados; o dado real para isso só existe depois de meses de uso em
+    produção, o que este ambiente de desenvolvimento não tem como simular de forma honesta.
+  - **Internacionalização** (Seção 20, Requisitos Não-Funcionais) — o texto exato do PRD é
+    "Interface preparada para tradução, embora português seja o idioma inicial", ou seja, um requisito
+    de arquitetura ("preparada para"), não um pedido para efetivamente lançar outro idioma. Todo o
+    frontend hoje tem strings em português direto no JSX, sem nenhuma biblioteca de i18n
+    (react-i18next ou equivalente) nem catálogo de textos extraído. Fazer essa extração retroativa
+    em ~30 páginas é um refactor mecânico de alto risco de regressão sem nenhum ganho visível até que
+    exista um segundo idioma real para validar contra — e você ainda não indicou qual seria esse
+    idioma nem forneceu nenhuma tradução. Preferimos deixar isso explícito a fingir uma preparação
+    para tradução que na prática não foi testada com nenhum idioma além do português.
 - **Portal da Família**: revogação de acesso é imediata via um contador `token_version` no usuário,
   embutido em todo JWT emitido e conferido a cada requisição — bumpar esse contador invalida
   instantaneamente qualquer token já emitido para aquele responsável, sem precisar de uma tabela de
