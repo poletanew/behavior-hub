@@ -2,6 +2,7 @@ import { FormEvent, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { ApiError } from "../api/client";
+import { BrandLogoVertical } from "../components/BrandMark";
 
 export default function LoginPage() {
   const { login, completeTwoFactorLogin } = useAuth();
@@ -49,6 +50,7 @@ export default function LoginPage() {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-brand-navy to-brand-turquoise px-4">
         <div className="bg-white rounded-card shadow-lg p-8 w-full max-w-sm">
+          <BrandLogoVertical className="mb-6" showTagline={false} />
           <h1 className="text-2xl font-bold text-brand-navy mb-1">Verificação em duas etapas</h1>
           <p className="text-sm text-neutralState mb-6">
             Digite o código de 6 dígitos do seu aplicativo autenticador.
@@ -95,8 +97,8 @@ export default function LoginPage() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-brand-navy to-brand-turquoise px-4">
       <div className="bg-white rounded-card shadow-lg p-8 w-full max-w-sm">
-        <h1 className="text-2xl font-bold text-brand-navy mb-1">Behavior Hub</h1>
-        <p className="text-sm text-neutralState mb-6">Entre com sua conta para continuar.</p>
+        <BrandLogoVertical className="mb-6" />
+        <p className="text-sm text-neutralState mb-6 text-center">Entre com sua conta para continuar.</p>
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>

@@ -5,7 +5,7 @@ import { useAuth } from "../context/AuthContext";
 import NotificationBell from "./NotificationBell";
 
 const navItems = [
-  { to: "/dashboard", label: "Dashboard" },
+  { to: "/dashboard", label: "Área de Trabalho" },
   { to: "/patients", label: "Pacientes" },
   { to: "/agenda", label: "Agenda" },
   { to: "/sessions", label: "Atendimentos" },

@@ -92,6 +92,12 @@ Este repositório está sendo construído **por fases**, seguindo o roadmap da S
   que o PRD não especifica** (ver "O que não está nesta fase" para o detalhamento dos três itens
   conscientemente deixados de fora: ondas seguintes de protocolos de avaliação, ML preditivo e
   internacionalização).
+- **Fase 6 (bloco 1) — Addendum de Melhorias v2.1, RF-01 e RF-02** (ver
+  `docs/Behavior_Hub_Addendum_v2.1.pdf`): favicon com o símbolo reduzido da marca (rede de nós
+  formando a letra "B", Seção 23.7) em todas as páginas, logotipo vertical centralizado na tela de
+  login/2FA acima dos campos de formulário (Seção 23.8), e renomeação de "Dashboard" para "Área de
+  Trabalho" em todo texto visível ao usuário (rótulo do menu e título da página) — sem alterar
+  comportamento ou a rota `/dashboard` internamente.
 
 ## Stack (Seção 4 do PRD)
 
