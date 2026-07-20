@@ -113,6 +113,13 @@ Este repositório está sendo construído **por fases**, seguindo o roadmap da S
   `ClinicPermissionSettings`, aplicado tanto na visibilidade do menu quanto na própria API de
   importação — não é só uma máscara visual). Contas individuais continuam com acesso irrestrito, já
   que não existe um "admin" separado para liberar o flag para si mesmas.
+- **Fase 6 (bloco 4) — Addendum de Melhorias v2.1, RF-03**: Patient ganha quatro campos pessoais
+  opcionais — endereço, telefone (com máscara), nome da escola e turno escolar — com o mesmo
+  tratamento de acesso já usado para diagnóstico (sem uma camada de criptografia por campo
+  separada; a proteção vem do gate normal de acesso ao registro do paciente). A listagem de
+  pacientes deixa de ser uma tabela simples e passa a ser um grid de cards (avatar com iniciais,
+  nome, idade calculada, badge de status, resumo de diagnóstico, segunda linha com escola+turno, e
+  um botão "Ver contato" que revela telefone/endereço sem precisar abrir o cadastro completo).
 
 ## Stack (Seção 4 do PRD)
 

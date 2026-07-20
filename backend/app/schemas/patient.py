@@ -3,7 +3,7 @@ import uuid
 
 from pydantic import BaseModel, Field
 
-from app.models.enums import AssignmentPermission, PatientStatus
+from app.models.enums import AssignmentPermission, PatientStatus, SchoolShift
 
 
 class PatientCreateRequest(BaseModel):
@@ -12,6 +12,10 @@ class PatientCreateRequest(BaseModel):
     guardian_name: str | None = None
     diagnosis: str | None = None
     notes: str | None = None
+    address: str | None = Field(default=None, max_length=500)
+    phone: str | None = Field(default=None, max_length=30)
+    school_name: str | None = Field(default=None, max_length=255)
+    school_shift: SchoolShift | None = None
 
 
 class PatientUpdateRequest(BaseModel):
@@ -21,6 +25,10 @@ class PatientUpdateRequest(BaseModel):
     diagnosis: str | None = None
     notes: str | None = None
     status: PatientStatus | None = None
+    address: str | None = Field(default=None, max_length=500)
+    phone: str | None = Field(default=None, max_length=30)
+    school_name: str | None = Field(default=None, max_length=255)
+    school_shift: SchoolShift | None = None
 
 
 class PatientResponse(BaseModel):
@@ -32,6 +40,10 @@ class PatientResponse(BaseModel):
     notes: str | None
     photo_url: str | None
     status: PatientStatus
+    address: str | None
+    phone: str | None
+    school_name: str | None
+    school_shift: SchoolShift | None
     clinic_id: uuid.UUID | None
     individual_owner_id: uuid.UUID | None
     deleted_at: datetime.datetime | None

@@ -11,6 +11,8 @@ export interface User {
   subscription_plan: string | null;
 }
 
+export type SchoolShift = "manha" | "tarde" | "integral" | "nao_frequenta";
+
 export interface Patient {
   id: string;
   name: string;
@@ -20,6 +22,10 @@ export interface Patient {
   notes: string | null;
   photo_url: string | null;
   status: string;
+  address: string | null;
+  phone: string | null;
+  school_name: string | null;
+  school_shift: SchoolShift | null;
   clinic_id: string | null;
   individual_owner_id: string | null;
   deleted_at: string | null;

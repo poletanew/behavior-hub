@@ -13,6 +13,7 @@ import {
 } from "../types";
 import { useAuth } from "../context/AuthContext";
 import { professionalDisplayName } from "../utils/specialty";
+import { schoolShiftLabel } from "../utils/patient";
 
 function formatDateTime(value: string) {
   return new Date(value).toLocaleString("pt-BR");
@@ -137,6 +138,14 @@ export default function PatientDetailPage() {
         <p className="text-neutralState text-sm mt-1">Nascimento: {patient.birth_date}</p>
         {patient.guardian_name && <p className="text-sm mt-1">Responsável: {patient.guardian_name}</p>}
         {patient.diagnosis && <p className="text-sm mt-1">Diagnóstico: {patient.diagnosis}</p>}
+        {patient.phone && <p className="text-sm mt-1">Telefone: {patient.phone}</p>}
+        {patient.address && <p className="text-sm mt-1">Endereço: {patient.address}</p>}
+        {patient.school_name && (
+          <p className="text-sm mt-1">
+            Escola: {patient.school_name}
+            {schoolShiftLabel(patient.school_shift) ? ` · ${schoolShiftLabel(patient.school_shift)}` : ""}
+          </p>
+        )}
         <div className="flex gap-4 mt-3 text-sm">
           <Link to={`/patients/${patientId}/treatment-plan`} className="text-brand-blue underline">
             Plano de Tratamento

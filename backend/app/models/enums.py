@@ -215,3 +215,12 @@ class WaitlistStatus(str, enum.Enum):
     WAITING = "waiting"
     CONVERTED = "converted"
     DISCARDED = "discarded"
+
+
+class SchoolShift(str, enum.Enum):
+    """Addendum v2.1, RF-03 — turno escolar do paciente, campo opcional."""
+
+    MANHA = "manha"
+    TARDE = "tarde"
+    INTEGRAL = "integral"
+    NAO_FREQUENTA = "nao_frequenta"

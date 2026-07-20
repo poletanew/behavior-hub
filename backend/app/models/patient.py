@@ -5,7 +5,7 @@ from sqlalchemy import CheckConstraint, Date, ForeignKey, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base, SoftDeleteMixin, TimestampMixin, UUIDPrimaryKeyMixin
-from app.models.enums import AssignmentPermission, PatientStatus
+from app.models.enums import AssignmentPermission, PatientStatus, SchoolShift
 
 
 class Patient(Base, UUIDPrimaryKeyMixin, TimestampMixin, SoftDeleteMixin):
@@ -31,6 +31,15 @@ class Patient(Base, UUIDPrimaryKeyMixin, TimestampMixin, SoftDeleteMixin):
     guardian_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
     diagnosis: Mapped[str | None] = mapped_column(Text, nullable=True)
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    # Addendum v2.1, RF-03 — dados pessoais adicionais (Seção 17.2/LGPD: mesmo
+    # tratamento de acesso já aplicado a diagnosis, sem uma camada de
+    # criptografia por campo separada — texto simples como os demais campos
+    # sensíveis deste modelo).
+    address: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    phone: Mapped[str | None] = mapped_column(String(30), nullable=True)
+    school_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    school_shift: Mapped[SchoolShift | None] = mapped_column(nullable=True)
     photo_url: Mapped[str | None] = mapped_column(String(1024), nullable=True)
     status: Mapped[PatientStatus] = mapped_column(default=PatientStatus.ACTIVE, nullable=False)
 

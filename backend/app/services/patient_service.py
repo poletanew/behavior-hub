@@ -102,6 +102,10 @@ def create_patient(db: Session, user: User, payload: PatientCreateRequest) -> Pa
         guardian_name=payload.guardian_name,
         diagnosis=payload.diagnosis,
         notes=payload.notes,
+        address=payload.address,
+        phone=payload.phone,
+        school_name=payload.school_name,
+        school_shift=payload.school_shift,
         status=PatientStatus.ACTIVE,
         created_by_user_id=user.id,
     )
