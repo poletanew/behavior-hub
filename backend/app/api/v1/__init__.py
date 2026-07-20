@@ -21,7 +21,6 @@ from app.api.v1 import (
     reports,
     resource_links,
     resources,
-    session_charges,
     session_templates,
     sessions,
     supervisor_dashboard,
@@ -46,7 +45,6 @@ api_router.include_router(patients.router)
 api_router.include_router(professionals.router)
 api_router.include_router(sessions.router)
 api_router.include_router(session_templates.router)
-api_router.include_router(session_charges.router)
 api_router.include_router(trainings.router)
 api_router.include_router(dashboard.router)
 api_router.include_router(treatment_plans.router)

@@ -475,37 +475,21 @@ no navegador do próprio responsável — quem busca a URL ali é o navegador de
 então não há esse risco. O rodapé "Powered by Behavior Hub" é adicionado incondicionalmente ao PDF,
 com ou sem white-label ativo, conforme a Seção 32.9 exige.
 
-## Nota sobre Faturamento por Sessão (Fase 5 bloco 3 — Seção 32.10)
+## Nota sobre a remoção do Faturamento por Sessão (Fase 6 bloco 2 — Addendum v2.1, RF-08/RF-16)
 
-`SessionCharge` (`app/models/session_charge.py`) segue o mesmo padrão de tenant denormalizado já
-usado em `Patient`/`Appointment`/`Assessment` (`clinic_id` XOR `individual_owner_id` via
-`CheckConstraint`), com `session_id` único — no máximo uma cobrança por sessão registrada
-(`ck_session_charges_amount_positive` garante `amount > 0` também no nível do banco). O gate de
-plano usa `plan_service.current_plan(user)` (o helper canônico já existente para "nunca confiar
-apenas no rótulo do plano salvo" — Seção 8.3) em vez de checar `clinic.subscription_plan`
-diretamente como fazem `two_factor_service`/`clinical_alert_service`: aqui faz sentido usar o
-helper porque o recurso também precisa funcionar para tenants individuais (Premium/Enterprise não é
-exclusivo de clínica), e `current_plan` já resolve isso corretamente para os dois tipos de tenant.
-
-`_require_admin` restringe criação/edição/exportação a `CLINIC_ADMIN`/`INDIVIDUAL` — a mesma
-restrição que `billing_service` já aplica à gestão de assinatura/Stripe, já que é dado financeiro
-sensível. **Leitura é mais permissiva de propósito**: `get_charge_for_session` não exige plano
-Premium/Enterprise nem permissão de admin (além do gate normal de acesso ao paciente via
-`patient_service.get_patient_or_404`) porque só informa se uma sessão já tem cobrança — não é em si
-um dado sensível, e esconder esse formulário atrás do plano exigiria uma segunda chamada só para
-decidir se mostra a tela, sem ganho real de segurança. A UI mostra sempre o formulário de cobrança;
-é a tentativa de `POST` que retorna 403 se o plano não for Premium/Enterprise.
-
-Sem due_date automático virando "em atraso": o campo `due_date` é só informativo. O status
-`overdue` é sempre setado por uma ação explícita da equipe financeira da clínica — o PRD não define
-uma regra de quando algo "conta" como atrasado (tolerância de dias, fuso horário, feriados etc.), e
-inventar essa regra seria fabricar um comportamento não pedido; por isso não há nenhum job Celery
-recalculando status por data.
+A Fase 5 bloco 3 havia introduzido `SessionCharge` (cobrança por sessão dentro da clínica). O
+Addendum de Melhorias v2.1 pediu a remoção explícita dessa proposta ("reverte a proposta de
+Faturamento por Sessão"), então o modelo, o serviço, as rotas, a migration de reversão e a tela de
+Faturamento foram removidos por completo — não é um recurso oculto atrás de feature flag como o
+RF-13 pediu para Importar Paciente, é uma reversão de fato. A gestão da assinatura Stripe do
+próprio Behavior Hub (Seção 8.3) não foi afetada: ela já vivia dentro da tela "Planos" desde a Fase
+3, então o pedido do RF-16 de "mover para dentro de Planos" já estava satisfeito sem nenhuma
+mudança adicional.
 
 ## Nota sobre Lista de Espera (Fase 5 bloco 4 — Seção 32.11, fecha os itens buildáveis da Fase 5)
 
 `WaitlistEntry` (`app/models/waitlist_entry.py`) segue o mesmo padrão de tenant denormalizado já
-usado em `Patient`/`Appointment`/`SessionCharge`. A única particularidade em relação a esses modelos:
+usado em `Patient`/`Appointment`/`Assessment`. A única particularidade em relação a esses modelos:
 `birth_date` é opcional aqui (nullable), já que a Seção 32.11 descreve a lista de espera como um
 "cadastro simplificado... antes da admissão formal" — a data de nascimento pode não estar disponível
 ainda na triagem, diferente de `Patient.birth_date`, que é obrigatório desde a Fase 1.
@@ -525,7 +509,7 @@ passaria a apontar para um histórico inconsistente.
 
 **Decisão de escopo deliberada: sem campos de convênio/plano de saúde.** O modelo de dados do
 Behavior Hub não tem nenhum conceito de convênio médico ainda (mesma lacuna já documentada para o
-Dashboard do Gestor e Faturamento por Sessão); a Seção 32.11 pede "campos mínimos", então adicionar
+Dashboard do Gestor); a Seção 32.11 pede "campos mínimos", então adicionar
 esse campo agora seria inventar um requisito não pedido pelo PRD. A permissão de acesso reaproveita
 `rbac_service.can_create_patient` (a mesma regra configurável de "Cadastrar paciente" da Seção
 17.1) em vez de criar uma permissão nova — decisão consistente com o fato de que a Lista de Espera é,

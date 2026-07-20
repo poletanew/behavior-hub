@@ -13,7 +13,6 @@ from app.models.report_summary import ReportSummary
 from app.models.resource import Resource
 from app.models.resource_link import ResourceLink
 from app.models.session import ClinicalSession, SessionTraining, Trial
-from app.models.session_charge import SessionCharge
 from app.models.session_template import SessionTemplate, SessionTemplateTraining
 from app.models.stripe_webhook_event import StripeWebhookEvent
 from app.models.training import Training, TrainingCategory
@@ -40,7 +39,6 @@ __all__ = [
     "ResourceLink",
     "ClinicalSession",
     "SessionTraining",
-    "SessionCharge",
     "SessionTemplate",
     "SessionTemplateTraining",
     "StripeWebhookEvent",

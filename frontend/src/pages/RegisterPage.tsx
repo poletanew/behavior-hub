@@ -1,21 +1,7 @@
 import { FormEvent, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { apiRequest, ApiError } from "../api/client";
-
-const SPECIALTIES = [
-  { value: "psicologo_infantil", label: "Psicólogo infantil" },
-  { value: "analista_comportamento_aba", label: "Analista do Comportamento / ABA" },
-  { value: "fonoaudiologo", label: "Fonoaudiólogo" },
-  { value: "terapeuta_ocupacional", label: "Terapeuta Ocupacional" },
-  { value: "psicopedagogo", label: "Psicopedagogo" },
-  { value: "fisioterapeuta_pediatrico", label: "Fisioterapeuta pediátrico" },
-  { value: "neuropediatra", label: "Neuropediatra" },
-  { value: "psiquiatra_infantil", label: "Psiquiatra infantil" },
-  { value: "nutricionista_infantil", label: "Nutricionista infantil" },
-  { value: "musicoterapeuta", label: "Musicoterapeuta" },
-  { value: "arteterapeuta", label: "Arteterapeuta" },
-  { value: "psicomotricista", label: "Psicomotricista" },
-];
+import { SPECIALTIES } from "../utils/specialty";
 
 type AccountType = "clinic" | "individual";
 

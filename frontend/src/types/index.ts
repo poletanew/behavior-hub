@@ -577,23 +577,6 @@ export interface WhiteLabelSettings {
   display_name: string | null;
 }
 
-export type PaymentStatus = "pending" | "paid" | "overdue";
-
-export interface SessionCharge {
-  id: string;
-  session_id: string;
-  patient_id: string;
-  patient_name: string;
-  session_date: string;
-  amount: number;
-  due_date: string | null;
-  payment_status: PaymentStatus;
-  paid_at: string | null;
-  notes: string | null;
-  created_by_user_id: string;
-  created_at: string;
-}
-
 export type WaitlistStatus = "waiting" | "converted" | "discarded";
 
 export interface WaitlistEntry {

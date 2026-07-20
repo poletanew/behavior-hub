@@ -208,16 +208,6 @@ class AssessmentProtocol(str, enum.Enum):
     ABLLS_R = "ablls_r"
 
 
-class PaymentStatus(str, enum.Enum):
-    """Seção 32.10 — Faturamento por Sessão: status de pagamento que a clínica
-    controla para o que ela mesma cobra do paciente/convênio (nunca é
-    calculado/atualizado automaticamente; sempre uma ação explícita da equipe)."""
-
-    PENDING = "pending"
-    PAID = "paid"
-    OVERDUE = "overdue"
-
-
 class WaitlistStatus(str, enum.Enum):
     """Seção 32.11 — Lista de Espera: cadastro simplificado antes da admissão
     formal. "Convertido" cria o paciente completo sem redigitação."""

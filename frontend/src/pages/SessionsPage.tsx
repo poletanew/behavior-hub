@@ -1,8 +1,9 @@
 import { FormEvent, useEffect, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { apiRequest } from "../api/client";
-import { ClinicalSession, Patient, Training, TrainingCategory } from "../types";
+import { ClinicalSession, Patient, Training, TrainingCategory, User } from "../types";
 import { useAuth } from "../context/AuthContext";
+import { professionalDisplayName } from "../utils/specialty";
 
 function formatDateTime(value: string) {
   return new Date(value).toLocaleString("pt-BR");
@@ -19,15 +20,18 @@ export default function SessionsPage() {
 
   const [sessions, setSessions] = useState<ClinicalSession[]>([]);
   const [patients, setPatients] = useState<Patient[]>([]);
+  const [professionals, setProfessionals] = useState<User[]>([]);
   const [categories, setCategories] = useState<TrainingCategory[]>([]);
   const [trainings, setTrainings] = useState<Training[]>([]);
   const [loading, setLoading] = useState(true);
-  const [showForm, setShowForm] = useState(Boolean(prefillAppointmentId));
-  const [patientId, setPatientId] = useState(prefillPatientId);
+  const [professionalId, setProfessionalId] = useState(prefillProfessionalId);
   const [occurredAt, setOccurredAt] = useState(prefillOccurredAt);
   const [notes, setNotes] = useState("");
   const [selectedTrainingIds, setSelectedTrainingIds] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
+
+  const showForm = Boolean(prefillPatientId);
+  const contextPatient = patients.find((p) => p.id === prefillPatientId);
 
   useEffect(() => {
     apiRequest<ClinicalSession[]>("/sessions")
@@ -36,7 +40,15 @@ export default function SessionsPage() {
     apiRequest<Patient[]>("/patients").then(setPatients);
     apiRequest<TrainingCategory[]>("/training-categories").then(setCategories);
     apiRequest<Training[]>("/trainings").then(setTrainings);
+    apiRequest<User[]>("/professionals").then((list) => {
+      setProfessionals(list.filter((p) => p.user_type !== "family"));
+    });
   }, []);
+
+  useEffect(() => {
+    if (user?.id && !professionalId) setProfessionalId(user.id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id]);
 
   function toggleTraining(id: string) {
     setSelectedTrainingIds((prev) => (prev.includes(id) ? prev.filter((t) => t !== id) : [...prev, id]));
@@ -49,8 +61,8 @@ export default function SessionsPage() {
       const session = await apiRequest<ClinicalSession>("/sessions", {
         method: "POST",
         body: {
-          patient_id: patientId,
-          professional_id: prefillProfessionalId || user?.id,
+          patient_id: prefillPatientId,
+          professional_id: professionalId || user?.id,
           occurred_at: new Date(occurredAt).toISOString(),
           notes: notes || null,
           training_ids: selectedTrainingIds,
@@ -59,20 +71,24 @@ export default function SessionsPage() {
       });
       navigate(`/sessions/${session.id}`);
     } catch {
-      setError("Não foi possível criar o atendimento. Selecione um paciente e ao menos um treino.");
+      setError("Não foi possível criar o atendimento. Selecione o profissional responsável e ao menos um treino.");
     }
   }
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-6">
+      <div className="mb-6">
         <h1 className="text-2xl font-bold text-brand-navy">Atendimentos</h1>
-        <button
-          onClick={() => setShowForm((v) => !v)}
-          className="rounded-btn bg-brand-turquoise text-white px-4 py-2 text-sm font-medium"
-        >
-          Novo Atendimento
-        </button>
+        {!showForm && (
+          <p className="text-sm text-neutralState mt-1">
+            Esta é a visão administrativa de todos os atendimentos da clínica. Para iniciar um novo
+            atendimento, acesse a{" "}
+            <Link to="/patients" className="text-brand-blue underline">
+              ficha do paciente
+            </Link>{" "}
+            ou conclua um compromisso pela Agenda.
+          </p>
+        )}
       </div>
 
       {showForm && (
@@ -84,16 +100,22 @@ export default function SessionsPage() {
           )}
           <div>
             <label className="block text-sm font-medium mb-1">Paciente</label>
+            <div className="w-full h-10 rounded-btn border border-slate-200 bg-slate-50 px-3 flex items-center text-neutralState">
+              {contextPatient?.name ?? "..."}
+            </div>
+          </div>
+          <div>
+            <label className="block text-sm font-medium mb-1">Profissional / Terapeuta responsável</label>
             <select
               required
-              value={patientId}
-              onChange={(e) => setPatientId(e.target.value)}
+              value={professionalId}
+              onChange={(e) => setProfessionalId(e.target.value)}
               className="w-full h-10 rounded-btn border border-slate-300 px-3"
             >
               <option value="">Selecione...</option>
-              {patients.map((p) => (
+              {professionals.map((p) => (
                 <option key={p.id} value={p.id}>
-                  {p.name}
+                  {professionalDisplayName(p)}
                 </option>
               ))}
             </select>
@@ -147,7 +169,7 @@ export default function SessionsPage() {
             </button>
             <button
               type="button"
-              onClick={() => setShowForm(false)}
+              onClick={() => navigate("/sessions")}
               className="rounded-btn bg-white border border-slate-300 px-4 py-2 text-sm font-medium"
             >
               Cancelar

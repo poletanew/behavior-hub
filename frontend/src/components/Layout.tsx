@@ -166,18 +166,6 @@ export default function Layout() {
           )}
           {isAdmin && (
             <NavLink
-              to="/billing-sessions"
-              className={({ isActive }) =>
-                `block rounded-btn px-3 py-2 text-sm font-medium transition-colors ${
-                  isActive ? "bg-brand-turquoise text-white" : "text-slate-200 hover:bg-white/10"
-                }`
-              }
-            >
-              Faturamento
-            </NavLink>
-          )}
-          {isAdmin && (
-            <NavLink
               to="/plans"
               className={({ isActive }) =>
                 `block rounded-btn px-3 py-2 text-sm font-medium transition-colors ${

@@ -98,6 +98,15 @@ Este repositório está sendo construído **por fases**, seguindo o roadmap da S
   login/2FA acima dos campos de formulário (Seção 23.8), e renomeação de "Dashboard" para "Área de
   Trabalho" em todo texto visível ao usuário (rótulo do menu e título da página) — sem alterar
   comportamento ou a rota `/dashboard` internamente.
+- **Fase 6 (bloco 2) — Addendum de Melhorias v2.1, RF-07/RF-09/RF-08/RF-16**: Atendimentos passa a
+  ser um fluxo centrado no paciente — a ficha do paciente (Pacientes → paciente → Histórico de
+  Sessões) é o ponto de entrada do dia a dia, com o campo Paciente sempre fixo/somente leitura e o
+  Profissional/Terapeuta responsável como seletor obrigatório (especialidade exibida junto ao nome).
+  A lista global de Atendimentos vira uma visão administrativa somente-leitura. **Reverte por
+  completo** a Faturamento por Sessão da Fase 5 bloco 3 (modelo, serviço, rotas e tela removidos, não
+  apenas ocultos) — a gestão da assinatura Stripe do Behavior Hub já vivia dentro da tela "Planos"
+  desde a Fase 3, então nenhuma mudança adicional foi necessária para o pedido de "mover para
+  Planos".
 
 ## Stack (Seção 4 do PRD)
 
