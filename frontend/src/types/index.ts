@@ -296,6 +296,7 @@ export interface ClinicPermissionSettings {
   admins_can_edit_any_objective_area: boolean;
   supervisors_can_restore_deleted_data: boolean;
   supervisors_can_generate_invitations: boolean;
+  bulk_import_enabled: boolean;
   no_collection_days: number;
   regression_window_sessions: number;
   regression_drop_pp: number;

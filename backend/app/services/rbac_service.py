@@ -3,8 +3,9 @@ import uuid
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 
+from app.models.clinic import Clinic
 from app.models.clinic_permission_settings import ClinicPermissionSettings
-from app.models.enums import UserType
+from app.models.enums import SubscriptionPlan, UserType
 from app.models.user import User
 from app.schemas.rbac import ClinicPermissionSettingsUpdateRequest
 from app.services import audit_service
@@ -112,3 +113,42 @@ def can_generate_invitation(db: Session, user: User) -> bool:
         settings = get_settings_for_user(db, user)
         return bool(settings and settings.supervisors_can_generate_invitations)
     return False
+
+
+def bulk_import_enabled_for_user(db: Session, user: User) -> bool:
+    """Addendum v2.1, RF-13 — contas individuais sempre têm acesso (não há um
+    "admin" separado para liberar o flag); clínicas ficam desligadas por
+    padrão até um admin habilitar (Enterprise apenas, ver update_bulk_import_flag)."""
+    if user.clinic_id is None:
+        return True
+    settings = get_settings_for_user(db, user)
+    return bool(settings and settings.bulk_import_enabled)
+
+
+def update_bulk_import_flag(db: Session, admin: User, enabled: bool) -> ClinicPermissionSettings:
+    if admin.user_type != UserType.CLINIC_ADMIN or admin.clinic_id is None:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only clinic admins can change this setting")
+
+    clinic = db.get(Clinic, admin.clinic_id)
+    if clinic is None or clinic.subscription_plan != SubscriptionPlan.ENTERPRISE or not clinic.has_paid_access:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Bulk patient import is only available on an active Enterprise plan",
+        )
+
+    settings = get_or_create_settings(db, admin.clinic_id)
+    before = {"bulk_import_enabled": settings.bulk_import_enabled}
+    settings.bulk_import_enabled = enabled
+
+    audit_service.record(
+        db,
+        actor_user_id=admin.id,
+        action="bulk_import_flag_updated",
+        entity_type="clinic_permission_settings",
+        entity_id=settings.id,
+        before=before,
+        after={"bulk_import_enabled": enabled},
+    )
+    db.commit()
+    db.refresh(settings)
+    return settings

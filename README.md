@@ -107,6 +107,12 @@ Este repositório está sendo construído **por fases**, seguindo o roadmap da S
   apenas ocultos) — a gestão da assinatura Stripe do Behavior Hub já vivia dentro da tela "Planos"
   desde a Fase 3, então nenhuma mudança adicional foi necessária para o pedido de "mover para
   Planos".
+- **Fase 6 (bloco 3) — Addendum de Melhorias v2.1, RF-13**: Importação em Lote de Pacientes não foi
+  removida do código, apenas fica oculta do menu principal por padrão. Liberável por clínica em
+  Configurações da Clínica, restrito a clínicas Enterprise ativas (`bulk_import_enabled` em
+  `ClinicPermissionSettings`, aplicado tanto na visibilidade do menu quanto na própria API de
+  importação — não é só uma máscara visual). Contas individuais continuam com acesso irrestrito, já
+  que não existe um "admin" separado para liberar o flag para si mesmas.
 
 ## Stack (Seção 4 do PRD)
 

@@ -111,6 +111,8 @@ export default function ClinicSettingsPage() {
   const [error, setError] = useState<string | null>(null);
   const [thresholdError, setThresholdError] = useState<string | null>(null);
   const [thresholdMessage, setThresholdMessage] = useState<string | null>(null);
+  const [bulkImportError, setBulkImportError] = useState<string | null>(null);
+  const [bulkImportSaving, setBulkImportSaving] = useState(false);
 
   const isEnterprise = billingStatus?.subscription_plan === "enterprise" && billingStatus.has_paid_access;
 
@@ -145,6 +147,30 @@ export default function ClinicSettingsPage() {
       } else {
         setThresholdError("Não foi possível salvar o limiar.");
       }
+    }
+  }
+
+  async function handleBulkImportToggle(value: boolean) {
+    if (!settings) return;
+    setBulkImportError(null);
+    const previous = settings;
+    setSettings({ ...settings, bulk_import_enabled: value });
+    setBulkImportSaving(true);
+    try {
+      const updated = await apiRequest<ClinicPermissionSettings>("/clinic/permission-settings/bulk-import", {
+        method: "POST",
+        body: { enabled: value },
+      });
+      setSettings(updated);
+    } catch (err) {
+      setSettings(previous);
+      if (err instanceof ApiError && err.status === 403) {
+        setBulkImportError("Disponível apenas para clínicas no plano Enterprise ativo.");
+      } else {
+        setBulkImportError("Não foi possível salvar a alteração.");
+      }
+    } finally {
+      setBulkImportSaving(false);
     }
   }
 
@@ -249,6 +275,45 @@ export default function ClinicSettingsPage() {
               </div>
             </div>
           ))}
+        </div>
+      )}
+
+      <h2 className="text-lg font-semibold text-brand-navy mt-8 mb-2">Importação de Pacientes</h2>
+      <p className="text-sm text-neutralState mb-4">
+        Fica oculta do menu principal por padrão. Libere apenas se a clínica precisar migrar
+        pacientes em lote de outro sistema (Addendum v2.1, RF-13) — disponível somente no plano
+        Enterprise ativo.
+      </p>
+
+      {!isEnterprise && (
+        <div className="bg-brand-grayLight border border-brand-blueLight rounded-card p-4 mb-4 text-sm">
+          A importação em lote só pode ser habilitada no plano Enterprise.
+        </div>
+      )}
+      {bulkImportError && <p className="text-danger text-sm mb-4">{bulkImportError}</p>}
+
+      {settings && (
+        <div className="bg-white rounded-card shadow-sm max-w-2xl">
+          <div className="flex items-start justify-between gap-4 px-6 py-4">
+            <div>
+              <div className="font-medium text-sm">Mostrar "Importar Pacientes" no menu</div>
+              <div className="text-xs text-neutralState mt-1">
+                Desligado por padrão. Uma vez habilitada, a importação em lote fica visível para
+                quem já tem permissão de cadastrar pacientes.
+              </div>
+            </div>
+            <label className="relative inline-flex items-center cursor-pointer shrink-0">
+              <input
+                type="checkbox"
+                checked={settings.bulk_import_enabled}
+                disabled={!isAdmin || !isEnterprise || bulkImportSaving}
+                onChange={(e) => handleBulkImportToggle(e.target.checked)}
+                className="sr-only peer"
+              />
+              <div className="w-11 h-6 bg-slate-300 peer-checked:bg-brand-turquoise rounded-full peer-disabled:opacity-50 transition-colors" />
+              <div className="absolute left-1 top-1 w-4 h-4 bg-white rounded-full transition-transform peer-checked:translate-x-5" />
+            </label>
+          </div>
         </div>
       )}
     </div>

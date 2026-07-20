@@ -1,10 +1,25 @@
 import io
 
-from tests.conftest import invite_and_accept_professional, register_clinic
+from app.models.clinic import Clinic
+from app.models.enums import SubscriptionPlan, SubscriptionStatus
+from tests.conftest import invite_and_accept_professional, register_clinic, register_individual
 
 
 def _csv_file(content: str, filename: str = "pacientes.csv"):
     return {"file": (filename, io.BytesIO(content.encode("utf-8")), "text/csv")}
+
+
+def _make_clinic_enterprise(db_session, clinic_id):
+    clinic = db_session.query(Clinic).filter(Clinic.id == clinic_id).first()
+    clinic.subscription_plan = SubscriptionPlan.ENTERPRISE
+    clinic.subscription_status = SubscriptionStatus.ACTIVE
+    db_session.commit()
+
+
+def _enable_bulk_import(client, db_session, clinic_id, headers):
+    _make_clinic_enterprise(db_session, clinic_id)
+    response = client.post("/v1/clinic/permission-settings/bulk-import", json={"enabled": True}, headers=headers)
+    assert response.status_code == 200, response.text
 
 
 VALID_CSV = (
@@ -15,8 +30,60 @@ VALID_CSV = (
 )
 
 
-def test_preview_detects_portuguese_columns_and_flags_invalid_rows(client):
+def test_bulk_import_disabled_by_default_for_clinic(client):
+    """Addendum v2.1, RF-13 — oculto do menu e bloqueado na API por padrão."""
     ctx = register_clinic(client)
+    enabled = client.get("/v1/patients/import/enabled", headers=ctx["headers"])
+    assert enabled.status_code == 200
+    assert enabled.json()["enabled"] is False
+
+    response = client.post(
+        "/v1/patients/import/preview", files=_csv_file(VALID_CSV), headers=ctx["headers"]
+    )
+    assert response.status_code == 403
+
+
+def test_bulk_import_always_enabled_for_individual(client):
+    """Contas individuais não têm um admin separado para liberar o flag."""
+    ctx = register_individual(client)
+    enabled = client.get("/v1/patients/import/enabled", headers=ctx["headers"])
+    assert enabled.status_code == 200
+    assert enabled.json()["enabled"] is True
+
+    response = client.post(
+        "/v1/patients/import/preview", files=_csv_file(VALID_CSV), headers=ctx["headers"]
+    )
+    assert response.status_code == 200
+
+
+def test_bulk_import_toggle_rejected_outside_enterprise(client):
+    ctx = register_clinic(client)
+    response = client.post("/v1/clinic/permission-settings/bulk-import", json={"enabled": True}, headers=ctx["headers"])
+    assert response.status_code == 403
+
+
+def test_bulk_import_toggle_requires_clinic_admin(client, db_session):
+    ctx = register_clinic(client)
+    professional = invite_and_accept_professional(client, ctx["headers"])
+    _make_clinic_enterprise(db_session, ctx["user"]["clinic_id"])
+
+    response = client.post(
+        "/v1/clinic/permission-settings/bulk-import", json={"enabled": True}, headers=professional["headers"]
+    )
+    assert response.status_code == 403
+
+
+def test_bulk_import_enabled_on_enterprise_after_admin_toggle(client, db_session):
+    ctx = register_clinic(client)
+    _enable_bulk_import(client, db_session, ctx["user"]["clinic_id"], ctx["headers"])
+
+    enabled = client.get("/v1/patients/import/enabled", headers=ctx["headers"])
+    assert enabled.json()["enabled"] is True
+
+
+def test_preview_detects_portuguese_columns_and_flags_invalid_rows(client, db_session):
+    ctx = register_clinic(client)
+    _enable_bulk_import(client, db_session, ctx["user"]["clinic_id"], ctx["headers"])
 
     response = client.post(
         "/v1/patients/import/preview", files=_csv_file(VALID_CSV), headers=ctx["headers"]
@@ -39,8 +106,9 @@ def test_preview_detects_portuguese_columns_and_flags_invalid_rows(client):
     assert rows["Pedro Lima"]["error"] == "Data de nascimento ausente"
 
 
-def test_preview_reports_missing_required_columns(client):
+def test_preview_reports_missing_required_columns(client, db_session):
     ctx = register_clinic(client)
+    _enable_bulk_import(client, db_session, ctx["user"]["clinic_id"], ctx["headers"])
     csv_content = "coluna_irrelevante\nvalor\n"
 
     response = client.post(
@@ -52,8 +120,9 @@ def test_preview_reports_missing_required_columns(client):
     assert body["rows"] == []
 
 
-def test_commit_imports_valid_rows_and_rejects_invalid_ones(client):
+def test_commit_imports_valid_rows_and_rejects_invalid_ones(client, db_session):
     ctx = register_clinic(client)
+    _enable_bulk_import(client, db_session, ctx["user"]["clinic_id"], ctx["headers"])
 
     response = client.post(
         "/v1/patients/import/commit", files=_csv_file(VALID_CSV), headers=ctx["headers"]
@@ -73,8 +142,9 @@ def test_commit_imports_valid_rows_and_rejects_invalid_ones(client):
     assert "Pedro Lima" not in names
 
 
-def test_commit_rejects_invalid_date_format(client):
+def test_commit_rejects_invalid_date_format(client, db_session):
     ctx = register_clinic(client)
+    _enable_bulk_import(client, db_session, ctx["user"]["clinic_id"], ctx["headers"])
     csv_content = "nome,data de nascimento\nJoana Reis,31-12-2020-extra\n"
 
     response = client.post(
@@ -86,8 +156,9 @@ def test_commit_rejects_invalid_date_format(client):
     assert body["rejected"][0]["reason"].startswith("Data de nascimento em formato inv")
 
 
-def test_commit_fails_when_required_columns_missing(client):
+def test_commit_fails_when_required_columns_missing(client, db_session):
     ctx = register_clinic(client)
+    _enable_bulk_import(client, db_session, ctx["user"]["clinic_id"], ctx["headers"])
     csv_content = "coluna_qualquer\nvalor\n"
 
     response = client.post(
@@ -96,9 +167,10 @@ def test_commit_fails_when_required_columns_missing(client):
     assert response.status_code == 400
 
 
-def test_professional_cannot_import_patients_by_default(client):
+def test_professional_cannot_import_patients_by_default(client, db_session):
     ctx = register_clinic(client)
     professional = invite_and_accept_professional(client, ctx["headers"])
+    _enable_bulk_import(client, db_session, ctx["user"]["clinic_id"], ctx["headers"])
 
     preview = client.post(
         "/v1/patients/import/preview", files=_csv_file(VALID_CSV), headers=professional["headers"]
@@ -111,9 +183,10 @@ def test_professional_cannot_import_patients_by_default(client):
     assert commit.status_code == 403
 
 
-def test_professional_can_import_patients_when_enabled(client):
+def test_professional_can_import_patients_when_enabled(client, db_session):
     ctx = register_clinic(client)
     professional = invite_and_accept_professional(client, ctx["headers"])
+    _enable_bulk_import(client, db_session, ctx["user"]["clinic_id"], ctx["headers"])
 
     client.patch(
         "/v1/clinic/permission-settings",

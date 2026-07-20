@@ -5,7 +5,11 @@ from app.core.deps import get_current_user
 from app.db.session import get_db
 from app.models.enums import UserType
 from app.models.user import User
-from app.schemas.rbac import ClinicPermissionSettingsResponse, ClinicPermissionSettingsUpdateRequest
+from app.schemas.rbac import (
+    BulkImportToggleRequest,
+    ClinicPermissionSettingsResponse,
+    ClinicPermissionSettingsUpdateRequest,
+)
 from app.services import rbac_service
 
 router = APIRouter(prefix="/clinic/permission-settings", tags=["rbac"])
@@ -26,3 +30,14 @@ def update_permission_settings(
     user: User = Depends(get_current_user),
 ):
     return rbac_service.update_settings(db, user, payload)
+
+
+@router.post("/bulk-import", response_model=ClinicPermissionSettingsResponse)
+def update_bulk_import_flag(
+    payload: BulkImportToggleRequest,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """Addendum v2.1, RF-13 — liberação manual do Importar Pacientes, restrita a
+    clínicas Enterprise ativas (ver rbac_service.update_bulk_import_flag)."""
+    return rbac_service.update_bulk_import_flag(db, user, payload.enabled)

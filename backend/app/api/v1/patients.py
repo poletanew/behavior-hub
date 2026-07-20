@@ -82,12 +82,20 @@ def list_deleted_patients(db: Session = Depends(get_db), user: User = Depends(ge
     return patient_service.list_deleted_patients(db, user)
 
 
+@router.get("/import/enabled")
+def get_patient_import_enabled(db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+    """Addendum v2.1, RF-13 — usado pelo menu principal para decidir se mostra
+    "Importar Pacientes"; qualquer usuário autenticado pode consultar (só a
+    troca do flag em si é restrita a admin, ver /clinic/permission-settings)."""
+    return {"enabled": rbac_service.bulk_import_enabled_for_user(db, user)}
+
+
 @router.post("/import/preview", response_model=PatientImportPreviewResponse)
 async def preview_patient_import(
     file: UploadFile = File(...), db: Session = Depends(get_db), user: User = Depends(get_current_user)
 ):
     """Seção 32.7 — pré-visualização do CSV antes de confirmar a importação."""
-    if not rbac_service.can_create_patient(db, user):
+    if not rbac_service.can_create_patient(db, user) or not rbac_service.bulk_import_enabled_for_user(db, user):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized to import patients")
     return await csv_import_service.preview_import(file)
 
@@ -97,7 +105,7 @@ async def commit_patient_import(
     file: UploadFile = File(...), db: Session = Depends(get_db), user: User = Depends(get_current_user)
 ):
     """Seção 32.7 — importa em lote e retorna relatório de linhas importadas versus rejeitadas."""
-    if not rbac_service.can_create_patient(db, user):
+    if not rbac_service.can_create_patient(db, user) or not rbac_service.bulk_import_enabled_for_user(db, user):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized to import patients")
     return await csv_import_service.commit_import_from_file(db, user, file)
 
