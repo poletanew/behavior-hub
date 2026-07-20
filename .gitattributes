@@ -1,0 +1,8 @@
+# Força LF (Unix) para scripts executados dentro de containers Linux,
+# independente do core.autocrlf configurado no Git de quem faz checkout.
+# Sem isso, um checkout no Windows converte o shebang de entrypoint.sh
+# para "#!/bin/sh\r", e o Docker falha com "exec ./entrypoint.sh: no
+# such file or directory" mesmo com o arquivo presente e executável.
+*.sh text eol=lf
+Dockerfile text eol=lf
+docker-compose.yml text eol=lf
