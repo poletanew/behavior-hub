@@ -139,6 +139,13 @@ Este repositório está sendo construído **por fases**, seguindo o roadmap da S
   personas do addendum (lista/detalhe de paciente, plano de tratamento, relatórios); rotas
   auxiliares como linha do tempo, alertas e sugestões não têm o mesmo guard — o AT não tem tela
   alguma no frontend que as exponha, mas isso não é o mesmo que um bloqueio na própria API.
+- **Fase 6 (bloco 7) — Addendum de Melhorias v2.1, RF-04**: a grade multidisciplinar do Plano de
+  Tratamento agora mostra todas as áreas como colunas (mesmo sem nenhum objetivo cadastrado ainda),
+  e cada coluna ganha um botão "Importar PDF" — anexa um documento (ex.: avaliação externa, plano em
+  papel já existente) só àquela área específica, com autor e data de upload visíveis. Um PDF
+  importado em "ABA" nunca aparece nem pode ser aberto a partir da coluna de outra área; o arquivo
+  abre no mesmo visualizador seguro (URL assinada e temporária) já usado pelos Recursos Terapêuticos
+  desde a Fase 2.
 
 ## Stack (Seção 4 do PRD)
 

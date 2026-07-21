@@ -1,6 +1,6 @@
 import { FormEvent, useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { apiRequest, ApiError } from "../api/client";
+import { apiRequest, apiUpload, ApiError } from "../api/client";
 import {
   DuplicateCandidate,
   Objective,
@@ -12,6 +12,7 @@ import {
   ResourceLink,
   TreatmentArea,
   TreatmentPlan,
+  TreatmentPlanAttachment,
   User,
 } from "../types";
 
@@ -261,6 +262,100 @@ function ObjectiveCard({
   );
 }
 
+function formatDate(value: string) {
+  return new Date(value).toLocaleDateString("pt-BR");
+}
+
+function AreaAttachments({
+  patientId,
+  area,
+  attachments,
+  onUploaded,
+}: {
+  patientId: string;
+  area: TreatmentArea;
+  attachments: TreatmentPlanAttachment[];
+  onUploaded: () => void;
+}) {
+  const [file, setFile] = useState<File | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
+
+  async function handleUpload(e: FormEvent) {
+    e.preventDefault();
+    setError(null);
+    if (!file) return;
+    const formData = new FormData();
+    formData.append("area", area);
+    formData.append("file", file);
+    setUploading(true);
+    try {
+      await apiUpload(`/patients/${patientId}/treatment-plan/attachments`, formData);
+      setFile(null);
+      onUploaded();
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 415) {
+        setError("Apenas arquivos PDF são aceitos.");
+      } else if (err instanceof ApiError && err.status === 403) {
+        setError("Você não tem permissão para importar PDF nesta área.");
+      } else {
+        setError("Não foi possível importar o arquivo.");
+      }
+    } finally {
+      setUploading(false);
+    }
+  }
+
+  async function openAttachment(attachmentId: string) {
+    const detail = await apiRequest<TreatmentPlanAttachment & { view_url: string }>(
+      `/treatment-plan/attachments/${attachmentId}`
+    );
+    window.open(detail.view_url, "_blank", "noopener,noreferrer");
+  }
+
+  return (
+    <div className="mt-3 pt-3 border-t border-slate-100">
+      <div className="text-xs font-semibold uppercase text-neutralState mb-2">PDFs anexados</div>
+      {attachments.length === 0 ? (
+        <p className="text-xs text-neutralState mb-2">Nenhum PDF anexado a esta área ainda.</p>
+      ) : (
+        <ul className="space-y-1 mb-2">
+          {attachments.map((a) => (
+            <li key={a.id}>
+              <button
+                onClick={() => openAttachment(a.id)}
+                className="text-xs text-brand-blue underline text-left"
+              >
+                📄 {a.original_filename}
+              </button>
+              <span className="text-xs text-neutralState">
+                {" "}
+                — {a.uploaded_by_name}, {formatDate(a.uploaded_at)}
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
+      <form onSubmit={handleUpload} className="space-y-2">
+        <input
+          type="file"
+          accept="application/pdf"
+          onChange={(e) => setFile(e.target.files?.[0] || null)}
+          className="block w-full text-xs file:mr-2 file:rounded-btn file:border-0 file:bg-slate-100 file:px-2 file:py-1 file:text-xs"
+        />
+        <button
+          type="submit"
+          disabled={!file || uploading}
+          className="w-full rounded-btn bg-white border border-slate-300 px-3 py-1.5 text-xs font-medium disabled:opacity-50"
+        >
+          Importar PDF
+        </button>
+      </form>
+      {error && <p className="text-danger text-xs mt-1">{error}</p>}
+    </div>
+  );
+}
+
 export default function TreatmentPlanPage() {
   const { patientId } = useParams<{ patientId: string }>();
   const [patient, setPatient] = useState<Patient | null>(null);
@@ -338,6 +433,14 @@ export default function TreatmentPlanPage() {
     objectivesByArea[objective.area] = objectivesByArea[objective.area] || [];
     objectivesByArea[objective.area].push(objective);
   }
+
+  const attachmentsByArea: Record<string, TreatmentPlanAttachment[]> = {};
+  for (const attachment of plan?.attachments || []) {
+    attachmentsByArea[attachment.area] = attachmentsByArea[attachment.area] || [];
+    attachmentsByArea[attachment.area].push(attachment);
+  }
+
+  const areasToShow = areaFilter ? [areaFilter as TreatmentArea] : (Object.keys(AREA_LABELS) as TreatmentArea[]);
 
   return (
     <div>
@@ -458,16 +561,12 @@ export default function TreatmentPlanPage() {
         </form>
       )}
 
-      {plan && plan.objectives.length === 0 ? (
-        <div className="bg-white rounded-card shadow-sm p-10 text-center text-neutralState">
-          Nenhum objetivo cadastrado ainda para este paciente.
-        </div>
-      ) : (
+      {patient && (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-          {Object.entries(objectivesByArea).map(([areaKey, objectives]) => (
-            <div key={areaKey}>
-              <h2 className="font-semibold text-brand-navy mb-2">{AREA_LABELS[areaKey as TreatmentArea]}</h2>
-              {objectives.map((objective) => (
+          {areasToShow.map((areaKey) => (
+            <div key={areaKey} className="bg-white rounded-card shadow-sm p-4">
+              <h2 className="font-semibold text-brand-navy mb-2">{AREA_LABELS[areaKey]}</h2>
+              {(objectivesByArea[areaKey] || []).map((objective) => (
                 <ObjectiveCard
                   key={objective.id}
                   objective={objective}
@@ -476,6 +575,17 @@ export default function TreatmentPlanPage() {
                   resources={resources}
                 />
               ))}
+              {(objectivesByArea[areaKey] || []).length === 0 && (
+                <p className="text-xs text-neutralState mb-2">Nenhum objetivo nesta área ainda.</p>
+              )}
+              {patientId && (
+                <AreaAttachments
+                  patientId={patientId}
+                  area={areaKey}
+                  attachments={attachmentsByArea[areaKey] || []}
+                  onUploaded={load}
+                />
+              )}
             </div>
           ))}
         </div>

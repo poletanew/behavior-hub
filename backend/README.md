@@ -572,6 +572,37 @@ somente-leitura das tentativas mais recentes registradas por qualquer AT do tena
 uma visão de acompanhamento, não uma camada de aprovação (o addendum descreve aprovação como
 opcional, "se a clínica optar", e não foi implementada nesta fase).
 
+## Nota sobre Anexos por Área do Plano de Tratamento (Fase 6 bloco 7 — Addendum v2.1, RF-04)
+
+Nova entidade `TreatmentPlanAttachment` (`app/models/treatment_plan.py`), independente de
+`Objective` — o addendum pede "anexar um documento àquela área específica do plano" (ex.: uma
+avaliação externa ou plano em papel já existente), não um anexo de um objetivo individual, então
+criar uma entidade nova em vez de reaproveitar `Objective`/`ObjectiveTraining` evita forçar um
+vínculo artificial com um objetivo que talvez nem exista ainda. O upload reaproveita
+`file_service` (mesmo MinIO/S3 já usado pelos Recursos Terapêuticos desde a Fase 2) — só PDF é
+aceito (`application/pdf`), mesmo limite de 10MB.
+
+O isolamento por área (critério de aceite do RF-04: "importar um PDF em ABA não o torna visível
+nem editável nas demais áreas") vem estruturalmente do modelo — `area` é uma coluna obrigatória do
+próprio anexo, não uma tag opcional, e a rota de detalhe (`GET /treatment-plan/attachments/{id}`)
+devolve uma URL assinada e temporária (`generate_presigned_url`), o mesmo padrão de "visualizador
+seguro" já usado por `resources.py` desde a Fase 2 — não há um endpoint de download direto e
+público.
+
+Upload exige `can_edit_area` (a mesma checagem já usada por `create_objective` para editar
+objetivos daquela área) — quem pode adicionar um objetivo a uma área também pode anexar um PDF a
+ela; não foi criada uma permissão nova separada. Leitura segue o gate normal de
+`get_patient_or_404`, e a rota de detalhe do anexo chama `assert_full_clinical_access` (RF-11) —
+o AT continua sem acesso a esses documentos, consistente com estar bloqueado do Plano de
+Tratamento como um todo.
+
+**Gotcha de migration**: `op.create_table` com uma coluna `sa.Enum(..., create_type=False)`
+reutilizando um tipo Postgres já existente (`treatmentarea`, criado desde `Objective.area` na Fase
+2) ainda tentava recriar o tipo e falhava com `DuplicateObject` — o `sa.Enum` genérico descarta o
+kwarg `create_type` silenciosamente; só `sqlalchemy.dialects.postgresql.ENUM(..., create_type=False)`
+de fato suprime a recriação. Ver o comentário na própria migration
+(`6120d163231c_fase6_bloco7_treatment_plan_attachments.py`) para o diagnóstico completo.
+
 ## Estrutura
 
 - `app/models/` — entidades SQLAlchemy (Seção 18/27 do PRD).

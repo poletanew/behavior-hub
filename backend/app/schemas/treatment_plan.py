@@ -56,11 +56,29 @@ class ObjectiveResponse(BaseModel):
         from_attributes = True
 
 
+class TreatmentPlanAttachmentResponse(BaseModel):
+    id: uuid.UUID
+    plan_id: uuid.UUID
+    area: TreatmentArea
+    original_filename: str
+    uploaded_by_user_id: uuid.UUID
+    uploaded_by_name: str
+    uploaded_at: datetime.datetime
+
+    class Config:
+        from_attributes = True
+
+
+class TreatmentPlanAttachmentWithUrlResponse(TreatmentPlanAttachmentResponse):
+    view_url: str
+
+
 class TreatmentPlanResponse(BaseModel):
     id: uuid.UUID
     patient_id: uuid.UUID
     version: int
     objectives: list[ObjectiveResponse]
+    attachments: list[TreatmentPlanAttachmentResponse] = Field(default_factory=list)
 
     class Config:
         from_attributes = True

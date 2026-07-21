@@ -1,7 +1,7 @@
 import datetime
 import uuid
 
-from fastapi import HTTPException, status
+from fastapi import HTTPException, UploadFile, status
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
@@ -16,10 +16,10 @@ from app.models.enums import (
 )
 from app.models.patient import Patient, PatientAssignment
 from app.models.training import Training
-from app.models.treatment_plan import Objective, ObjectiveComment, ObjectiveTraining, TreatmentPlan
+from app.models.treatment_plan import Objective, ObjectiveComment, ObjectiveTraining, TreatmentPlan, TreatmentPlanAttachment
 from app.models.user import User
 from app.schemas.treatment_plan import ObjectiveCreateRequest, ObjectiveUpdateRequest
-from app.services import audit_service, notification_service, patient_service, rbac_service
+from app.services import audit_service, file_service, notification_service, patient_service, rbac_service
 
 DUPLICATE_SIMILARITY_THRESHOLD = 0.35
 
@@ -364,3 +364,74 @@ def get_objective_training_ids(db: Session, objective_id: uuid.UUID) -> list[uui
         row[0]
         for row in db.query(ObjectiveTraining.training_id).filter(ObjectiveTraining.objective_id == objective_id).all()
     ]
+
+
+MAX_ATTACHMENT_SIZE_BYTES = 10 * 1024 * 1024  # 10MB, mesmo limite conservador da Seção 34/Resources
+
+
+def list_attachments(db: Session, plan_id: uuid.UUID) -> list[TreatmentPlanAttachment]:
+    return (
+        db.query(TreatmentPlanAttachment)
+        .filter(TreatmentPlanAttachment.plan_id == plan_id)
+        .order_by(TreatmentPlanAttachment.uploaded_at.desc())
+        .all()
+    )
+
+
+async def upload_attachment(
+    db: Session, user: User, patient_id: uuid.UUID, area: TreatmentArea, file: UploadFile
+) -> TreatmentPlanAttachment:
+    """RF-04 — "Importar PDF" por área da grade multidisciplinar; o anexo fica
+    restrito à área escolhida, sem ficar visível ou editável nas demais."""
+    patient = patient_service.get_patient_or_404(db, user, patient_id)
+    if not can_edit_area(db, user, patient, area):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized to edit this area")
+
+    if file.content_type != "application/pdf":
+        raise HTTPException(
+            status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
+            detail="Only PDF files are accepted for treatment plan attachments",
+        )
+
+    body = await file.read()
+    if len(body) > MAX_ATTACHMENT_SIZE_BYTES:
+        raise HTTPException(status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, detail="File exceeds size limit")
+
+    plan = get_or_create_plan(db, patient)
+    key = f"treatment-plan-attachments/{plan.id}/{area.value}/{uuid.uuid4()}-{file.filename}"
+    file_service.upload_object(key, body, file.content_type)
+
+    attachment = TreatmentPlanAttachment(
+        plan_id=plan.id,
+        area=area,
+        file_key=key,
+        original_filename=file.filename or "documento.pdf",
+        uploaded_by_user_id=user.id,
+    )
+    db.add(attachment)
+    audit_service.record(
+        db,
+        actor_user_id=user.id,
+        action="treatment_plan_attachment_uploaded",
+        entity_type="treatment_plan_attachment",
+        entity_id=attachment.id,
+        after={"area": area.value, "filename": attachment.original_filename},
+    )
+    db.commit()
+    db.refresh(attachment)
+    return attachment
+
+
+def get_attachment_or_404(db: Session, user: User, attachment_id: uuid.UUID) -> tuple[Patient, TreatmentPlanAttachment]:
+    attachment = db.get(TreatmentPlanAttachment, attachment_id)
+    if attachment is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Attachment not found")
+    plan = db.get(TreatmentPlan, attachment.plan_id)
+    patient = patient_service.get_patient_or_404(db, user, plan.patient_id)
+    return patient, attachment
+
+
+def get_attachment_view_url(attachment: TreatmentPlanAttachment) -> str:
+    """Seção 15/17.2 — mesmo visualizador seguro (URL assinada e temporária) já usado
+    para Recursos Terapêuticos."""
+    return file_service.generate_presigned_url(attachment.file_key)

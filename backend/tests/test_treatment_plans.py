@@ -1,4 +1,10 @@
-from tests.conftest import assign_professional, create_patient, invite_and_accept_professional, register_clinic
+from tests.conftest import (
+    assign_professional,
+    create_patient,
+    invite_and_accept,
+    invite_and_accept_professional,
+    register_clinic,
+)
 
 
 def _create_objective(client, headers, patient_id, **overrides):
@@ -174,3 +180,82 @@ def test_treatment_plan_isolated_by_tenant(client):
 
     forbidden = client.get(f"/v1/patients/{patient_a['id']}/treatment-plan", headers=clinic_b["headers"])
     assert forbidden.status_code == 404
+
+
+def _upload_attachment(client, headers, patient_id, area="aba", filename="avaliacao.pdf"):
+    return client.post(
+        f"/v1/patients/{patient_id}/treatment-plan/attachments",
+        data={"area": area},
+        files={"file": (filename, b"%PDF-1.4 fake content", "application/pdf")},
+        headers=headers,
+    )
+
+
+def test_upload_attachment_scoped_to_its_area(client, mock_s3):
+    """RF-04 — importar um PDF em uma área não o torna visível nem editável nas demais."""
+    ctx = register_clinic(client)
+    patient = create_patient(client, ctx["headers"])
+
+    response = _upload_attachment(client, ctx["headers"], patient["id"], area="aba")
+    assert response.status_code == 201, response.text
+    attachment = response.json()
+    assert attachment["area"] == "aba"
+    assert attachment["original_filename"] == "avaliacao.pdf"
+    assert attachment["uploaded_by_name"] == ctx["user"]["name"]
+
+    plan = client.get(f"/v1/patients/{patient['id']}/treatment-plan", headers=ctx["headers"])
+    attachments = plan.json()["attachments"]
+    assert len(attachments) == 1
+    assert attachments[0]["area"] == "aba"
+
+    aba_only = [a for a in attachments if a["area"] == "aba"]
+    other_areas = [a for a in attachments if a["area"] != "aba"]
+    assert len(aba_only) == 1
+    assert len(other_areas) == 0
+
+
+def test_attachment_opens_via_signed_view_url(client, mock_s3):
+    ctx = register_clinic(client)
+    patient = create_patient(client, ctx["headers"])
+    attachment = _upload_attachment(client, ctx["headers"], patient["id"]).json()
+
+    detail = client.get(f"/v1/treatment-plan/attachments/{attachment['id']}", headers=ctx["headers"])
+    assert detail.status_code == 200
+    assert detail.json()["view_url"].startswith("http")
+
+
+def test_attachment_rejects_non_pdf(client, mock_s3):
+    ctx = register_clinic(client)
+    patient = create_patient(client, ctx["headers"])
+
+    response = client.post(
+        f"/v1/patients/{patient['id']}/treatment-plan/attachments",
+        data={"area": "aba"},
+        files={"file": ("script.exe", b"MZ...", "application/x-msdownload")},
+        headers=ctx["headers"],
+    )
+    assert response.status_code == 415
+
+
+def test_professional_without_area_permission_cannot_upload_attachment(client, mock_s3):
+    ctx = register_clinic(client)
+    patient = create_patient(client, ctx["headers"])
+    professional = invite_and_accept_professional(client, ctx["headers"], specialty="fonoaudiologo")
+    assign_professional(client, ctx["headers"], patient["id"], professional["user"]["id"])
+
+    response = _upload_attachment(client, professional["headers"], patient["id"], area="aba")
+    assert response.status_code == 403
+
+
+def test_at_cannot_access_treatment_plan_attachments(client, mock_s3):
+    """RF-11 — o AT não tem acesso ao Plano de Tratamento, nem aos seus anexos."""
+    ctx = register_clinic(client)
+    patient = create_patient(client, ctx["headers"])
+    attachment = _upload_attachment(client, ctx["headers"], patient["id"]).json()
+    at = invite_and_accept(client, ctx["headers"], role="at")
+
+    forbidden_plan = client.get(f"/v1/patients/{patient['id']}/treatment-plan", headers=at["headers"])
+    assert forbidden_plan.status_code == 403
+
+    forbidden_attachment = client.get(f"/v1/treatment-plan/attachments/{attachment['id']}", headers=at["headers"])
+    assert forbidden_attachment.status_code == 403

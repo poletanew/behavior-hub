@@ -136,11 +136,22 @@ export interface Objective {
   training_ids: string[];
 }
 
+export interface TreatmentPlanAttachment {
+  id: string;
+  plan_id: string;
+  area: TreatmentArea;
+  original_filename: string;
+  uploaded_by_user_id: string;
+  uploaded_by_name: string;
+  uploaded_at: string;
+}
+
 export interface TreatmentPlan {
   id: string;
   patient_id: string;
   version: number;
   objectives: Objective[];
+  attachments: TreatmentPlanAttachment[];
 }
 
 export interface DuplicateCandidate {

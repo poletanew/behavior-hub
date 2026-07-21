@@ -20,6 +20,9 @@ class TreatmentPlan(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     objectives: Mapped[list["Objective"]] = relationship(
         back_populates="plan", cascade="all, delete-orphan", order_by="Objective.created_at"
     )
+    attachments: Mapped[list["TreatmentPlanAttachment"]] = relationship(
+        back_populates="plan", cascade="all, delete-orphan", order_by="TreatmentPlanAttachment.uploaded_at"
+    )
 
 
 class Objective(Base, UUIDPrimaryKeyMixin, TimestampMixin, SoftDeleteMixin):
@@ -44,6 +47,25 @@ class Objective(Base, UUIDPrimaryKeyMixin, TimestampMixin, SoftDeleteMixin):
     training_links: Mapped[list["ObjectiveTraining"]] = relationship(
         back_populates="objective", cascade="all, delete-orphan"
     )
+
+
+class TreatmentPlanAttachment(Base, UUIDPrimaryKeyMixin):
+    """Addendum v2.1, RF-04 — PDF anexado a uma área específica da grade
+    multidisciplinar (ex.: avaliação externa, plano em papel), sem relação
+    com nenhum Objective individual."""
+
+    __tablename__ = "treatment_plan_attachments"
+
+    plan_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("treatment_plans.id"), nullable=False, index=True)
+    area: Mapped[TreatmentArea] = mapped_column(nullable=False)
+    file_key: Mapped[str] = mapped_column(String(500), nullable=False)
+    original_filename: Mapped[str] = mapped_column(String(255), nullable=False)
+    uploaded_by_user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"), nullable=False)
+    uploaded_at: Mapped[datetime.datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+    plan: Mapped["TreatmentPlan"] = relationship(back_populates="attachments")
 
 
 class ObjectiveComment(Base, UUIDPrimaryKeyMixin):
