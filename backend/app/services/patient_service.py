@@ -43,8 +43,20 @@ def _reject_family_user(user: User) -> None:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Family accounts cannot access this resource")
 
 
+def assert_full_clinical_access(user: User) -> None:
+    """Addendum v2.1, RF-11 — o AT não tem acesso a diagnóstico completo, plano
+    de tratamento ou relatórios (Seção 3, tabela de personas). Chamado pelas
+    rotas que expõem esses dados (listagem/detalhe completo de paciente, plano
+    de tratamento, reports) — o AT continua acessando pacientes/treinos
+    atribuídos pelas rotas específicas (training-links, sessions), que não
+    chamam esta checagem."""
+    if user.user_type == UserType.AT:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="AT accounts cannot access this resource")
+
+
 def list_patients(db: Session, user: User, *, include_deleted: bool = False) -> list[Patient]:
     _reject_family_user(user)
+    assert_full_clinical_access(user)
     query = db.query(Patient).filter(_tenant_scope_filter(user))
     if not include_deleted:
         query = query.filter(Patient.deleted_at.is_(None))
@@ -102,6 +114,10 @@ def create_patient(db: Session, user: User, payload: PatientCreateRequest) -> Pa
         guardian_name=payload.guardian_name,
         diagnosis=payload.diagnosis,
         notes=payload.notes,
+        address=payload.address,
+        phone=payload.phone,
+        school_name=payload.school_name,
+        school_shift=payload.school_shift,
         status=PatientStatus.ACTIVE,
         created_by_user_id=user.id,
     )
@@ -260,10 +276,26 @@ def list_deleted_patients(db: Session, user: User) -> list[Patient]:
     )
 
 
+def _get_patient_for_assignment_management(db: Session, user: User, patient_id: uuid.UUID) -> Patient:
+    """Addendum v2.1, RF-11 — quem gerencia atribuições (admin/supervisor, já
+    checado na rota) precisa enxergar qualquer paciente do tenant, mesmo que
+    ainda não esteja atribuído a ele — diferente do gate normal de leitura
+    clínica (get_patient_or_404), que restringe supervisor/profissional aos
+    pacientes já atribuídos."""
+    patient = (
+        db.query(Patient)
+        .filter(Patient.id == patient_id, _tenant_scope_filter(user), Patient.deleted_at.is_(None))
+        .first()
+    )
+    if patient is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Patient not found")
+    return patient
+
+
 def assign_professional(
     db: Session, user: User, patient_id: uuid.UUID, payload: PatientAssignmentCreateRequest
 ) -> PatientAssignment:
-    patient = get_patient_or_404(db, user, patient_id)
+    patient = _get_patient_for_assignment_management(db, user, patient_id)
 
     professional = db.get(User, payload.professional_id)
     if professional is None or professional.clinic_id != patient.clinic_id:
@@ -302,7 +334,7 @@ def assign_professional(
 
 
 def remove_assignment(db: Session, user: User, patient_id: uuid.UUID, professional_id: uuid.UUID) -> None:
-    patient = get_patient_or_404(db, user, patient_id)
+    patient = _get_patient_for_assignment_management(db, user, patient_id)
     assignment = (
         db.query(PatientAssignment)
         .filter(

@@ -35,6 +35,7 @@ def create_patient(
 
 @router.get("/{patient_id}", response_model=PatientResponse)
 def get_patient(patient_id: uuid.UUID, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+    patient_service.assert_full_clinical_access(user)
     return patient_service.get_patient_or_404(db, user, patient_id)
 
 
@@ -82,12 +83,20 @@ def list_deleted_patients(db: Session = Depends(get_db), user: User = Depends(ge
     return patient_service.list_deleted_patients(db, user)
 
 
+@router.get("/import/enabled")
+def get_patient_import_enabled(db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+    """Addendum v2.1, RF-13 — usado pelo menu principal para decidir se mostra
+    "Importar Pacientes"; qualquer usuário autenticado pode consultar (só a
+    troca do flag em si é restrita a admin, ver /clinic/permission-settings)."""
+    return {"enabled": rbac_service.bulk_import_enabled_for_user(db, user)}
+
+
 @router.post("/import/preview", response_model=PatientImportPreviewResponse)
 async def preview_patient_import(
     file: UploadFile = File(...), db: Session = Depends(get_db), user: User = Depends(get_current_user)
 ):
     """Seção 32.7 — pré-visualização do CSV antes de confirmar a importação."""
-    if not rbac_service.can_create_patient(db, user):
+    if not rbac_service.can_create_patient(db, user) or not rbac_service.bulk_import_enabled_for_user(db, user):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized to import patients")
     return await csv_import_service.preview_import(file)
 
@@ -97,7 +106,7 @@ async def commit_patient_import(
     file: UploadFile = File(...), db: Session = Depends(get_db), user: User = Depends(get_current_user)
 ):
     """Seção 32.7 — importa em lote e retorna relatório de linhas importadas versus rejeitadas."""
-    if not rbac_service.can_create_patient(db, user):
+    if not rbac_service.can_create_patient(db, user) or not rbac_service.bulk_import_enabled_for_user(db, user):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized to import patients")
     return await csv_import_service.commit_import_from_file(db, user, file)
 
@@ -113,9 +122,11 @@ def assign_professional(
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
-    """Seção 7.3 — a clinica pode atribuir um paciente a um ou varios profissionais."""
-    if user.user_type != UserType.CLINIC_ADMIN:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only clinic admins can assign patients")
+    """Seção 7.3 — a clinica pode atribuir um paciente a um ou varios profissionais.
+    Addendum v2.1, RF-11 — supervisores também atribuem (fluxo da aba ABA: atribuir
+    um AT a um paciente)."""
+    if user.user_type not in (UserType.CLINIC_ADMIN, UserType.SUPERVISOR):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only clinic admins or supervisors can assign patients")
     return patient_service.assign_professional(db, user, patient_id, payload)
 
 
@@ -126,6 +137,6 @@ def remove_assignment(
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
-    if user.user_type != UserType.CLINIC_ADMIN:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only clinic admins can manage assignments")
+    if user.user_type not in (UserType.CLINIC_ADMIN, UserType.SUPERVISOR):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only clinic admins or supervisors can manage assignments")
     patient_service.remove_assignment(db, user, patient_id, professional_id)

@@ -9,8 +9,12 @@ import {
   SessionTemplate,
   Training,
   TrainingCategory,
+  TrainingPatientLink,
+  User,
 } from "../types";
 import { useAuth } from "../context/AuthContext";
+import { professionalDisplayName } from "../utils/specialty";
+import { schoolShiftLabel } from "../utils/patient";
 
 function formatDateTime(value: string) {
   return new Date(value).toLocaleString("pt-BR");
@@ -54,7 +58,10 @@ export default function PatientDetailPage() {
   const [categories, setCategories] = useState<TrainingCategory[]>([]);
   const [trainings, setTrainings] = useState<Training[]>([]);
   const [templates, setTemplates] = useState<SessionTemplate[]>([]);
+  const [trainingLinks, setTrainingLinks] = useState<TrainingPatientLink[]>([]);
+  const [professionals, setProfessionals] = useState<User[]>([]);
   const [showNewSession, setShowNewSession] = useState(false);
+  const [professionalId, setProfessionalId] = useState("");
   const [occurredAt, setOccurredAt] = useState("");
   const [notes, setNotes] = useState("");
   const [selectedTrainingIds, setSelectedTrainingIds] = useState<string[]>([]);
@@ -67,6 +74,7 @@ export default function PatientDetailPage() {
     apiRequest<ClinicalSuggestion[]>(`/patients/${patientId}/suggestions`).then(setSuggestions);
     apiRequest<ClinicalSession[]>(`/sessions?patient_id=${patientId}`).then(setSessions);
     apiRequest<SessionTemplate[]>(`/session-templates?patient_id=${patientId}`).then(setTemplates);
+    apiRequest<TrainingPatientLink[]>(`/patients/${patientId}/training-links`).then(setTrainingLinks);
   }
 
   useEffect(load, [patientId]);
@@ -74,7 +82,15 @@ export default function PatientDetailPage() {
   useEffect(() => {
     apiRequest<TrainingCategory[]>("/training-categories").then(setCategories);
     apiRequest<Training[]>("/trainings").then(setTrainings);
+    apiRequest<User[]>("/professionals").then((list) => {
+      setProfessionals(list.filter((p) => p.user_type !== "family"));
+    });
   }, []);
+
+  useEffect(() => {
+    if (user?.id && !professionalId) setProfessionalId(user.id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id]);
 
   function applyTemplate(templateId: string) {
     const template = templates.find((t) => t.id === templateId);
@@ -91,7 +107,7 @@ export default function PatientDetailPage() {
         method: "POST",
         body: {
           patient_id: patientId,
-          professional_id: user?.id,
+          professional_id: professionalId || user?.id,
           occurred_at: new Date(occurredAt).toISOString(),
           notes: notes || null,
           training_ids: selectedTrainingIds,
@@ -99,7 +115,7 @@ export default function PatientDetailPage() {
       });
       navigate(`/sessions/${session.id}`);
     } catch {
-      setError("Não foi possível criar o atendimento. Selecione ao menos um treino.");
+      setError("Não foi possível criar o atendimento. Selecione o profissional responsável e ao menos um treino.");
     }
   }
 
@@ -125,6 +141,14 @@ export default function PatientDetailPage() {
         <p className="text-neutralState text-sm mt-1">Nascimento: {patient.birth_date}</p>
         {patient.guardian_name && <p className="text-sm mt-1">Responsável: {patient.guardian_name}</p>}
         {patient.diagnosis && <p className="text-sm mt-1">Diagnóstico: {patient.diagnosis}</p>}
+        {patient.phone && <p className="text-sm mt-1">Telefone: {patient.phone}</p>}
+        {patient.address && <p className="text-sm mt-1">Endereço: {patient.address}</p>}
+        {patient.school_name && (
+          <p className="text-sm mt-1">
+            Escola: {patient.school_name}
+            {schoolShiftLabel(patient.school_shift) ? ` · ${schoolShiftLabel(patient.school_shift)}` : ""}
+          </p>
+        )}
         <div className="flex gap-4 mt-3 text-sm">
           <Link to={`/patients/${patientId}/treatment-plan`} className="text-brand-blue underline">
             Plano de Tratamento
@@ -220,6 +244,28 @@ export default function PatientDetailPage() {
 
       {showNewSession && (
         <form onSubmit={handleCreateSession} className="bg-white rounded-card shadow-sm p-6 mb-6 space-y-4">
+          <div>
+            <label className="block text-sm font-medium mb-1">Paciente</label>
+            <div className="w-full h-10 rounded-btn border border-slate-200 bg-slate-50 px-3 flex items-center text-neutralState">
+              {patient.name}
+            </div>
+          </div>
+          <div>
+            <label className="block text-sm font-medium mb-1">Profissional / Terapeuta responsável</label>
+            <select
+              required
+              value={professionalId}
+              onChange={(e) => setProfessionalId(e.target.value)}
+              className="w-full h-10 rounded-btn border border-slate-300 px-3"
+            >
+              <option value="">Selecione...</option>
+              {professionals.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {professionalDisplayName(p)}
+                </option>
+              ))}
+            </select>
+          </div>
           {templates.length > 0 && (
             <div>
               <label className="block text-sm font-medium mb-1">Usar modelo de atendimento (opcional)</label>
@@ -265,16 +311,24 @@ export default function PatientDetailPage() {
                   </div>
                   {trainings
                     .filter((t) => t.category_id === category.id)
-                    .map((training) => (
-                      <label key={training.id} className="flex items-center gap-2 px-3 py-2 text-sm hover:bg-slate-50">
-                        <input
-                          type="checkbox"
-                          checked={selectedTrainingIds.includes(training.id)}
-                          onChange={() => toggleTraining(training.id)}
-                        />
-                        {training.title}
-                      </label>
-                    ))}
+                    .map((training) => {
+                      const link = trainingLinks.find((l) => l.training_id === training.id);
+                      return (
+                        <label key={training.id} className="flex items-center gap-2 px-3 py-2 text-sm hover:bg-slate-50">
+                          <input
+                            type="checkbox"
+                            checked={selectedTrainingIds.includes(training.id)}
+                            onChange={() => toggleTraining(training.id)}
+                          />
+                          {training.title}
+                          {link && (
+                            <span className="rounded px-1.5 py-0.5 text-[10px] font-medium bg-brand-blueLight/20 text-brand-blue">
+                              {link.status === "applied" ? "Aplicado" : "Prescrito"}
+                            </span>
+                          )}
+                        </label>
+                      );
+                    })}
                 </div>
               ))}
             </div>

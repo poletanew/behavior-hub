@@ -38,6 +38,10 @@ def upload_object(key: str, fileobj, content_type: str) -> None:
     get_s3_client().put_object(Bucket=settings.S3_BUCKET_NAME, Key=key, Body=fileobj, ContentType=content_type)
 
 
+def download_object(key: str) -> bytes:
+    return get_s3_client().get_object(Bucket=settings.S3_BUCKET_NAME, Key=key)["Body"].read()
+
+
 def generate_presigned_url(key: str, expires_seconds: int = 900) -> str:
     """Seção 17.2 — URLs de arquivos temporárias e assinadas."""
     return get_s3_client().generate_presigned_url(

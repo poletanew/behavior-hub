@@ -1,13 +1,16 @@
+import datetime
 import uuid
 
 from fastapi import HTTPException, status
 from sqlalchemy import or_
 from sqlalchemy.orm import Session as DbSession
 
-from app.models.enums import TrainingVisibility
+from app.models.enums import TrainingLinkStatus, TrainingVisibility
 from app.models.training import Training, TrainingCategory
+from app.models.training_patient_link import TrainingPatientLink
 from app.models.user import User
-from app.schemas.training import TrainingCreateRequest
+from app.schemas.training import TrainingCreateRequest, TrainingPatientLinkResponse
+from app.services import patient_service
 
 
 def list_categories(db: DbSession) -> list[TrainingCategory]:
@@ -91,3 +94,76 @@ def delete_custom_training(db: DbSession, user: User, training_id: uuid.UUID) ->
 
     db.delete(training)
     db.commit()
+
+
+def _to_link_response(link: TrainingPatientLink, training_title: str) -> TrainingPatientLinkResponse:
+    return TrainingPatientLinkResponse(
+        id=link.id,
+        training_id=link.training_id,
+        training_title=training_title,
+        patient_id=link.patient_id,
+        status=link.status,
+        linked_by_user_id=link.linked_by_user_id,
+        linked_at=link.linked_at,
+    )
+
+
+def link_training_to_patient(
+    db: DbSession, user: User, training_id: uuid.UUID, patient_id: uuid.UUID
+) -> TrainingPatientLinkResponse:
+    """Addendum v2.1, RF-10 — "Vincular" um treino a um paciente ("treino prescrito")."""
+    training = get_training_or_404(db, training_id)
+    patient = patient_service.get_patient_or_404(db, user, patient_id)
+
+    existing = (
+        db.query(TrainingPatientLink)
+        .filter(TrainingPatientLink.training_id == training.id, TrainingPatientLink.patient_id == patient.id)
+        .first()
+    )
+    if existing is not None:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Training already linked to this patient")
+
+    link = TrainingPatientLink(
+        training_id=training.id,
+        patient_id=patient.id,
+        linked_by_user_id=user.id,
+        linked_at=datetime.datetime.now(datetime.timezone.utc),
+    )
+    db.add(link)
+    db.commit()
+    db.refresh(link)
+    return _to_link_response(link, training.title)
+
+
+def unlink_training_from_patient(db: DbSession, user: User, link_id: uuid.UUID) -> None:
+    link = db.get(TrainingPatientLink, link_id)
+    if link is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Link not found")
+    # Garante isolamento de tenant: só quem acessa o paciente pode desvincular.
+    patient_service.get_patient_or_404(db, user, link.patient_id)
+
+    db.delete(link)
+    db.commit()
+
+
+def list_links_for_patient(db: DbSession, user: User, patient_id: uuid.UUID) -> list[TrainingPatientLinkResponse]:
+    patient = patient_service.get_patient_or_404(db, user, patient_id)
+    links = db.query(TrainingPatientLink).filter(TrainingPatientLink.patient_id == patient.id).all()
+    if not links:
+        return []
+    training_ids = [link.training_id for link in links]
+    trainings = {t.id: t for t in db.query(Training).filter(Training.id.in_(training_ids)).all()}
+    return [_to_link_response(link, trainings[link.training_id].title) for link in links]
+
+
+def mark_links_applied(db: DbSession, patient_id: uuid.UUID, training_ids: list[uuid.UUID]) -> None:
+    """Chamado por session_service.create_session — a primeira sessão que
+    efetivamente usa um treino prescrito passa o vínculo de "prescrito" para
+    "aplicado", sem precisar de nenhuma ação manual extra do profissional."""
+    if not training_ids:
+        return
+    db.query(TrainingPatientLink).filter(
+        TrainingPatientLink.patient_id == patient_id,
+        TrainingPatientLink.training_id.in_(training_ids),
+        TrainingPatientLink.status == TrainingLinkStatus.PRESCRIBED,
+    ).update({"status": TrainingLinkStatus.APPLIED}, synchronize_session=False)

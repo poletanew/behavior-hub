@@ -18,11 +18,11 @@ export default function DashboardPage() {
   }, []);
 
   if (loading) return <p className="text-neutralState">Carregando...</p>;
-  if (!data) return <p className="text-danger">Não foi possível carregar o dashboard.</p>;
+  if (!data) return <p className="text-danger">Não foi possível carregar a área de trabalho.</p>;
 
   return (
     <div>
-      <h1 className="text-2xl font-bold text-brand-navy mb-6">Dashboard</h1>
+      <h1 className="text-2xl font-bold text-brand-navy mb-6">Área de Trabalho</h1>
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
         <div className="bg-white rounded-card shadow-sm p-6">

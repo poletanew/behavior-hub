@@ -28,6 +28,11 @@ class ClinicPermissionSettings(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     # "Gerar convite": Supervisor — Configurável
     supervisors_can_generate_invitations: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 
+    # Addendum v2.1, RF-13 — Importação em Lote de Pacientes fica oculta do menu
+    # principal por padrão; liberável manualmente por clínicas Enterprise que
+    # precisem migrar de outro sistema, sem exigir novo deploy.
+    bulk_import_enabled: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+
     # Seção 29.1 — limiares dos Alertas Clínicos Inteligentes. Padrão de fábrica
     # conforme o PRD; configuráveis por clínica apenas no plano Enterprise
     # (aplicado em clinical_alert_service.update_thresholds).

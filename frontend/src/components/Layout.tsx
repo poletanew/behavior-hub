@@ -5,11 +5,11 @@ import { useAuth } from "../context/AuthContext";
 import NotificationBell from "./NotificationBell";
 
 const navItems = [
-  { to: "/dashboard", label: "Dashboard" },
+  { to: "/dashboard", label: "Área de Trabalho" },
   { to: "/patients", label: "Pacientes" },
   { to: "/agenda", label: "Agenda" },
   { to: "/sessions", label: "Atendimentos" },
-  { to: "/training-library", label: "Training Library" },
+  { to: "/training-library", label: "Biblioteca de Treino" },
   { to: "/resources", label: "Recursos" },
 ];
 
@@ -17,14 +17,19 @@ export default function Layout() {
   const { user, logout } = useAuth();
   const isAdmin = user?.user_type === "clinic_admin" || user?.user_type === "individual";
   const canSeeClinicSettings = user?.user_type === "clinic_admin" || user?.user_type === "supervisor";
+  const canSeeABA = user?.user_type === "clinic_admin" || user?.user_type === "supervisor";
   const canSeeAuditLog = user?.user_type === "clinic_admin" || user?.user_type === "individual";
   const canSeeManagerDashboard = user?.user_type === "clinic_admin";
   const [requires2fa, setRequires2fa] = useState(false);
+  const [bulkImportEnabled, setBulkImportEnabled] = useState(false);
 
   useEffect(() => {
     apiRequest<{ is_2fa_enabled: boolean; required: boolean }>("/auth/2fa/status")
       .then((s) => setRequires2fa(s.required))
       .catch(() => setRequires2fa(false));
+    apiRequest<{ enabled: boolean }>("/patients/import/enabled")
+      .then((s) => setBulkImportEnabled(s.enabled))
+      .catch(() => setBulkImportEnabled(false));
   }, [user?.id]);
 
   return (
@@ -84,16 +89,18 @@ export default function Layout() {
           >
             Lista de Espera
           </NavLink>
-          <NavLink
-            to="/patients/import"
-            className={({ isActive }) =>
-              `block rounded-btn px-3 py-2 text-sm font-medium transition-colors ${
-                isActive ? "bg-brand-turquoise text-white" : "text-slate-200 hover:bg-white/10"
-              }`
-            }
-          >
-            Importar Pacientes
-          </NavLink>
+          {bulkImportEnabled && (
+            <NavLink
+              to="/patients/import"
+              className={({ isActive }) =>
+                `block rounded-btn px-3 py-2 text-sm font-medium transition-colors ${
+                  isActive ? "bg-brand-turquoise text-white" : "text-slate-200 hover:bg-white/10"
+                }`
+              }
+            >
+              Importar Pacientes
+            </NavLink>
+          )}
           {canSeeClinicSettings && (
             <NavLink
               to="/supervisor-dashboard"
@@ -104,6 +111,18 @@ export default function Layout() {
               }
             >
               Painel de Supervisão
+            </NavLink>
+          )}
+          {canSeeABA && (
+            <NavLink
+              to="/aba"
+              className={({ isActive }) =>
+                `block rounded-btn px-3 py-2 text-sm font-medium transition-colors ${
+                  isActive ? "bg-brand-turquoise text-white" : "text-slate-200 hover:bg-white/10"
+                }`
+              }
+            >
+              ABA
             </NavLink>
           )}
           {canSeeManagerDashboard && (
@@ -162,18 +181,6 @@ export default function Layout() {
               }
             >
               White-label
-            </NavLink>
-          )}
-          {isAdmin && (
-            <NavLink
-              to="/billing-sessions"
-              className={({ isActive }) =>
-                `block rounded-btn px-3 py-2 text-sm font-medium transition-colors ${
-                  isActive ? "bg-brand-turquoise text-white" : "text-slate-200 hover:bg-white/10"
-                }`
-              }
-            >
-              Faturamento
             </NavLink>
           )}
           {isAdmin && (

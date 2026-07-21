@@ -1,4 +1,4 @@
-export type UserType = "clinic_admin" | "professional" | "individual" | "supervisor" | "family";
+export type UserType = "clinic_admin" | "professional" | "individual" | "supervisor" | "family" | "at";
 
 export interface User {
   id: string;
@@ -11,6 +11,8 @@ export interface User {
   subscription_plan: string | null;
 }
 
+export type SchoolShift = "manha" | "tarde" | "integral" | "nao_frequenta";
+
 export interface Patient {
   id: string;
   name: string;
@@ -20,6 +22,10 @@ export interface Patient {
   notes: string | null;
   photo_url: string | null;
   status: string;
+  address: string | null;
+  phone: string | null;
+  school_name: string | null;
+  school_shift: SchoolShift | null;
   clinic_id: string | null;
   individual_owner_id: string | null;
   deleted_at: string | null;
@@ -43,6 +49,18 @@ export interface Training {
   notes: string | null;
   suggested_age_range: string | null;
   visibility: string;
+}
+
+export type TrainingLinkStatus = "prescribed" | "applied";
+
+export interface TrainingPatientLink {
+  id: string;
+  training_id: string;
+  training_title: string;
+  patient_id: string;
+  status: TrainingLinkStatus;
+  linked_by_user_id: string;
+  linked_at: string;
 }
 
 export interface SessionTraining {
@@ -116,6 +134,28 @@ export interface Objective {
   updated_at: string;
   deleted_at: string | null;
   training_ids: string[];
+  ai_generated: boolean;
+  ai_source_document_id: string | null;
+  ai_reviewed_at: string | null;
+}
+
+export interface ObjectiveAIFillResponse {
+  source_document_id: string;
+  title: string;
+  description: string;
+  criteria: string;
+  strategies: string;
+  extraction_note: string | null;
+}
+
+export interface TreatmentPlanAttachment {
+  id: string;
+  plan_id: string;
+  area: TreatmentArea;
+  original_filename: string;
+  uploaded_by_user_id: string;
+  uploaded_by_name: string;
+  uploaded_at: string;
 }
 
 export interface TreatmentPlan {
@@ -123,6 +163,7 @@ export interface TreatmentPlan {
   patient_id: string;
   version: number;
   objectives: Objective[];
+  attachments: TreatmentPlanAttachment[];
 }
 
 export interface DuplicateCandidate {
@@ -296,6 +337,7 @@ export interface ClinicPermissionSettings {
   admins_can_edit_any_objective_area: boolean;
   supervisors_can_restore_deleted_data: boolean;
   supervisors_can_generate_invitations: boolean;
+  bulk_import_enabled: boolean;
   no_collection_days: number;
   regression_window_sessions: number;
   regression_drop_pp: number;
@@ -577,23 +619,6 @@ export interface WhiteLabelSettings {
   display_name: string | null;
 }
 
-export type PaymentStatus = "pending" | "paid" | "overdue";
-
-export interface SessionCharge {
-  id: string;
-  session_id: string;
-  patient_id: string;
-  patient_name: string;
-  session_date: string;
-  amount: number;
-  due_date: string | null;
-  payment_status: PaymentStatus;
-  paid_at: string | null;
-  notes: string | null;
-  created_by_user_id: string;
-  created_at: string;
-}
-
 export type WaitlistStatus = "waiting" | "converted" | "discarded";
 
 export interface WaitlistEntry {
@@ -608,4 +633,37 @@ export interface WaitlistEntry {
   converted_patient_id: string | null;
   created_by_user_id: string;
   created_at: string;
+}
+
+// Addendum v2.1, RF-11 — papel AT (Auxiliar Terapêutico) e aba ABA (supervisor).
+export interface ATPatient {
+  id: string;
+  name: string;
+  birth_date: string;
+}
+
+export interface ATSummary {
+  id: string;
+  name: string;
+  email: string;
+  supervisor_id: string | null;
+  assigned_patient_count: number;
+}
+
+export interface ABAAssignedPatient {
+  id: string;
+  name: string;
+}
+
+export interface ABATrialReviewEntry {
+  trial_id: string;
+  at_user_id: string;
+  at_name: string;
+  patient_id: string;
+  patient_name: string;
+  training_id: string;
+  training_title: string;
+  result: "correct" | "incorrect" | "partial" | "no_response";
+  prompt_level: "independent" | "gestural" | "verbal" | "modeling" | "partial_physical" | "full_physical";
+  recorded_at: string;
 }

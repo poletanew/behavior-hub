@@ -1,6 +1,207 @@
 import { FormEvent, useEffect, useState } from "react";
-import { apiRequest } from "../api/client";
-import { ResourceItem, ResourceLink, Training, TrainingCategory } from "../types";
+import { apiRequest, ApiError } from "../api/client";
+import { Patient, ResourceItem, ResourceLink, Training, TrainingCategory } from "../types";
+
+function NewTrainingForm({
+  categories,
+  onCreated,
+  onCancel,
+}: {
+  categories: TrainingCategory[];
+  onCreated: () => void;
+  onCancel: () => void;
+}) {
+  const [categoryId, setCategoryId] = useState("");
+  const [title, setTitle] = useState("");
+  const [objective, setObjective] = useState("");
+  const [discriminativeInstruction, setDiscriminativeInstruction] = useState("");
+  const [expectedResponse, setExpectedResponse] = useState("");
+  const [promptHierarchy, setPromptHierarchy] = useState("");
+  const [masteryCriteria, setMasteryCriteria] = useState("");
+  const [notes, setNotes] = useState("");
+  const [error, setError] = useState<string | null>(null);
+
+  async function handleSubmit(e: FormEvent) {
+    e.preventDefault();
+    setError(null);
+    try {
+      await apiRequest("/trainings", {
+        method: "POST",
+        body: {
+          category_id: categoryId,
+          title,
+          objective,
+          discriminative_instruction: discriminativeInstruction || null,
+          expected_response: expectedResponse || null,
+          prompt_hierarchy: promptHierarchy || null,
+          mastery_criteria: masteryCriteria || null,
+          notes: notes || null,
+        },
+      });
+      onCreated();
+    } catch {
+      setError("Não foi possível criar o treino. Confirme os campos obrigatórios.");
+    }
+  }
+
+  return (
+    <form onSubmit={handleSubmit} className="bg-white rounded-card shadow-sm p-6 mb-6 space-y-4 max-w-xl">
+      <div>
+        <label className="block text-sm font-medium mb-1">Categoria</label>
+        <select
+          required
+          value={categoryId}
+          onChange={(e) => setCategoryId(e.target.value)}
+          className="w-full h-10 rounded-btn border border-slate-300 px-3"
+        >
+          <option value="">Selecione...</option>
+          {categories.map((c) => (
+            <option key={c.id} value={c.id}>
+              {c.name}
+            </option>
+          ))}
+        </select>
+      </div>
+      <div>
+        <label className="block text-sm font-medium mb-1">Título</label>
+        <input
+          required
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+          className="w-full h-10 rounded-btn border border-slate-300 px-3"
+        />
+      </div>
+      <div>
+        <label className="block text-sm font-medium mb-1">Objetivo</label>
+        <textarea
+          required
+          value={objective}
+          onChange={(e) => setObjective(e.target.value)}
+          className="w-full rounded-btn border border-slate-300 px-3 py-2"
+        />
+      </div>
+      <div>
+        <label className="block text-sm font-medium mb-1">Instrução discriminativa</label>
+        <textarea
+          value={discriminativeInstruction}
+          onChange={(e) => setDiscriminativeInstruction(e.target.value)}
+          className="w-full rounded-btn border border-slate-300 px-3 py-2"
+        />
+      </div>
+      <div>
+        <label className="block text-sm font-medium mb-1">Resposta esperada</label>
+        <textarea
+          value={expectedResponse}
+          onChange={(e) => setExpectedResponse(e.target.value)}
+          className="w-full rounded-btn border border-slate-300 px-3 py-2"
+        />
+      </div>
+      <div>
+        <label className="block text-sm font-medium mb-1">Hierarquia de ajuda</label>
+        <textarea
+          value={promptHierarchy}
+          onChange={(e) => setPromptHierarchy(e.target.value)}
+          className="w-full rounded-btn border border-slate-300 px-3 py-2"
+        />
+      </div>
+      <div>
+        <label className="block text-sm font-medium mb-1">Critério de domínio</label>
+        <textarea
+          value={masteryCriteria}
+          onChange={(e) => setMasteryCriteria(e.target.value)}
+          className="w-full rounded-btn border border-slate-300 px-3 py-2"
+        />
+      </div>
+      <div>
+        <label className="block text-sm font-medium mb-1">Observações</label>
+        <textarea
+          value={notes}
+          onChange={(e) => setNotes(e.target.value)}
+          className="w-full rounded-btn border border-slate-300 px-3 py-2"
+        />
+      </div>
+      {error && <p className="text-danger text-sm">{error}</p>}
+      <div className="flex gap-3">
+        <button type="submit" className="rounded-btn bg-brand-turquoise text-white px-4 py-2 text-sm font-medium">
+          Salvar treino
+        </button>
+        <button
+          type="button"
+          onClick={onCancel}
+          className="rounded-btn bg-white border border-slate-300 px-4 py-2 text-sm font-medium"
+        >
+          Cancelar
+        </button>
+      </div>
+    </form>
+  );
+}
+
+function LinkToPatientPanel({ training }: { training: Training }) {
+  const [open, setOpen] = useState(false);
+  const [patients, setPatients] = useState<Patient[]>([]);
+  const [search, setSearch] = useState("");
+  const [message, setMessage] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (open && patients.length === 0) {
+      apiRequest<Patient[]>("/patients").then(setPatients);
+    }
+  }, [open, patients.length]);
+
+  const filtered = patients.filter((p) => p.name.toLowerCase().includes(search.toLowerCase()));
+
+  async function handleLink(patientId: string) {
+    setMessage(null);
+    try {
+      await apiRequest(`/trainings/${training.id}/link`, {
+        method: "POST",
+        body: { patient_id: patientId },
+      });
+      setMessage("Treino vinculado — vai aparecer como \"Prescrito\" no Novo Atendimento desse paciente.");
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 409) {
+        setMessage("Este treino já está vinculado a esse paciente.");
+      } else {
+        setMessage("Não foi possível vincular o treino.");
+      }
+    }
+  }
+
+  return (
+    <div className="pt-3 border-t border-slate-100 mt-2">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="text-xs font-medium text-brand-blue underline"
+      >
+        {open ? "Fechar" : "Vincular a um paciente"}
+      </button>
+      {open && (
+        <div className="mt-2 space-y-2">
+          <input
+            placeholder="Buscar paciente por nome..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="w-full h-8 text-xs rounded-btn border border-slate-300 px-2"
+          />
+          <ul className="max-h-48 overflow-y-auto divide-y divide-slate-100 border border-slate-100 rounded-btn">
+            {filtered.map((p) => (
+              <li key={p.id} className="flex items-center justify-between px-3 py-2 text-xs">
+                <span>{p.name}</span>
+                <button onClick={() => handleLink(p.id)} className="text-brand-turquoise font-medium">
+                  Vincular
+                </button>
+              </li>
+            ))}
+            {filtered.length === 0 && <li className="px-3 py-2 text-xs text-neutralState">Nenhum paciente encontrado.</li>}
+          </ul>
+          {message && <p className="text-xs text-neutralState">{message}</p>}
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default function TrainingLibraryPage() {
   const [categories, setCategories] = useState<TrainingCategory[]>([]);
@@ -12,18 +213,21 @@ export default function TrainingLibraryPage() {
   const [resourceLinks, setResourceLinks] = useState<ResourceLink[]>([]);
   const [linkResourceId, setLinkResourceId] = useState("");
   const [linkRelevance, setLinkRelevance] = useState(3);
+  const [showNewTraining, setShowNewTraining] = useState(false);
+
+  function loadTrainings() {
+    const params = new URLSearchParams();
+    if (categoryId) params.set("category_id", categoryId);
+    if (search) params.set("search", search);
+    apiRequest<Training[]>(`/trainings?${params.toString()}`).then(setTrainings);
+  }
 
   useEffect(() => {
     apiRequest<TrainingCategory[]>("/training-categories").then(setCategories);
     apiRequest<ResourceItem[]>("/resources").then(setResources);
   }, []);
 
-  useEffect(() => {
-    const params = new URLSearchParams();
-    if (categoryId) params.set("category_id", categoryId);
-    if (search) params.set("search", search);
-    apiRequest<Training[]>(`/trainings?${params.toString()}`).then(setTrainings);
-  }, [categoryId, search]);
+  useEffect(loadTrainings, [categoryId, search]);
 
   function loadResourceLinks(trainingId: string) {
     apiRequest<ResourceLink[]>(`/trainings/${trainingId}/resource-links`).then(setResourceLinks);
@@ -54,7 +258,26 @@ export default function TrainingLibraryPage() {
 
   return (
     <div>
-      <h1 className="text-2xl font-bold text-brand-navy mb-6">Training Library</h1>
+      <div className="flex items-center justify-between mb-6">
+        <h1 className="text-2xl font-bold text-brand-navy">Biblioteca de Treino</h1>
+        <button
+          onClick={() => setShowNewTraining((v) => !v)}
+          className="rounded-btn bg-brand-turquoise text-white px-4 py-2 text-sm font-medium"
+        >
+          + Novo Treinamento
+        </button>
+      </div>
+
+      {showNewTraining && (
+        <NewTrainingForm
+          categories={categories}
+          onCreated={() => {
+            setShowNewTraining(false);
+            loadTrainings();
+          }}
+          onCancel={() => setShowNewTraining(false)}
+        />
+      )}
 
       <div className="flex flex-wrap gap-3 mb-6">
         <input
@@ -170,6 +393,8 @@ export default function TrainingLibraryPage() {
                   </button>
                 </form>
               </div>
+
+              <LinkToPatientPanel training={selected} />
             </div>
           ) : (
             <div className="bg-white rounded-card shadow-sm p-6 text-neutralState text-sm">

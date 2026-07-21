@@ -1,9 +1,10 @@
 import { FormEvent, useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { apiRequest, ApiError } from "../api/client";
+import { apiRequest, apiUpload, ApiError } from "../api/client";
 import {
   DuplicateCandidate,
   Objective,
+  ObjectiveAIFillResponse,
   ObjectiveComment,
   ObjectivePriority,
   ObjectiveStatus,
@@ -12,6 +13,7 @@ import {
   ResourceLink,
   TreatmentArea,
   TreatmentPlan,
+  TreatmentPlanAttachment,
   User,
 } from "../types";
 
@@ -125,7 +127,14 @@ function ObjectiveCard({
     <div className="bg-white rounded-card shadow-sm p-4 mb-3">
       <div className="flex items-start justify-between gap-2">
         <div>
-          <div className="font-medium text-brand-navy">{objective.title}</div>
+          <div className="font-medium text-brand-navy">
+            {objective.title}
+            {objective.ai_generated && (
+              <span className="ml-2 rounded px-1.5 py-0.5 text-[10px] font-medium bg-brand-turquoise/10 text-brand-turquoise align-middle">
+                Gerado por IA
+              </span>
+            )}
+          </div>
           <div className="text-xs text-neutralState mt-0.5">Prioridade: {PRIORITY_LABELS[objective.priority]}</div>
         </div>
         <span className={`text-[10px] uppercase font-semibold px-2 py-1 rounded-full ${STATUS_COLORS[objective.status]}`}>
@@ -261,6 +270,100 @@ function ObjectiveCard({
   );
 }
 
+function formatDate(value: string) {
+  return new Date(value).toLocaleDateString("pt-BR");
+}
+
+function AreaAttachments({
+  patientId,
+  area,
+  attachments,
+  onUploaded,
+}: {
+  patientId: string;
+  area: TreatmentArea;
+  attachments: TreatmentPlanAttachment[];
+  onUploaded: () => void;
+}) {
+  const [file, setFile] = useState<File | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
+
+  async function handleUpload(e: FormEvent) {
+    e.preventDefault();
+    setError(null);
+    if (!file) return;
+    const formData = new FormData();
+    formData.append("area", area);
+    formData.append("file", file);
+    setUploading(true);
+    try {
+      await apiUpload(`/patients/${patientId}/treatment-plan/attachments`, formData);
+      setFile(null);
+      onUploaded();
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 415) {
+        setError("Apenas arquivos PDF são aceitos.");
+      } else if (err instanceof ApiError && err.status === 403) {
+        setError("Você não tem permissão para importar PDF nesta área.");
+      } else {
+        setError("Não foi possível importar o arquivo.");
+      }
+    } finally {
+      setUploading(false);
+    }
+  }
+
+  async function openAttachment(attachmentId: string) {
+    const detail = await apiRequest<TreatmentPlanAttachment & { view_url: string }>(
+      `/treatment-plan/attachments/${attachmentId}`
+    );
+    window.open(detail.view_url, "_blank", "noopener,noreferrer");
+  }
+
+  return (
+    <div className="mt-3 pt-3 border-t border-slate-100">
+      <div className="text-xs font-semibold uppercase text-neutralState mb-2">PDFs anexados</div>
+      {attachments.length === 0 ? (
+        <p className="text-xs text-neutralState mb-2">Nenhum PDF anexado a esta área ainda.</p>
+      ) : (
+        <ul className="space-y-1 mb-2">
+          {attachments.map((a) => (
+            <li key={a.id}>
+              <button
+                onClick={() => openAttachment(a.id)}
+                className="text-xs text-brand-blue underline text-left"
+              >
+                📄 {a.original_filename}
+              </button>
+              <span className="text-xs text-neutralState">
+                {" "}
+                — {a.uploaded_by_name}, {formatDate(a.uploaded_at)}
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
+      <form onSubmit={handleUpload} className="space-y-2">
+        <input
+          type="file"
+          accept="application/pdf"
+          onChange={(e) => setFile(e.target.files?.[0] || null)}
+          className="block w-full text-xs file:mr-2 file:rounded-btn file:border-0 file:bg-slate-100 file:px-2 file:py-1 file:text-xs"
+        />
+        <button
+          type="submit"
+          disabled={!file || uploading}
+          className="w-full rounded-btn bg-white border border-slate-300 px-3 py-1.5 text-xs font-medium disabled:opacity-50"
+        >
+          Importar PDF
+        </button>
+      </form>
+      {error && <p className="text-danger text-xs mt-1">{error}</p>}
+    </div>
+  );
+}
+
 export default function TreatmentPlanPage() {
   const { patientId } = useParams<{ patientId: string }>();
   const [patient, setPatient] = useState<Patient | null>(null);
@@ -279,6 +382,11 @@ export default function TreatmentPlanPage() {
   const [error, setError] = useState<string | null>(null);
   const [professionals, setProfessionals] = useState<User[]>([]);
   const [resources, setResources] = useState<ResourceItem[]>([]);
+  const [aiAttachmentId, setAiAttachmentId] = useState("");
+  const [aiFilling, setAiFilling] = useState(false);
+  const [aiError, setAiError] = useState<string | null>(null);
+  const [aiGenerated, setAiGenerated] = useState(false);
+  const [aiExtractionNote, setAiExtractionNote] = useState<string | null>(null);
 
   useEffect(() => {
     apiRequest<User[]>("/professionals").then(setProfessionals);
@@ -304,13 +412,53 @@ export default function TreatmentPlanPage() {
     setPriority("medium");
     setDuplicateCandidates(null);
     setError(null);
+    setAiAttachmentId("");
+    setAiGenerated(false);
+    setAiError(null);
+    setAiExtractionNote(null);
+  }
+
+  async function handleAiFill() {
+    if (!aiAttachmentId) return;
+    setAiError(null);
+    setAiFilling(true);
+    try {
+      const draft = await apiRequest<ObjectiveAIFillResponse>(
+        `/patients/${patientId}/treatment-plan/objectives/ai-fill`,
+        { method: "POST", body: { attachment_id: aiAttachmentId } }
+      );
+      setTitle(draft.title);
+      setDescription(draft.description);
+      setCriteria(draft.criteria);
+      setStrategies(draft.strategies);
+      setAiGenerated(true);
+      setAiExtractionNote(draft.extraction_note);
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 403) {
+        setAiError("Você não tem permissão para editar objetivos desta área.");
+      } else {
+        setAiError("Não foi possível gerar o rascunho a partir deste documento.");
+      }
+    } finally {
+      setAiFilling(false);
+    }
   }
 
   async function submitObjective(force: boolean) {
     try {
       await apiRequest(`/patients/${patientId}/treatment-plan/objectives`, {
         method: "POST",
-        body: { area, title, description: description || null, criteria: criteria || null, strategies: strategies || null, priority, force },
+        body: {
+          area,
+          title,
+          description: description || null,
+          criteria: criteria || null,
+          strategies: strategies || null,
+          priority,
+          force,
+          ai_generated: aiGenerated,
+          ai_source_document_id: aiGenerated ? aiAttachmentId : null,
+        },
       });
       setShowForm(false);
       resetForm();
@@ -338,6 +486,14 @@ export default function TreatmentPlanPage() {
     objectivesByArea[objective.area] = objectivesByArea[objective.area] || [];
     objectivesByArea[objective.area].push(objective);
   }
+
+  const attachmentsByArea: Record<string, TreatmentPlanAttachment[]> = {};
+  for (const attachment of plan?.attachments || []) {
+    attachmentsByArea[attachment.area] = attachmentsByArea[attachment.area] || [];
+    attachmentsByArea[attachment.area].push(attachment);
+  }
+
+  const areasToShow = areaFilter ? [areaFilter as TreatmentArea] : (Object.keys(AREA_LABELS) as TreatmentArea[]);
 
   return (
     <div>
@@ -412,7 +568,14 @@ export default function TreatmentPlanPage() {
 
           <div>
             <label className="block text-sm font-medium mb-1">Área</label>
-            <select value={area} onChange={(e) => setArea(e.target.value as TreatmentArea)} className="w-full h-10 rounded-btn border border-slate-300 px-3">
+            <select
+              value={area}
+              onChange={(e) => {
+                setArea(e.target.value as TreatmentArea);
+                setAiAttachmentId("");
+              }}
+              className="w-full h-10 rounded-btn border border-slate-300 px-3"
+            >
               {Object.entries(AREA_LABELS).map(([value, label]) => (
                 <option key={value} value={value}>
                   {label}
@@ -420,6 +583,44 @@ export default function TreatmentPlanPage() {
               ))}
             </select>
           </div>
+
+          {(attachmentsByArea[area] || []).length > 0 && (
+            <div className="bg-brand-grayLight rounded-card p-3">
+              <label className="block text-xs font-medium mb-1">
+                Preencher a partir de um PDF já anexado a esta área (RF-04)
+              </label>
+              <div className="flex gap-2">
+                <select
+                  value={aiAttachmentId}
+                  onChange={(e) => setAiAttachmentId(e.target.value)}
+                  className="flex-1 h-9 rounded-btn border border-slate-300 px-2 text-sm"
+                >
+                  <option value="">Selecione um PDF...</option>
+                  {(attachmentsByArea[area] || []).map((a) => (
+                    <option key={a.id} value={a.id}>
+                      {a.original_filename}
+                    </option>
+                  ))}
+                </select>
+                <button
+                  type="button"
+                  disabled={!aiAttachmentId || aiFilling}
+                  onClick={handleAiFill}
+                  className="h-9 rounded-btn bg-white border border-slate-300 px-3 text-xs font-medium disabled:opacity-50"
+                >
+                  {aiFilling ? "Lendo documento..." : "Preencher com IA"}
+                </button>
+              </div>
+              {aiError && <p className="text-danger text-xs mt-1">{aiError}</p>}
+              {aiGenerated && (
+                <p className="text-xs text-brand-turquoise font-medium mt-2">
+                  Gerado por IA — revise os campos abaixo antes de salvar.
+                </p>
+              )}
+              {aiExtractionNote && <p className="text-xs text-warning mt-1">{aiExtractionNote}</p>}
+            </div>
+          )}
+
           <div>
             <label className="block text-sm font-medium mb-1">Objetivo</label>
             <input required value={title} onChange={(e) => setTitle(e.target.value)} className="w-full h-10 rounded-btn border border-slate-300 px-3" />
@@ -458,16 +659,12 @@ export default function TreatmentPlanPage() {
         </form>
       )}
 
-      {plan && plan.objectives.length === 0 ? (
-        <div className="bg-white rounded-card shadow-sm p-10 text-center text-neutralState">
-          Nenhum objetivo cadastrado ainda para este paciente.
-        </div>
-      ) : (
+      {patient && (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-          {Object.entries(objectivesByArea).map(([areaKey, objectives]) => (
-            <div key={areaKey}>
-              <h2 className="font-semibold text-brand-navy mb-2">{AREA_LABELS[areaKey as TreatmentArea]}</h2>
-              {objectives.map((objective) => (
+          {areasToShow.map((areaKey) => (
+            <div key={areaKey} className="bg-white rounded-card shadow-sm p-4">
+              <h2 className="font-semibold text-brand-navy mb-2">{AREA_LABELS[areaKey]}</h2>
+              {(objectivesByArea[areaKey] || []).map((objective) => (
                 <ObjectiveCard
                   key={objective.id}
                   objective={objective}
@@ -476,6 +673,17 @@ export default function TreatmentPlanPage() {
                   resources={resources}
                 />
               ))}
+              {(objectivesByArea[areaKey] || []).length === 0 && (
+                <p className="text-xs text-neutralState mb-2">Nenhum objetivo nesta área ainda.</p>
+              )}
+              {patientId && (
+                <AreaAttachments
+                  patientId={patientId}
+                  area={areaKey}
+                  attachments={attachmentsByArea[areaKey] || []}
+                  onUploaded={load}
+                />
+              )}
             </div>
           ))}
         </div>

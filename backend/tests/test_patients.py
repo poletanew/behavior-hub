@@ -90,3 +90,58 @@ def test_individual_tenant_can_manage_own_patients(client):
     response = _create_patient(client, ctx["headers"])
     assert response.status_code == 201
     assert response.json()["individual_owner_id"] == ctx["user"]["id"]
+
+
+def test_extra_personal_fields_persist_and_are_optional(client):
+    """Addendum v2.1, RF-03 — endereço, telefone, escola e turno são opcionais
+    e persistem corretamente quando informados."""
+    ctx = register_clinic(client)
+
+    without_extra = client.post(
+        "/v1/patients",
+        json={"name": "Sem Campos Extras", "birth_date": "2019-01-01"},
+        headers=ctx["headers"],
+    )
+    assert without_extra.status_code == 201
+    body = without_extra.json()
+    assert body["address"] is None
+    assert body["phone"] is None
+    assert body["school_name"] is None
+    assert body["school_shift"] is None
+
+    with_extra = client.post(
+        "/v1/patients",
+        json={
+            "name": "Com Campos Extras",
+            "birth_date": "2019-01-01",
+            "address": "Rua das Flores, 123, Bairro Centro, São Paulo, 01000-000",
+            "phone": "(11) 91234-5678",
+            "school_name": "Escola Girassol",
+            "school_shift": "manha",
+        },
+        headers=ctx["headers"],
+    )
+    assert with_extra.status_code == 201, with_extra.text
+    patient_id = with_extra.json()["id"]
+
+    reopened = client.get(f"/v1/patients/{patient_id}", headers=ctx["headers"])
+    assert reopened.status_code == 200
+    reopened_body = reopened.json()
+    assert reopened_body["address"] == "Rua das Flores, 123, Bairro Centro, São Paulo, 01000-000"
+    assert reopened_body["phone"] == "(11) 91234-5678"
+    assert reopened_body["school_name"] == "Escola Girassol"
+    assert reopened_body["school_shift"] == "manha"
+
+
+def test_extra_personal_fields_updatable(client):
+    ctx = register_clinic(client)
+    patient = _create_patient(client, ctx["headers"]).json()
+
+    response = client.patch(
+        f"/v1/patients/{patient['id']}",
+        json={"phone": "(21) 98888-7777", "school_shift": "integral"},
+        headers=ctx["headers"],
+    )
+    assert response.status_code == 200, response.text
+    assert response.json()["phone"] == "(21) 98888-7777"
+    assert response.json()["school_shift"] == "integral"

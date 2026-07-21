@@ -13,5 +13,8 @@ export default function ProtectedRoute({ children }: { children: JSX.Element }) 
   if (user.user_type === "family") {
     return <Navigate to="/family-portal" replace />;
   }
+  if (user.user_type === "at") {
+    return <Navigate to="/at/patients" replace />;
+  }
   return children;
 }

@@ -475,37 +475,21 @@ no navegador do próprio responsável — quem busca a URL ali é o navegador de
 então não há esse risco. O rodapé "Powered by Behavior Hub" é adicionado incondicionalmente ao PDF,
 com ou sem white-label ativo, conforme a Seção 32.9 exige.
 
-## Nota sobre Faturamento por Sessão (Fase 5 bloco 3 — Seção 32.10)
+## Nota sobre a remoção do Faturamento por Sessão (Fase 6 bloco 2 — Addendum v2.1, RF-08/RF-16)
 
-`SessionCharge` (`app/models/session_charge.py`) segue o mesmo padrão de tenant denormalizado já
-usado em `Patient`/`Appointment`/`Assessment` (`clinic_id` XOR `individual_owner_id` via
-`CheckConstraint`), com `session_id` único — no máximo uma cobrança por sessão registrada
-(`ck_session_charges_amount_positive` garante `amount > 0` também no nível do banco). O gate de
-plano usa `plan_service.current_plan(user)` (o helper canônico já existente para "nunca confiar
-apenas no rótulo do plano salvo" — Seção 8.3) em vez de checar `clinic.subscription_plan`
-diretamente como fazem `two_factor_service`/`clinical_alert_service`: aqui faz sentido usar o
-helper porque o recurso também precisa funcionar para tenants individuais (Premium/Enterprise não é
-exclusivo de clínica), e `current_plan` já resolve isso corretamente para os dois tipos de tenant.
-
-`_require_admin` restringe criação/edição/exportação a `CLINIC_ADMIN`/`INDIVIDUAL` — a mesma
-restrição que `billing_service` já aplica à gestão de assinatura/Stripe, já que é dado financeiro
-sensível. **Leitura é mais permissiva de propósito**: `get_charge_for_session` não exige plano
-Premium/Enterprise nem permissão de admin (além do gate normal de acesso ao paciente via
-`patient_service.get_patient_or_404`) porque só informa se uma sessão já tem cobrança — não é em si
-um dado sensível, e esconder esse formulário atrás do plano exigiria uma segunda chamada só para
-decidir se mostra a tela, sem ganho real de segurança. A UI mostra sempre o formulário de cobrança;
-é a tentativa de `POST` que retorna 403 se o plano não for Premium/Enterprise.
-
-Sem due_date automático virando "em atraso": o campo `due_date` é só informativo. O status
-`overdue` é sempre setado por uma ação explícita da equipe financeira da clínica — o PRD não define
-uma regra de quando algo "conta" como atrasado (tolerância de dias, fuso horário, feriados etc.), e
-inventar essa regra seria fabricar um comportamento não pedido; por isso não há nenhum job Celery
-recalculando status por data.
+A Fase 5 bloco 3 havia introduzido `SessionCharge` (cobrança por sessão dentro da clínica). O
+Addendum de Melhorias v2.1 pediu a remoção explícita dessa proposta ("reverte a proposta de
+Faturamento por Sessão"), então o modelo, o serviço, as rotas, a migration de reversão e a tela de
+Faturamento foram removidos por completo — não é um recurso oculto atrás de feature flag como o
+RF-13 pediu para Importar Paciente, é uma reversão de fato. A gestão da assinatura Stripe do
+próprio Behavior Hub (Seção 8.3) não foi afetada: ela já vivia dentro da tela "Planos" desde a Fase
+3, então o pedido do RF-16 de "mover para dentro de Planos" já estava satisfeito sem nenhuma
+mudança adicional.
 
 ## Nota sobre Lista de Espera (Fase 5 bloco 4 — Seção 32.11, fecha os itens buildáveis da Fase 5)
 
 `WaitlistEntry` (`app/models/waitlist_entry.py`) segue o mesmo padrão de tenant denormalizado já
-usado em `Patient`/`Appointment`/`SessionCharge`. A única particularidade em relação a esses modelos:
+usado em `Patient`/`Appointment`/`Assessment`. A única particularidade em relação a esses modelos:
 `birth_date` é opcional aqui (nullable), já que a Seção 32.11 descreve a lista de espera como um
 "cadastro simplificado... antes da admissão formal" — a data de nascimento pode não estar disponível
 ainda na triagem, diferente de `Patient.birth_date`, que é obrigatório desde a Fase 1.
@@ -525,7 +509,7 @@ passaria a apontar para um histórico inconsistente.
 
 **Decisão de escopo deliberada: sem campos de convênio/plano de saúde.** O modelo de dados do
 Behavior Hub não tem nenhum conceito de convênio médico ainda (mesma lacuna já documentada para o
-Dashboard do Gestor e Faturamento por Sessão); a Seção 32.11 pede "campos mínimos", então adicionar
+Dashboard do Gestor); a Seção 32.11 pede "campos mínimos", então adicionar
 esse campo agora seria inventar um requisito não pedido pelo PRD. A permissão de acesso reaproveita
 `rbac_service.can_create_patient` (a mesma regra configurável de "Cadastrar paciente" da Seção
 17.1) em vez de criar uma permissão nova — decisão consistente com o fato de que a Lista de Espera é,
@@ -547,6 +531,109 @@ para tradução", não o lançamento efetivo de outro idioma, e o frontend não 
 biblioteca de i18n para justificar uma extração retroativa sem um segundo idioma real para validar).
 O detalhamento completo de cada decisão está na seção "O que não está nesta fase" do `README.md` da
 raiz.
+
+## Nota sobre o papel Auxiliar Terapêutico e a aba ABA (Fase 6 bloco 6 — Addendum v2.1, RF-11)
+
+Novo valor `AT` em `UserType` (enum Postgres nativo — `autogenerate` do Alembic não detecta um
+valor novo em um enum já existente, só tipos inteiramente novos, então a migration usa
+`ALTER TYPE usertype ADD VALUE IF NOT EXISTS 'AT'` explicitamente, mesmo padrão já usado para
+adicionar `FAMILY` na Fase 5). `User.supervisor_id` vincula o AT ao supervisor/admin que gerou o
+convite (preenchido em `auth_service.accept_invitation`), usado só para agrupar ATs na aba ABA —
+não é, hoje, uma trava de visibilidade adicional.
+
+Em vez de retrofitar restrições de campo nas rotas clínicas gerais, o AT ganhou um namespace de API
+inteiramente dedicado (`app/api/v1/at_portal.py` + `app/services/at_portal_service.py` +
+`app/schemas/at_portal.py`), que só expõe DTOs mínimos e seguros (`ATPatientResponse` não tem
+diagnóstico) e reaproveita diretamente a lógica clínica já existente e já seguros — criar
+atendimento (`session_service.create_session`) e registrar tentativa (rotas genéricas de
+`session-trainings/{id}/trials` e `/progress`) — em vez de duplicá-la. A única regra nova é
+`at_portal_service.apply_training`, que garante que o AT só aplica um treino já vinculado a esse
+paciente especificamente (RF-10 "Vincular"), não qualquer treino do sistema.
+
+`patient_service.assert_full_clinical_access` é um guard explícito, chamado nas rotas citadas na
+tabela de personas do addendum como vedadas ao AT — listagem e detalhe de paciente, plano de
+tratamento (`treatment_plans.py`) e relatórios (`reports.py`). **Decisão de escopo deliberada**:
+outras rotas clínicas (linha do tempo, alertas, sugestões) não têm o mesmo guard; o frontend do AT
+não tem nenhuma tela que as chame, mas isso é diferente de uma trava na própria API — mesmo tipo de
+tradeoff documentado já para a "exposição residual" do Portal da Família (bloco 1 desta mesma
+fase).
+
+Atribuir um AT a um paciente reaproveita o mecanismo de atribuição já existente
+(`assign_professional`/`remove_assignment`), agora liberado também para `SUPERVISOR` (antes,
+só `CLINIC_ADMIN`). Isso expôs um gotcha: essas rotas usavam `get_patient_or_404`, que restringe
+não-admins aos pacientes **já atribuídos a si mesmos** — mas um supervisor atribuindo um paciente
+novo a um AT precisa enxergar pacientes ainda não atribuídos a ninguém. Corrigido com
+`_get_patient_for_assignment_management`, uma busca escopada só ao tenant (sem a restrição de
+atribuição), usada exclusivamente por essas duas rotas administrativas.
+
+`app/api/v1/aba.py` + `app/services/aba_service.py` dão ao supervisor/admin a visão de gestão: listar
+ATs com contagem de pacientes atribuídos, listar pacientes de um AT específico, e uma tabela
+somente-leitura das tentativas mais recentes registradas por qualquer AT do tenant — explicitamente
+uma visão de acompanhamento, não uma camada de aprovação (o addendum descreve aprovação como
+opcional, "se a clínica optar", e não foi implementada nesta fase).
+
+## Nota sobre Anexos por Área do Plano de Tratamento (Fase 6 bloco 7 — Addendum v2.1, RF-04)
+
+Nova entidade `TreatmentPlanAttachment` (`app/models/treatment_plan.py`), independente de
+`Objective` — o addendum pede "anexar um documento àquela área específica do plano" (ex.: uma
+avaliação externa ou plano em papel já existente), não um anexo de um objetivo individual, então
+criar uma entidade nova em vez de reaproveitar `Objective`/`ObjectiveTraining` evita forçar um
+vínculo artificial com um objetivo que talvez nem exista ainda. O upload reaproveita
+`file_service` (mesmo MinIO/S3 já usado pelos Recursos Terapêuticos desde a Fase 2) — só PDF é
+aceito (`application/pdf`), mesmo limite de 10MB.
+
+O isolamento por área (critério de aceite do RF-04: "importar um PDF em ABA não o torna visível
+nem editável nas demais áreas") vem estruturalmente do modelo — `area` é uma coluna obrigatória do
+próprio anexo, não uma tag opcional, e a rota de detalhe (`GET /treatment-plan/attachments/{id}`)
+devolve uma URL assinada e temporária (`generate_presigned_url`), o mesmo padrão de "visualizador
+seguro" já usado por `resources.py` desde a Fase 2 — não há um endpoint de download direto e
+público.
+
+Upload exige `can_edit_area` (a mesma checagem já usada por `create_objective` para editar
+objetivos daquela área) — quem pode adicionar um objetivo a uma área também pode anexar um PDF a
+ela; não foi criada uma permissão nova separada. Leitura segue o gate normal de
+`get_patient_or_404`, e a rota de detalhe do anexo chama `assert_full_clinical_access` (RF-11) —
+o AT continua sem acesso a esses documentos, consistente com estar bloqueado do Plano de
+Tratamento como um todo.
+
+**Gotcha de migration**: `op.create_table` com uma coluna `sa.Enum(..., create_type=False)`
+reutilizando um tipo Postgres já existente (`treatmentarea`, criado desde `Objective.area` na Fase
+2) ainda tentava recriar o tipo e falhava com `DuplicateObject` — o `sa.Enum` genérico descarta o
+kwarg `create_type` silenciosamente; só `sqlalchemy.dialects.postgresql.ENUM(..., create_type=False)`
+de fato suprime a recriação. Ver o comentário na própria migration
+(`6120d163231c_fase6_bloco7_treatment_plan_attachments.py`) para o diagnóstico completo.
+
+## Nota sobre IA no Plano de Tratamento — "Preencher com IA" (Fase 6 bloco 8 — Addendum v2.1, RF-05)
+
+`Objective` ganha três campos novos — `ai_generated` (bool), `ai_source_document_id` (FK para
+`treatment_plan_attachments`) e `ai_reviewed_at`. O addendum é explícito ao pedir que "a partir do
+PDF exportado/importado (RF-04)" a IA sugira os 4 campos — por isso a rota nova
+(`POST /patients/{id}/treatment-plan/objectives/ai-fill`) reaproveita diretamente os anexos já
+criados no Bloco 7, em vez de abrir um upload paralelo dentro do formulário de Novo Objetivo.
+
+**Sem chamada a nenhuma API de IA externa** — mesmo princípio já usado em
+`report_summary_service._draft_text` (Fase 2/14.5): o "Ponto técnico de atenção" do próprio
+addendum recomenda começar simples ("a IA lê o texto e tenta mapear para os 4 campos"), então
+`treatment_plan_service._draft_objective_fields_from_text` extrai o texto do PDF via `pypdf`
+(`file_service.download_object` + `PdfReader`) e mapeia por palavras-chave determinísticas
+(`critério`/`domínio`/`%` para o critério de domínio; `estratégia`/`intervenção`/`prompt`/`ajuda`
+para as estratégias; a primeira linha vira título; o restante vira descrição). Um PDF sem texto
+extraível (documento escaneado sem OCR, por exemplo) não falha silenciosamente — retorna campos
+vazios com `extraction_note` explicando o motivo, para o profissional preencher manualmente.
+
+**Nunca publica sozinho**: a rota de "Preencher com IA" não persiste nada — devolve só o rascunho
+na resposta. O objetivo só grava `ai_generated=true`/`ai_source_document_id`/`ai_reviewed_at` no
+exato momento em que `create_objective` é chamado, ou seja, quando o profissional já revisou (ou
+optou por não revisar) e clicou em Salvar — o mesmo princípio de "a IA pode gerar rascunhos, mas não
+deve publicar automaticamente conteúdo clínico sem revisão" (Seção 12.1) já seguido por
+`report_summary_service` e `resource_service`. `ai_reviewed_at` é preenchido nesse instante, não
+antes, já que não existe um estado de rascunho persistido intermediário — diferente do
+`ai_generated_plan_draft` que o RF-06 (próximo bloco) vai introduzir para Avaliações.
+
+Upload de PDF (RF-04) e "Preencher com IA" (RF-05) compartilham a mesma checagem de permissão
+(`can_edit_area`) — quem pode anexar um documento a uma área também pode gerar um rascunho a partir
+dele; não foi criada uma permissão nova. Dependência nova: `pypdf` (`requirements.txt`), leitura de
+texto de PDF pura em Python, sem binário externo.
 
 ## Estrutura
 

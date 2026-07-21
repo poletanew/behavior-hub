@@ -33,6 +33,10 @@ class User(Base, UUIDPrimaryKeyMixin, TimestampMixin, StripeBillingMixin):
         ForeignKey("clinics.id", use_alter=True, name="fk_users_clinic_id"), nullable=True, index=True
     )
 
+    # Addendum v2.1, RF-11 — vincula um AT (Auxiliar Terapêutico) ao supervisor/
+    # admin que o convidou; usado pela aba ABA para agrupar ATs por supervisor.
+    supervisor_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id"), nullable=True)
+
     # Individual professionals (no clinic) carry their own subscription plan.
     subscription_plan: Mapped[SubscriptionPlan | None] = mapped_column(nullable=True)
     subscription_status: Mapped[SubscriptionStatus] = mapped_column(

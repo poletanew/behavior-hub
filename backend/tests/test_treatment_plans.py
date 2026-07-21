@@ -1,4 +1,26 @@
-from tests.conftest import assign_professional, create_patient, invite_and_accept_professional, register_clinic
+import io
+
+from reportlab.pdfgen import canvas
+
+from tests.conftest import (
+    assign_professional,
+    create_patient,
+    invite_and_accept,
+    invite_and_accept_professional,
+    register_clinic,
+)
+
+
+def _pdf_with_text(*lines: str) -> bytes:
+    buf = io.BytesIO()
+    c = canvas.Canvas(buf)
+    y = 750
+    for line in lines:
+        c.drawString(100, y, line)
+        y -= 20
+    c.showPage()
+    c.save()
+    return buf.getvalue()
 
 
 def _create_objective(client, headers, patient_id, **overrides):
@@ -174,3 +196,183 @@ def test_treatment_plan_isolated_by_tenant(client):
 
     forbidden = client.get(f"/v1/patients/{patient_a['id']}/treatment-plan", headers=clinic_b["headers"])
     assert forbidden.status_code == 404
+
+
+def _upload_attachment(client, headers, patient_id, area="aba", filename="avaliacao.pdf"):
+    return client.post(
+        f"/v1/patients/{patient_id}/treatment-plan/attachments",
+        data={"area": area},
+        files={"file": (filename, b"%PDF-1.4 fake content", "application/pdf")},
+        headers=headers,
+    )
+
+
+def test_upload_attachment_scoped_to_its_area(client, mock_s3):
+    """RF-04 — importar um PDF em uma área não o torna visível nem editável nas demais."""
+    ctx = register_clinic(client)
+    patient = create_patient(client, ctx["headers"])
+
+    response = _upload_attachment(client, ctx["headers"], patient["id"], area="aba")
+    assert response.status_code == 201, response.text
+    attachment = response.json()
+    assert attachment["area"] == "aba"
+    assert attachment["original_filename"] == "avaliacao.pdf"
+    assert attachment["uploaded_by_name"] == ctx["user"]["name"]
+
+    plan = client.get(f"/v1/patients/{patient['id']}/treatment-plan", headers=ctx["headers"])
+    attachments = plan.json()["attachments"]
+    assert len(attachments) == 1
+    assert attachments[0]["area"] == "aba"
+
+    aba_only = [a for a in attachments if a["area"] == "aba"]
+    other_areas = [a for a in attachments if a["area"] != "aba"]
+    assert len(aba_only) == 1
+    assert len(other_areas) == 0
+
+
+def test_attachment_opens_via_signed_view_url(client, mock_s3):
+    ctx = register_clinic(client)
+    patient = create_patient(client, ctx["headers"])
+    attachment = _upload_attachment(client, ctx["headers"], patient["id"]).json()
+
+    detail = client.get(f"/v1/treatment-plan/attachments/{attachment['id']}", headers=ctx["headers"])
+    assert detail.status_code == 200
+    assert detail.json()["view_url"].startswith("http")
+
+
+def test_attachment_rejects_non_pdf(client, mock_s3):
+    ctx = register_clinic(client)
+    patient = create_patient(client, ctx["headers"])
+
+    response = client.post(
+        f"/v1/patients/{patient['id']}/treatment-plan/attachments",
+        data={"area": "aba"},
+        files={"file": ("script.exe", b"MZ...", "application/x-msdownload")},
+        headers=ctx["headers"],
+    )
+    assert response.status_code == 415
+
+
+def test_professional_without_area_permission_cannot_upload_attachment(client, mock_s3):
+    ctx = register_clinic(client)
+    patient = create_patient(client, ctx["headers"])
+    professional = invite_and_accept_professional(client, ctx["headers"], specialty="fonoaudiologo")
+    assign_professional(client, ctx["headers"], patient["id"], professional["user"]["id"])
+
+    response = _upload_attachment(client, professional["headers"], patient["id"], area="aba")
+    assert response.status_code == 403
+
+
+def test_at_cannot_access_treatment_plan_attachments(client, mock_s3):
+    """RF-11 — o AT não tem acesso ao Plano de Tratamento, nem aos seus anexos."""
+    ctx = register_clinic(client)
+    patient = create_patient(client, ctx["headers"])
+    attachment = _upload_attachment(client, ctx["headers"], patient["id"]).json()
+    at = invite_and_accept(client, ctx["headers"], role="at")
+
+    forbidden_plan = client.get(f"/v1/patients/{patient['id']}/treatment-plan", headers=at["headers"])
+    assert forbidden_plan.status_code == 403
+
+    forbidden_attachment = client.get(f"/v1/treatment-plan/attachments/{attachment['id']}", headers=at["headers"])
+    assert forbidden_attachment.status_code == 403
+
+
+def _upload_pdf_bytes(client, headers, patient_id, data: bytes, area="aba", filename="doc.pdf"):
+    return client.post(
+        f"/v1/patients/{patient_id}/treatment-plan/attachments",
+        data={"area": area},
+        files={"file": (filename, data, "application/pdf")},
+        headers=headers,
+    )
+
+
+def test_ai_fill_maps_pdf_text_to_objective_fields(client, mock_s3):
+    """RF-05 — "Preencher com IA": extrai o texto do PDF já anexado (RF-04) e sugere
+    um rascunho editável dos 4 campos, sem publicar nada automaticamente."""
+    ctx = register_clinic(client)
+    patient = create_patient(client, ctx["headers"])
+    pdf_bytes = _pdf_with_text(
+        "Avaliacao de linguagem expressiva",
+        "Criterio de dominio: 80% de acertos em 3 sessoes",
+        "Estrategia: uso de dicas visuais e reforco positivo",
+    )
+    attachment = _upload_pdf_bytes(client, ctx["headers"], patient["id"], pdf_bytes).json()
+
+    response = client.post(
+        f"/v1/patients/{patient['id']}/treatment-plan/objectives/ai-fill",
+        json={"attachment_id": attachment["id"]},
+        headers=ctx["headers"],
+    )
+    assert response.status_code == 200, response.text
+    draft = response.json()
+    assert draft["source_document_id"] == attachment["id"]
+    assert draft["title"] == "Avaliacao de linguagem expressiva"
+    assert "80%" in draft["criteria"]
+    assert "positivo" in draft["strategies"].lower() or "estrategia" in draft["strategies"].lower()
+    assert draft["extraction_note"] is None
+
+
+def test_ai_fill_flags_pdf_with_no_extractable_text(client, mock_s3):
+    """PDF de página em branco (sem texto) — caminho de fallback do "Ponto técnico
+    de atenção" do addendum (ex.: documento escaneado sem OCR)."""
+    ctx = register_clinic(client)
+    patient = create_patient(client, ctx["headers"])
+    blank_pdf = _pdf_with_text()
+    attachment = _upload_pdf_bytes(client, ctx["headers"], patient["id"], blank_pdf).json()
+
+    response = client.post(
+        f"/v1/patients/{patient['id']}/treatment-plan/objectives/ai-fill",
+        json={"attachment_id": attachment["id"]},
+        headers=ctx["headers"],
+    )
+    assert response.status_code == 200, response.text
+    draft = response.json()
+    assert draft["extraction_note"] is not None
+    assert draft["description"] == ""
+
+
+def test_creating_objective_from_ai_draft_marks_reviewed_at_save(client, mock_s3):
+    ctx = register_clinic(client)
+    patient = create_patient(client, ctx["headers"])
+    pdf_bytes = _pdf_with_text("Objetivo sugerido", "Criterio de dominio: 90%", "Estrategia: modelagem")
+    attachment = _upload_pdf_bytes(client, ctx["headers"], patient["id"], pdf_bytes).json()
+
+    response = _create_objective(
+        client,
+        ctx["headers"],
+        patient["id"],
+        title="Objetivo sugerido",
+        ai_generated=True,
+        ai_source_document_id=attachment["id"],
+    )
+    assert response.status_code == 201, response.text
+    objective = response.json()
+    assert objective["ai_generated"] is True
+    assert objective["ai_source_document_id"] == attachment["id"]
+    assert objective["ai_reviewed_at"] is not None
+
+
+def test_non_ai_objective_has_no_ai_fields(client):
+    ctx = register_clinic(client)
+    patient = create_patient(client, ctx["headers"])
+    objective = _create_objective(client, ctx["headers"], patient["id"]).json()
+    assert objective["ai_generated"] is False
+    assert objective["ai_source_document_id"] is None
+    assert objective["ai_reviewed_at"] is None
+
+
+def test_ai_fill_requires_area_edit_permission(client, mock_s3):
+    ctx = register_clinic(client)
+    patient = create_patient(client, ctx["headers"])
+    pdf_bytes = _pdf_with_text("Documento")
+    attachment = _upload_pdf_bytes(client, ctx["headers"], patient["id"], pdf_bytes, area="aba").json()
+
+    professional = invite_and_accept_professional(client, ctx["headers"], specialty="fonoaudiologo")
+    assign_professional(client, ctx["headers"], patient["id"], professional["user"]["id"])
+
+    response = client.post(
+        f"/v1/patients/{patient['id']}/treatment-plan/objectives/ai-fill",
+        json={"attachment_id": attachment["id"]},
+        headers=professional["headers"],
+    )
+    assert response.status_code == 403

@@ -1,8 +1,7 @@
 import { FormEvent, useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { apiRequest, ApiError } from "../api/client";
-import { ClinicalSession, Patient, PaymentStatus, SessionCharge, SessionTrainingProgress, Training } from "../types";
-import { useAuth } from "../context/AuthContext";
+import { apiRequest } from "../api/client";
+import { ClinicalSession, Patient, SessionTrainingProgress, Training } from "../types";
 import VoiceDictationButton from "../components/VoiceDictationButton";
 import {
   flushQueue,
@@ -12,153 +11,6 @@ import {
   queueTrial,
   subscribeQueueChanges,
 } from "../offline/offlineQueue";
-
-const PAYMENT_STATUS_LABELS: Record<PaymentStatus, string> = {
-  pending: "Pendente",
-  paid: "Pago",
-  overdue: "Em atraso",
-};
-
-const PAYMENT_STATUS_COLORS: Record<PaymentStatus, string> = {
-  pending: "bg-slate-200 text-neutralState",
-  paid: "bg-success/10 text-success",
-  overdue: "bg-danger/10 text-danger",
-};
-
-function SessionChargeWidget({ sessionId }: { sessionId: string }) {
-  const { user } = useAuth();
-  const [charge, setCharge] = useState<SessionCharge | null>(null);
-  const [loaded, setLoaded] = useState(false);
-  const [notAvailable, setNotAvailable] = useState(false);
-  const [amount, setAmount] = useState("");
-  const [dueDate, setDueDate] = useState("");
-  const [notes, setNotes] = useState("");
-  const [error, setError] = useState<string | null>(null);
-
-  const canManage = user?.user_type === "clinic_admin" || user?.user_type === "individual";
-
-  function load() {
-    apiRequest<SessionCharge | null>(`/sessions/${sessionId}/charge`)
-      .then((data) => {
-        setCharge(data);
-        setLoaded(true);
-      })
-      .catch((err) => {
-        if (err instanceof ApiError && err.status === 403) {
-          setNotAvailable(true);
-        }
-        setLoaded(true);
-      });
-  }
-
-  useEffect(load, [sessionId]);
-
-  async function handleCreate(e: FormEvent) {
-    e.preventDefault();
-    setError(null);
-    try {
-      await apiRequest(`/sessions/${sessionId}/charge`, {
-        method: "POST",
-        body: { amount: Number(amount), due_date: dueDate || null, notes: notes || null },
-      });
-      setAmount("");
-      setDueDate("");
-      setNotes("");
-      load();
-    } catch (err) {
-      if (err instanceof ApiError && err.status === 403) {
-        setNotAvailable(true);
-      } else {
-        setError("Não foi possível registrar a cobrança.");
-      }
-    }
-  }
-
-  async function handleStatusChange(newStatus: PaymentStatus) {
-    await apiRequest(`/session-charges/${charge!.id}/status`, {
-      method: "POST",
-      body: { payment_status: newStatus },
-    });
-    load();
-  }
-
-  if (!canManage || !loaded) return null;
-
-  if (notAvailable) {
-    return (
-      <div className="border-t border-slate-100 pt-4 mt-4 text-sm text-neutralState">
-        Faturamento por sessão está disponível apenas nos planos{" "}
-        <Link to="/plans" className="text-brand-blue underline">
-          Premium ou Enterprise
-        </Link>
-        .
-      </div>
-    );
-  }
-
-  if (charge) {
-    return (
-      <div className="border-t border-slate-100 pt-4 mt-4 text-sm">
-        <div className="font-medium text-xs uppercase text-neutralState mb-2">Faturamento</div>
-        <div className="flex items-center gap-3">
-          <span>R$ {charge.amount.toFixed(2)}</span>
-          {charge.due_date && <span className="text-neutralState text-xs">vencimento {charge.due_date}</span>}
-          <span className={`rounded px-2 py-0.5 text-xs font-medium ${PAYMENT_STATUS_COLORS[charge.payment_status]}`}>
-            {PAYMENT_STATUS_LABELS[charge.payment_status]}
-          </span>
-          <select
-            value={charge.payment_status}
-            onChange={(e) => handleStatusChange(e.target.value as PaymentStatus)}
-            className="h-8 text-xs rounded-btn border border-slate-300 px-2"
-          >
-            <option value="pending">Pendente</option>
-            <option value="paid">Pago</option>
-            <option value="overdue">Em atraso</option>
-          </select>
-        </div>
-        {charge.notes && <p className="text-neutralState mt-1">{charge.notes}</p>}
-      </div>
-    );
-  }
-
-  return (
-    <form onSubmit={handleCreate} className="border-t border-slate-100 pt-4 mt-4 flex gap-2 items-end text-sm">
-      <div>
-        <label className="block text-xs font-medium mb-1">Valor (R$)</label>
-        <input
-          type="number"
-          step="0.01"
-          min="0.01"
-          required
-          value={amount}
-          onChange={(e) => setAmount(e.target.value)}
-          className="w-28 h-9 rounded-btn border border-slate-300 px-2 text-sm"
-        />
-      </div>
-      <div>
-        <label className="block text-xs font-medium mb-1">Vencimento</label>
-        <input
-          type="date"
-          value={dueDate}
-          onChange={(e) => setDueDate(e.target.value)}
-          className="h-9 rounded-btn border border-slate-300 px-2 text-sm"
-        />
-      </div>
-      <div className="flex-1">
-        <label className="block text-xs font-medium mb-1">Observações</label>
-        <input
-          value={notes}
-          onChange={(e) => setNotes(e.target.value)}
-          className="w-full h-9 rounded-btn border border-slate-300 px-2 text-sm"
-        />
-      </div>
-      <button type="submit" className="h-9 rounded-btn bg-brand-turquoise text-white px-4 text-sm font-medium">
-        Cobrar esta sessão
-      </button>
-      {error && <p className="text-danger text-xs">{error}</p>}
-    </form>
-  );
-}
 
 const RESULT_LABELS: Record<string, string> = {
   correct: "Correta",
@@ -457,7 +309,6 @@ export default function SessionDetailPage() {
           </form>
         )}
 
-        {sessionId && <SessionChargeWidget sessionId={sessionId} />}
       </div>
 
       {session.trainings.map((st) => {

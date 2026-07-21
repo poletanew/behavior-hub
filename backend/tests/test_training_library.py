@@ -1,4 +1,4 @@
-from tests.conftest import create_training, create_training_category, register_clinic
+from tests.conftest import create_patient, create_training, create_training_category, register_clinic, register_individual
 
 
 def test_list_categories_and_trainings(client, db_session):
@@ -54,3 +54,104 @@ def test_custom_training_creation_and_deletion(client, db_session):
 
     delete_response = client.delete(f"/v1/trainings/{training_id}", headers=ctx["headers"])
     assert delete_response.status_code == 204
+
+
+def test_link_training_to_patient_shows_as_prescribed(client, db_session):
+    """Addendum v2.1, RF-10 — vincular treino cria treino "prescrito" pro paciente."""
+    category = create_training_category(db_session)
+    training = create_training(db_session, category)
+    ctx = register_clinic(client)
+    patient = create_patient(client, ctx["headers"])
+
+    response = client.post(
+        f"/v1/trainings/{training.id}/link", json={"patient_id": patient["id"]}, headers=ctx["headers"]
+    )
+    assert response.status_code == 201, response.text
+    body = response.json()
+    assert body["status"] == "prescribed"
+    assert body["training_title"] == training.title
+
+    links = client.get(f"/v1/patients/{patient['id']}/training-links", headers=ctx["headers"])
+    assert links.status_code == 200
+    assert len(links.json()) == 1
+    assert links.json()[0]["status"] == "prescribed"
+
+
+def test_link_training_to_patient_is_idempotent_per_pair(client, db_session):
+    category = create_training_category(db_session)
+    training = create_training(db_session, category)
+    ctx = register_clinic(client)
+    patient = create_patient(client, ctx["headers"])
+
+    first = client.post(f"/v1/trainings/{training.id}/link", json={"patient_id": patient["id"]}, headers=ctx["headers"])
+    assert first.status_code == 201
+
+    duplicate = client.post(f"/v1/trainings/{training.id}/link", json={"patient_id": patient["id"]}, headers=ctx["headers"])
+    assert duplicate.status_code == 409
+
+
+def test_unlink_training_from_patient(client, db_session):
+    category = create_training_category(db_session)
+    training = create_training(db_session, category)
+    ctx = register_clinic(client)
+    patient = create_patient(client, ctx["headers"])
+
+    link = client.post(
+        f"/v1/trainings/{training.id}/link", json={"patient_id": patient["id"]}, headers=ctx["headers"]
+    ).json()
+
+    response = client.delete(f"/v1/training-patient-links/{link['id']}", headers=ctx["headers"])
+    assert response.status_code == 204
+
+    links = client.get(f"/v1/patients/{patient['id']}/training-links", headers=ctx["headers"])
+    assert links.json() == []
+
+
+def test_link_status_becomes_applied_after_first_session_using_it(client, db_session):
+    """A sessão que de fato usa o treino prescrito muda o status pra "aplicado"."""
+    category = create_training_category(db_session)
+    training = create_training(db_session, category)
+    ctx = register_clinic(client)
+    patient = create_patient(client, ctx["headers"])
+
+    client.post(f"/v1/trainings/{training.id}/link", json={"patient_id": patient["id"]}, headers=ctx["headers"])
+
+    session_response = client.post(
+        "/v1/sessions",
+        json={
+            "patient_id": patient["id"],
+            "professional_id": ctx["user"]["id"],
+            "occurred_at": "2026-07-21T10:00:00Z",
+            "training_ids": [str(training.id)],
+        },
+        headers=ctx["headers"],
+    )
+    assert session_response.status_code == 201, session_response.text
+
+    links = client.get(f"/v1/patients/{patient['id']}/training-links", headers=ctx["headers"])
+    assert links.json()[0]["status"] == "applied"
+
+
+def test_cannot_link_training_to_patient_from_another_tenant(client, db_session):
+    category = create_training_category(db_session)
+    training = create_training(db_session, category)
+    ctx_a = register_clinic(client, clinic_name="Clinica A Link")
+    ctx_b = register_clinic(client, clinic_name="Clinica B Link")
+    patient_b = create_patient(client, ctx_b["headers"])
+
+    response = client.post(
+        f"/v1/trainings/{training.id}/link", json={"patient_id": patient_b["id"]}, headers=ctx_a["headers"]
+    )
+    assert response.status_code == 404
+
+
+def test_individual_tenant_can_link_training_to_own_patient(client, db_session):
+    category = create_training_category(db_session)
+    training = create_training(db_session, category)
+    ctx = register_individual(client)
+    patient = create_patient(client, ctx["headers"])
+
+    response = client.post(
+        f"/v1/trainings/{training.id}/link", json={"patient_id": patient["id"]}, headers=ctx["headers"]
+    )
+    assert response.status_code == 201

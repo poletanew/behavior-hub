@@ -3,7 +3,12 @@ import Layout from "./components/Layout";
 import FamilyPortalLayout from "./components/FamilyPortalLayout";
 import ProtectedRoute from "./components/ProtectedRoute";
 import FamilyProtectedRoute from "./components/FamilyProtectedRoute";
+import ATProtectedRoute from "./components/ATProtectedRoute";
+import ATWorkspaceLayout from "./components/ATWorkspaceLayout";
 import FamilyPortalPage from "./pages/family/FamilyPortalPage";
+import ATPatientsPage from "./pages/at/ATPatientsPage";
+import ATPatientWorkspacePage from "./pages/at/ATPatientWorkspacePage";
+import ABAPage from "./pages/ABAPage";
 import LoginPage from "./pages/LoginPage";
 import RegisterPage from "./pages/RegisterPage";
 import DashboardPage from "./pages/DashboardPage";
@@ -30,7 +35,6 @@ import AssessmentsPage from "./pages/AssessmentsPage";
 import PlansPage from "./pages/PlansPage";
 import FamilyAccessAdminPage from "./pages/FamilyAccessAdminPage";
 import WhiteLabelSettingsPage from "./pages/WhiteLabelSettingsPage";
-import BillingSessionsPage from "./pages/BillingSessionsPage";
 import WaitlistPage from "./pages/WaitlistPage";
 
 export default function App() {
@@ -48,6 +52,17 @@ export default function App() {
         }
       >
         <Route path="/family-portal" element={<FamilyPortalPage />} />
+      </Route>
+
+      <Route
+        element={
+          <ATProtectedRoute>
+            <ATWorkspaceLayout />
+          </ATProtectedRoute>
+        }
+      >
+        <Route path="/at/patients" element={<ATPatientsPage />} />
+        <Route path="/at/patients/:patientId" element={<ATPatientWorkspacePage />} />
       </Route>
 
       <Route
@@ -80,8 +95,8 @@ export default function App() {
         <Route path="/manager-dashboard" element={<ManagerDashboardPage />} />
         <Route path="/plans" element={<PlansPage />} />
         <Route path="/white-label" element={<WhiteLabelSettingsPage />} />
-        <Route path="/billing-sessions" element={<BillingSessionsPage />} />
         <Route path="/waitlist" element={<WaitlistPage />} />
+        <Route path="/aba" element={<ABAPage />} />
       </Route>
 
       <Route path="/" element={<Navigate to="/dashboard" replace />} />

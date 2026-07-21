@@ -92,6 +92,68 @@ Este repositório está sendo construído **por fases**, seguindo o roadmap da S
   que o PRD não especifica** (ver "O que não está nesta fase" para o detalhamento dos três itens
   conscientemente deixados de fora: ondas seguintes de protocolos de avaliação, ML preditivo e
   internacionalização).
+- **Fase 6 (bloco 1) — Addendum de Melhorias v2.1, RF-01 e RF-02** (ver
+  `docs/Behavior_Hub_Addendum_v2.1.pdf`): favicon com o símbolo reduzido da marca (rede de nós
+  formando a letra "B", Seção 23.7) em todas as páginas, logotipo vertical centralizado na tela de
+  login/2FA acima dos campos de formulário (Seção 23.8), e renomeação de "Dashboard" para "Área de
+  Trabalho" em todo texto visível ao usuário (rótulo do menu e título da página) — sem alterar
+  comportamento ou a rota `/dashboard` internamente.
+- **Fase 6 (bloco 2) — Addendum de Melhorias v2.1, RF-07/RF-09/RF-08/RF-16**: Atendimentos passa a
+  ser um fluxo centrado no paciente — a ficha do paciente (Pacientes → paciente → Histórico de
+  Sessões) é o ponto de entrada do dia a dia, com o campo Paciente sempre fixo/somente leitura e o
+  Profissional/Terapeuta responsável como seletor obrigatório (especialidade exibida junto ao nome).
+  A lista global de Atendimentos vira uma visão administrativa somente-leitura. **Reverte por
+  completo** a Faturamento por Sessão da Fase 5 bloco 3 (modelo, serviço, rotas e tela removidos, não
+  apenas ocultos) — a gestão da assinatura Stripe do Behavior Hub já vivia dentro da tela "Planos"
+  desde a Fase 3, então nenhuma mudança adicional foi necessária para o pedido de "mover para
+  Planos".
+- **Fase 6 (bloco 3) — Addendum de Melhorias v2.1, RF-13**: Importação em Lote de Pacientes não foi
+  removida do código, apenas fica oculta do menu principal por padrão. Liberável por clínica em
+  Configurações da Clínica, restrito a clínicas Enterprise ativas (`bulk_import_enabled` em
+  `ClinicPermissionSettings`, aplicado tanto na visibilidade do menu quanto na própria API de
+  importação — não é só uma máscara visual). Contas individuais continuam com acesso irrestrito, já
+  que não existe um "admin" separado para liberar o flag para si mesmas.
+- **Fase 6 (bloco 4) — Addendum de Melhorias v2.1, RF-03**: Patient ganha quatro campos pessoais
+  opcionais — endereço, telefone (com máscara), nome da escola e turno escolar — com o mesmo
+  tratamento de acesso já usado para diagnóstico (sem uma camada de criptografia por campo
+  separada; a proteção vem do gate normal de acesso ao registro do paciente). A listagem de
+  pacientes deixa de ser uma tabela simples e passa a ser um grid de cards (avatar com iniciais,
+  nome, idade calculada, badge de status, resumo de diagnóstico, segunda linha com escola+turno, e
+  um botão "Ver contato" que revela telefone/endereço sem precisar abrir o cadastro completo).
+- **Fase 6 (bloco 5) — Addendum de Melhorias v2.1, RF-10**: Training Library renomeada para
+  "Biblioteca de Treino"; botão "Novo Treinamento" (reaproveita o `POST /trainings` já existente
+  desde a Fase 1, só faltava a tela). Nova entidade `TrainingPatientLink` — botão "Vincular a um
+  paciente" (busca por nome parcial) cria um vínculo treino↔paciente que aparece com o rótulo
+  "Prescrito" na tela de Novo Atendimento daquele paciente, e passa automaticamente para "Aplicado"
+  assim que uma sessão realmente usar esse treino com esse paciente (sem nenhuma ação manual extra).
+- **Fase 6 (bloco 6) — Addendum de Melhorias v2.1, RF-11**: novo papel de usuário Auxiliar
+  Terapêutico (AT), convidável pela tela Profissionais como qualquer outro papel. AT tem um espaço
+  de trabalho dedicado (`/at/patients`) — só vê os pacientes que lhe foram atribuídos, os treinos
+  já prescritos (RF-10) para cada um, e pode aplicar um treino (cria o atendimento) e registrar
+  tentativas nele, sem acesso a diagnóstico completo, plano de tratamento ou relatórios (bloqueado
+  por um guard dedicado nas rotas de listagem/detalhe de paciente, plano de tratamento e
+  relatórios). Supervisor e admin ganham a aba "ABA", de onde atribuem pacientes a ATs (reaproveita
+  o mecanismo de atribuição já existente, agora também liberado para o papel Supervisor) e revisam,
+  em modo somente-leitura, as tentativas recentes registradas por cada AT. **Nota de escopo**: o
+  bloqueio de acesso clínico do AT foi aplicado nas rotas explicitamente citadas na tabela de
+  personas do addendum (lista/detalhe de paciente, plano de tratamento, relatórios); rotas
+  auxiliares como linha do tempo, alertas e sugestões não têm o mesmo guard — o AT não tem tela
+  alguma no frontend que as exponha, mas isso não é o mesmo que um bloqueio na própria API.
+- **Fase 6 (bloco 7) — Addendum de Melhorias v2.1, RF-04**: a grade multidisciplinar do Plano de
+  Tratamento agora mostra todas as áreas como colunas (mesmo sem nenhum objetivo cadastrado ainda),
+  e cada coluna ganha um botão "Importar PDF" — anexa um documento (ex.: avaliação externa, plano em
+  papel já existente) só àquela área específica, com autor e data de upload visíveis. Um PDF
+  importado em "ABA" nunca aparece nem pode ser aberto a partir da coluna de outra área; o arquivo
+  abre no mesmo visualizador seguro (URL assinada e temporária) já usado pelos Recursos Terapêuticos
+  desde a Fase 2.
+- **Fase 6 (bloco 8) — Addendum de Melhorias v2.1, RF-05**: dentro de "Novo Objetivo", ao escolher
+  uma área que já tem algum PDF importado (RF-04), aparece um seletor desses documentos e um botão
+  "Preencher com IA" — extrai o texto do PDF e sugere automaticamente título, descrição, critério de
+  domínio e estratégias como rascunho editável, com o aviso "Gerado por IA — revise os campos abaixo
+  antes de salvar". Nada é publicado sozinho: o rascunho só existe no formulário até o profissional
+  clicar em Salvar, e o objetivo salvo mantém um badge "Gerado por IA" visível daí em diante. Se o
+  PDF não tiver texto extraível (ex.: documento escaneado sem OCR), os campos ficam em branco com um
+  aviso explicando o motivo, em vez de uma falha silenciosa.
 
 ## Stack (Seção 4 do PRD)
 

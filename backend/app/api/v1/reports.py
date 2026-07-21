@@ -13,7 +13,7 @@ from app.schemas.report import (
     ReportSummaryResponse,
     ReportSummaryUpdateRequest,
 )
-from app.services import report_export_service, report_service, report_summary_service
+from app.services import patient_service, report_export_service, report_service, report_summary_service
 
 router = APIRouter(prefix="/reports", tags=["reports"])
 
@@ -32,6 +32,7 @@ def get_report(
     user: User = Depends(get_current_user),
 ):
     """Seção 14.1/14.2/14.3 — dados agregados a partir das tentativas registradas."""
+    patient_service.assert_full_clinical_access(user)
     return report_service.get_report_data(
         db,
         user,

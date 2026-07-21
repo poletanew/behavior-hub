@@ -1,26 +1,43 @@
 import datetime
 import uuid
 
-from fastapi import APIRouter, Depends, Query, status
+from fastapi import APIRouter, Depends, File, Form, Query, UploadFile, status
 from sqlalchemy.orm import Session
 
 from app.core.deps import get_current_user
 from app.db.session import get_db
 from app.models.enums import ObjectivePriority, ObjectiveStatus, TreatmentArea
-from app.models.treatment_plan import Objective, TreatmentPlan
+from app.models.treatment_plan import Objective, TreatmentPlan, TreatmentPlanAttachment
 from app.models.user import User
 from app.schemas.treatment_plan import (
+    ObjectiveAIFillRequest,
+    ObjectiveAIFillResponse,
     ObjectiveCommentCreateRequest,
     ObjectiveCommentResponse,
     ObjectiveCreateRequest,
     ObjectiveHistoryEntry,
     ObjectiveResponse,
     ObjectiveUpdateRequest,
+    TreatmentPlanAttachmentResponse,
+    TreatmentPlanAttachmentWithUrlResponse,
     TreatmentPlanResponse,
 )
-from app.services import treatment_plan_service
+from app.services import patient_service, treatment_plan_service
 
 router = APIRouter(tags=["treatment-plans"])
+
+
+def _to_attachment_response(db: Session, attachment: TreatmentPlanAttachment) -> TreatmentPlanAttachmentResponse:
+    uploader = db.get(User, attachment.uploaded_by_user_id)
+    return TreatmentPlanAttachmentResponse(
+        id=attachment.id,
+        plan_id=attachment.plan_id,
+        area=attachment.area,
+        original_filename=attachment.original_filename,
+        uploaded_by_user_id=attachment.uploaded_by_user_id,
+        uploaded_by_name=uploader.name if uploader else "Usuário removido",
+        uploaded_at=attachment.uploaded_at,
+    )
 
 
 def _to_objective_response(db: Session, objective: Objective) -> ObjectiveResponse:
@@ -41,6 +58,9 @@ def _to_objective_response(db: Session, objective: Objective) -> ObjectiveRespon
         updated_at=objective.updated_at,
         deleted_at=objective.deleted_at,
         training_ids=treatment_plan_service.get_objective_training_ids(db, objective.id),
+        ai_generated=objective.ai_generated,
+        ai_source_document_id=objective.ai_source_document_id,
+        ai_reviewed_at=objective.ai_reviewed_at,
     )
 
 
@@ -57,6 +77,7 @@ def get_treatment_plan(
     user: User = Depends(get_current_user),
 ):
     """Seção 13.1 — grade multidisciplinar única por paciente, com filtros."""
+    patient_service.assert_full_clinical_access(user)
     plan, objectives = treatment_plan_service.get_treatment_plan(
         db,
         user,
@@ -73,7 +94,51 @@ def get_treatment_plan(
         patient_id=plan.patient_id,
         version=plan.version,
         objectives=[_to_objective_response(db, o) for o in objectives],
+        attachments=[_to_attachment_response(db, a) for a in treatment_plan_service.list_attachments(db, plan.id)],
     )
+
+
+@router.post(
+    "/patients/{patient_id}/treatment-plan/attachments",
+    response_model=TreatmentPlanAttachmentResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+async def upload_attachment(
+    patient_id: uuid.UUID,
+    area: TreatmentArea = Form(...),
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """RF-04 — importar um PDF anexado a uma área específica da grade multidisciplinar."""
+    attachment = await treatment_plan_service.upload_attachment(db, user, patient_id, area, file)
+    return _to_attachment_response(db, attachment)
+
+
+@router.get("/treatment-plan/attachments/{attachment_id}", response_model=TreatmentPlanAttachmentWithUrlResponse)
+def get_attachment(attachment_id: uuid.UUID, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+    """Seção 15/17.2 — abre com URL temporária e assinada, mesmo visualizador seguro dos Recursos Terapêuticos."""
+    patient_service.assert_full_clinical_access(user)
+    _patient, attachment = treatment_plan_service.get_attachment_or_404(db, user, attachment_id)
+    view_url = treatment_plan_service.get_attachment_view_url(attachment)
+    return TreatmentPlanAttachmentWithUrlResponse(
+        **_to_attachment_response(db, attachment).model_dump(), view_url=view_url
+    )
+
+
+@router.post(
+    "/patients/{patient_id}/treatment-plan/objectives/ai-fill",
+    response_model=ObjectiveAIFillResponse,
+)
+def ai_fill_objective(
+    patient_id: uuid.UUID,
+    payload: ObjectiveAIFillRequest,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """RF-05 — "Preencher com IA": extrai o texto do PDF já anexado à área (RF-04) e
+    sugere título/descrição/estratégias/critério de domínio como rascunho editável."""
+    return treatment_plan_service.generate_objective_draft_from_attachment(db, user, patient_id, payload.attachment_id)
 
 
 @router.post(

@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <defs>
+    <linearGradient id="bhFaviconGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#1D4ED8" />
+      <stop offset="55%" stop-color="#14B8A6" />
+      <stop offset="100%" stop-color="#22C55E" />
+    </linearGradient>
+  </defs>
+  <circle cx="32" cy="32" r="30" fill="#FFFFFF" />
+  <path
+    d="M20 15 L20 49 M20 15 C34 15 40 19 40 24 C40 29 34 32 20 32 M20 32 C36 32 43 36 43 41 C43 46 36 49 20 49"
+    fill="none"
+    stroke="url(#bhFaviconGradient)"
+    stroke-width="6.5"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+  />
+  <circle cx="20" cy="15" r="4" fill="#1D4ED8" />
+  <circle cx="20" cy="32" r="4" fill="#14B8A6" />
+  <circle cx="20" cy="49" r="4" fill="#22C55E" />
+  <circle cx="40" cy="24" r="3.2" fill="#1D4ED8" />
+  <circle cx="43" cy="41" r="3.2" fill="#22C55E" />
+</svg>

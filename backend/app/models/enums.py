@@ -7,6 +7,10 @@ class UserType(str, enum.Enum):
     INDIVIDUAL = "individual"
     SUPERVISOR = "supervisor"
     FAMILY = "family"
+    # Addendum v2.1, RF-11 — Auxiliar Terapêutico: aplica treinos prescritos
+    # (RF-10) em pacientes atribuídos, sob supervisão; sem acesso a
+    # diagnóstico completo, plano de tratamento ou relatórios.
+    AT = "at"
 
 
 class UserStatus(str, enum.Enum):
@@ -208,16 +212,6 @@ class AssessmentProtocol(str, enum.Enum):
     ABLLS_R = "ablls_r"
 
 
-class PaymentStatus(str, enum.Enum):
-    """Seção 32.10 — Faturamento por Sessão: status de pagamento que a clínica
-    controla para o que ela mesma cobra do paciente/convênio (nunca é
-    calculado/atualizado automaticamente; sempre uma ação explícita da equipe)."""
-
-    PENDING = "pending"
-    PAID = "paid"
-    OVERDUE = "overdue"
-
-
 class WaitlistStatus(str, enum.Enum):
     """Seção 32.11 — Lista de Espera: cadastro simplificado antes da admissão
     formal. "Convertido" cria o paciente completo sem redigitação."""
@@ -225,3 +219,21 @@ class WaitlistStatus(str, enum.Enum):
     WAITING = "waiting"
     CONVERTED = "converted"
     DISCARDED = "discarded"
+
+
+class SchoolShift(str, enum.Enum):
+    """Addendum v2.1, RF-03 — turno escolar do paciente, campo opcional."""
+
+    MANHA = "manha"
+    TARDE = "tarde"
+    INTEGRAL = "integral"
+    NAO_FREQUENTA = "nao_frequenta"
+
+
+class TrainingLinkStatus(str, enum.Enum):
+    """Addendum v2.1, RF-10 — vínculo treino↔paciente ("treino prescrito").
+    Passa de PRESCRIBED para APPLIED automaticamente na primeira sessão que
+    de fato usar esse treino com esse paciente."""
+
+    PRESCRIBED = "prescribed"
+    APPLIED = "applied"

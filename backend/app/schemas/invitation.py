@@ -5,7 +5,7 @@ from pydantic import BaseModel, EmailStr, model_validator
 
 from app.models.enums import InvitationStatus, Specialty, UserType
 
-INVITABLE_ROLES = (UserType.PROFESSIONAL, UserType.SUPERVISOR, UserType.FAMILY)
+INVITABLE_ROLES = (UserType.PROFESSIONAL, UserType.SUPERVISOR, UserType.FAMILY, UserType.AT)
 
 
 class InvitationCreateRequest(BaseModel):
