@@ -1,4 +1,4 @@
-export type UserType = "clinic_admin" | "professional" | "individual" | "supervisor" | "family";
+export type UserType = "clinic_admin" | "professional" | "individual" | "supervisor" | "family" | "at";
 
 export interface User {
   id: string;
@@ -610,4 +610,37 @@ export interface WaitlistEntry {
   converted_patient_id: string | null;
   created_by_user_id: string;
   created_at: string;
+}
+
+// Addendum v2.1, RF-11 — papel AT (Auxiliar Terapêutico) e aba ABA (supervisor).
+export interface ATPatient {
+  id: string;
+  name: string;
+  birth_date: string;
+}
+
+export interface ATSummary {
+  id: string;
+  name: string;
+  email: string;
+  supervisor_id: string | null;
+  assigned_patient_count: number;
+}
+
+export interface ABAAssignedPatient {
+  id: string;
+  name: string;
+}
+
+export interface ABATrialReviewEntry {
+  trial_id: string;
+  at_user_id: string;
+  at_name: string;
+  patient_id: string;
+  patient_name: string;
+  training_id: string;
+  training_title: string;
+  result: "correct" | "incorrect" | "partial" | "no_response";
+  prompt_level: "independent" | "gestural" | "verbal" | "modeling" | "partial_physical" | "full_physical";
+  recorded_at: string;
 }

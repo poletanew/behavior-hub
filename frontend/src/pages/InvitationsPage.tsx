@@ -18,6 +18,7 @@ interface InvitationCreated extends Invitation {
 const ROLE_LABELS: Record<string, string> = {
   professional: "Profissional",
   supervisor: "Supervisor",
+  at: "Auxiliar Terapêutico (AT)",
 };
 
 export default function InvitationsPage() {
@@ -83,6 +84,7 @@ export default function InvitationsPage() {
           >
             <option value="professional">Profissional</option>
             <option value="supervisor">Supervisor</option>
+            <option value="at">Auxiliar Terapêutico (AT)</option>
           </select>
         </div>
         <button type="submit" className="h-10 rounded-btn bg-brand-turquoise text-white px-4 text-sm font-medium">

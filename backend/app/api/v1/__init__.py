@@ -1,8 +1,10 @@
 from fastapi import APIRouter
 
 from app.api.v1 import (
+    aba,
     appointments,
     assessments,
+    at_portal,
     audit_logs,
     auth,
     billing,
@@ -60,3 +62,5 @@ api_router.include_router(family_access.router)
 api_router.include_router(family_portal.router)
 api_router.include_router(white_label.router)
 api_router.include_router(waitlist.router)
+api_router.include_router(at_portal.router)
+api_router.include_router(aba.router)

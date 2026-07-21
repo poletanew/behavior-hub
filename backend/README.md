@@ -532,6 +532,46 @@ biblioteca de i18n para justificar uma extração retroativa sem um segundo idio
 O detalhamento completo de cada decisão está na seção "O que não está nesta fase" do `README.md` da
 raiz.
 
+## Nota sobre o papel Auxiliar Terapêutico e a aba ABA (Fase 6 bloco 6 — Addendum v2.1, RF-11)
+
+Novo valor `AT` em `UserType` (enum Postgres nativo — `autogenerate` do Alembic não detecta um
+valor novo em um enum já existente, só tipos inteiramente novos, então a migration usa
+`ALTER TYPE usertype ADD VALUE IF NOT EXISTS 'AT'` explicitamente, mesmo padrão já usado para
+adicionar `FAMILY` na Fase 5). `User.supervisor_id` vincula o AT ao supervisor/admin que gerou o
+convite (preenchido em `auth_service.accept_invitation`), usado só para agrupar ATs na aba ABA —
+não é, hoje, uma trava de visibilidade adicional.
+
+Em vez de retrofitar restrições de campo nas rotas clínicas gerais, o AT ganhou um namespace de API
+inteiramente dedicado (`app/api/v1/at_portal.py` + `app/services/at_portal_service.py` +
+`app/schemas/at_portal.py`), que só expõe DTOs mínimos e seguros (`ATPatientResponse` não tem
+diagnóstico) e reaproveita diretamente a lógica clínica já existente e já seguros — criar
+atendimento (`session_service.create_session`) e registrar tentativa (rotas genéricas de
+`session-trainings/{id}/trials` e `/progress`) — em vez de duplicá-la. A única regra nova é
+`at_portal_service.apply_training`, que garante que o AT só aplica um treino já vinculado a esse
+paciente especificamente (RF-10 "Vincular"), não qualquer treino do sistema.
+
+`patient_service.assert_full_clinical_access` é um guard explícito, chamado nas rotas citadas na
+tabela de personas do addendum como vedadas ao AT — listagem e detalhe de paciente, plano de
+tratamento (`treatment_plans.py`) e relatórios (`reports.py`). **Decisão de escopo deliberada**:
+outras rotas clínicas (linha do tempo, alertas, sugestões) não têm o mesmo guard; o frontend do AT
+não tem nenhuma tela que as chame, mas isso é diferente de uma trava na própria API — mesmo tipo de
+tradeoff documentado já para a "exposição residual" do Portal da Família (bloco 1 desta mesma
+fase).
+
+Atribuir um AT a um paciente reaproveita o mecanismo de atribuição já existente
+(`assign_professional`/`remove_assignment`), agora liberado também para `SUPERVISOR` (antes,
+só `CLINIC_ADMIN`). Isso expôs um gotcha: essas rotas usavam `get_patient_or_404`, que restringe
+não-admins aos pacientes **já atribuídos a si mesmos** — mas um supervisor atribuindo um paciente
+novo a um AT precisa enxergar pacientes ainda não atribuídos a ninguém. Corrigido com
+`_get_patient_for_assignment_management`, uma busca escopada só ao tenant (sem a restrição de
+atribuição), usada exclusivamente por essas duas rotas administrativas.
+
+`app/api/v1/aba.py` + `app/services/aba_service.py` dão ao supervisor/admin a visão de gestão: listar
+ATs com contagem de pacientes atribuídos, listar pacientes de um AT específico, e uma tabela
+somente-leitura das tentativas mais recentes registradas por qualquer AT do tenant — explicitamente
+uma visão de acompanhamento, não uma camada de aprovação (o addendum descreve aprovação como
+opcional, "se a clínica optar", e não foi implementada nesta fase).
+
 ## Estrutura
 
 - `app/models/` — entidades SQLAlchemy (Seção 18/27 do PRD).

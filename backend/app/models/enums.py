@@ -7,6 +7,10 @@ class UserType(str, enum.Enum):
     INDIVIDUAL = "individual"
     SUPERVISOR = "supervisor"
     FAMILY = "family"
+    # Addendum v2.1, RF-11 — Auxiliar Terapêutico: aplica treinos prescritos
+    # (RF-10) em pacientes atribuídos, sob supervisão; sem acesso a
+    # diagnóstico completo, plano de tratamento ou relatórios.
+    AT = "at"
 
 
 class UserStatus(str, enum.Enum):

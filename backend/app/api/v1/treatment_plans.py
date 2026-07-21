@@ -18,7 +18,7 @@ from app.schemas.treatment_plan import (
     ObjectiveUpdateRequest,
     TreatmentPlanResponse,
 )
-from app.services import treatment_plan_service
+from app.services import patient_service, treatment_plan_service
 
 router = APIRouter(tags=["treatment-plans"])
 
@@ -57,6 +57,7 @@ def get_treatment_plan(
     user: User = Depends(get_current_user),
 ):
     """Seção 13.1 — grade multidisciplinar única por paciente, com filtros."""
+    patient_service.assert_full_clinical_access(user)
     plan, objectives = treatment_plan_service.get_treatment_plan(
         db,
         user,

@@ -126,6 +126,19 @@ Este repositório está sendo construído **por fases**, seguindo o roadmap da S
   paciente" (busca por nome parcial) cria um vínculo treino↔paciente que aparece com o rótulo
   "Prescrito" na tela de Novo Atendimento daquele paciente, e passa automaticamente para "Aplicado"
   assim que uma sessão realmente usar esse treino com esse paciente (sem nenhuma ação manual extra).
+- **Fase 6 (bloco 6) — Addendum de Melhorias v2.1, RF-11**: novo papel de usuário Auxiliar
+  Terapêutico (AT), convidável pela tela Profissionais como qualquer outro papel. AT tem um espaço
+  de trabalho dedicado (`/at/patients`) — só vê os pacientes que lhe foram atribuídos, os treinos
+  já prescritos (RF-10) para cada um, e pode aplicar um treino (cria o atendimento) e registrar
+  tentativas nele, sem acesso a diagnóstico completo, plano de tratamento ou relatórios (bloqueado
+  por um guard dedicado nas rotas de listagem/detalhe de paciente, plano de tratamento e
+  relatórios). Supervisor e admin ganham a aba "ABA", de onde atribuem pacientes a ATs (reaproveita
+  o mecanismo de atribuição já existente, agora também liberado para o papel Supervisor) e revisam,
+  em modo somente-leitura, as tentativas recentes registradas por cada AT. **Nota de escopo**: o
+  bloqueio de acesso clínico do AT foi aplicado nas rotas explicitamente citadas na tabela de
+  personas do addendum (lista/detalhe de paciente, plano de tratamento, relatórios); rotas
+  auxiliares como linha do tempo, alertas e sugestões não têm o mesmo guard — o AT não tem tela
+  alguma no frontend que as exponha, mas isso não é o mesmo que um bloqueio na própria API.
 
 ## Stack (Seção 4 do PRD)
 

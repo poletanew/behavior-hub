@@ -3,7 +3,12 @@ import Layout from "./components/Layout";
 import FamilyPortalLayout from "./components/FamilyPortalLayout";
 import ProtectedRoute from "./components/ProtectedRoute";
 import FamilyProtectedRoute from "./components/FamilyProtectedRoute";
+import ATProtectedRoute from "./components/ATProtectedRoute";
+import ATWorkspaceLayout from "./components/ATWorkspaceLayout";
 import FamilyPortalPage from "./pages/family/FamilyPortalPage";
+import ATPatientsPage from "./pages/at/ATPatientsPage";
+import ATPatientWorkspacePage from "./pages/at/ATPatientWorkspacePage";
+import ABAPage from "./pages/ABAPage";
 import LoginPage from "./pages/LoginPage";
 import RegisterPage from "./pages/RegisterPage";
 import DashboardPage from "./pages/DashboardPage";
@@ -51,6 +56,17 @@ export default function App() {
 
       <Route
         element={
+          <ATProtectedRoute>
+            <ATWorkspaceLayout />
+          </ATProtectedRoute>
+        }
+      >
+        <Route path="/at/patients" element={<ATPatientsPage />} />
+        <Route path="/at/patients/:patientId" element={<ATPatientWorkspacePage />} />
+      </Route>
+
+      <Route
+        element={
           <ProtectedRoute>
             <Layout />
           </ProtectedRoute>
@@ -80,6 +96,7 @@ export default function App() {
         <Route path="/plans" element={<PlansPage />} />
         <Route path="/white-label" element={<WhiteLabelSettingsPage />} />
         <Route path="/waitlist" element={<WaitlistPage />} />
+        <Route path="/aba" element={<ABAPage />} />
       </Route>
 
       <Route path="/" element={<Navigate to="/dashboard" replace />} />

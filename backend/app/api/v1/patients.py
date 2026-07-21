@@ -35,6 +35,7 @@ def create_patient(
 
 @router.get("/{patient_id}", response_model=PatientResponse)
 def get_patient(patient_id: uuid.UUID, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+    patient_service.assert_full_clinical_access(user)
     return patient_service.get_patient_or_404(db, user, patient_id)
 
 
@@ -121,9 +122,11 @@ def assign_professional(
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
-    """Seção 7.3 — a clinica pode atribuir um paciente a um ou varios profissionais."""
-    if user.user_type != UserType.CLINIC_ADMIN:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only clinic admins can assign patients")
+    """Seção 7.3 — a clinica pode atribuir um paciente a um ou varios profissionais.
+    Addendum v2.1, RF-11 — supervisores também atribuem (fluxo da aba ABA: atribuir
+    um AT a um paciente)."""
+    if user.user_type not in (UserType.CLINIC_ADMIN, UserType.SUPERVISOR):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only clinic admins or supervisors can assign patients")
     return patient_service.assign_professional(db, user, patient_id, payload)
 
 
@@ -134,6 +137,6 @@ def remove_assignment(
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
-    if user.user_type != UserType.CLINIC_ADMIN:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only clinic admins can manage assignments")
+    if user.user_type not in (UserType.CLINIC_ADMIN, UserType.SUPERVISOR):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only clinic admins or supervisors can manage assignments")
     patient_service.remove_assignment(db, user, patient_id, professional_id)

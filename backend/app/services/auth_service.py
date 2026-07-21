@@ -270,6 +270,7 @@ def accept_invitation(db: Session, raw_token: str, payload: InvitationAcceptRequ
         status=UserStatus.ACTIVE,
         clinic_id=invitation.clinic_id,
         terms_accepted_at=now,
+        supervisor_id=invitation.created_by_user_id if invitation.role == UserType.AT else None,
     )
     db.add(user)
     db.flush()
