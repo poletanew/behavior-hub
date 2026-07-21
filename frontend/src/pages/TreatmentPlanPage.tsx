@@ -4,6 +4,7 @@ import { apiRequest, apiUpload, ApiError } from "../api/client";
 import {
   DuplicateCandidate,
   Objective,
+  ObjectiveAIFillResponse,
   ObjectiveComment,
   ObjectivePriority,
   ObjectiveStatus,
@@ -126,7 +127,14 @@ function ObjectiveCard({
     <div className="bg-white rounded-card shadow-sm p-4 mb-3">
       <div className="flex items-start justify-between gap-2">
         <div>
-          <div className="font-medium text-brand-navy">{objective.title}</div>
+          <div className="font-medium text-brand-navy">
+            {objective.title}
+            {objective.ai_generated && (
+              <span className="ml-2 rounded px-1.5 py-0.5 text-[10px] font-medium bg-brand-turquoise/10 text-brand-turquoise align-middle">
+                Gerado por IA
+              </span>
+            )}
+          </div>
           <div className="text-xs text-neutralState mt-0.5">Prioridade: {PRIORITY_LABELS[objective.priority]}</div>
         </div>
         <span className={`text-[10px] uppercase font-semibold px-2 py-1 rounded-full ${STATUS_COLORS[objective.status]}`}>
@@ -374,6 +382,11 @@ export default function TreatmentPlanPage() {
   const [error, setError] = useState<string | null>(null);
   const [professionals, setProfessionals] = useState<User[]>([]);
   const [resources, setResources] = useState<ResourceItem[]>([]);
+  const [aiAttachmentId, setAiAttachmentId] = useState("");
+  const [aiFilling, setAiFilling] = useState(false);
+  const [aiError, setAiError] = useState<string | null>(null);
+  const [aiGenerated, setAiGenerated] = useState(false);
+  const [aiExtractionNote, setAiExtractionNote] = useState<string | null>(null);
 
   useEffect(() => {
     apiRequest<User[]>("/professionals").then(setProfessionals);
@@ -399,13 +412,53 @@ export default function TreatmentPlanPage() {
     setPriority("medium");
     setDuplicateCandidates(null);
     setError(null);
+    setAiAttachmentId("");
+    setAiGenerated(false);
+    setAiError(null);
+    setAiExtractionNote(null);
+  }
+
+  async function handleAiFill() {
+    if (!aiAttachmentId) return;
+    setAiError(null);
+    setAiFilling(true);
+    try {
+      const draft = await apiRequest<ObjectiveAIFillResponse>(
+        `/patients/${patientId}/treatment-plan/objectives/ai-fill`,
+        { method: "POST", body: { attachment_id: aiAttachmentId } }
+      );
+      setTitle(draft.title);
+      setDescription(draft.description);
+      setCriteria(draft.criteria);
+      setStrategies(draft.strategies);
+      setAiGenerated(true);
+      setAiExtractionNote(draft.extraction_note);
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 403) {
+        setAiError("Você não tem permissão para editar objetivos desta área.");
+      } else {
+        setAiError("Não foi possível gerar o rascunho a partir deste documento.");
+      }
+    } finally {
+      setAiFilling(false);
+    }
   }
 
   async function submitObjective(force: boolean) {
     try {
       await apiRequest(`/patients/${patientId}/treatment-plan/objectives`, {
         method: "POST",
-        body: { area, title, description: description || null, criteria: criteria || null, strategies: strategies || null, priority, force },
+        body: {
+          area,
+          title,
+          description: description || null,
+          criteria: criteria || null,
+          strategies: strategies || null,
+          priority,
+          force,
+          ai_generated: aiGenerated,
+          ai_source_document_id: aiGenerated ? aiAttachmentId : null,
+        },
       });
       setShowForm(false);
       resetForm();
@@ -515,7 +568,14 @@ export default function TreatmentPlanPage() {
 
           <div>
             <label className="block text-sm font-medium mb-1">Área</label>
-            <select value={area} onChange={(e) => setArea(e.target.value as TreatmentArea)} className="w-full h-10 rounded-btn border border-slate-300 px-3">
+            <select
+              value={area}
+              onChange={(e) => {
+                setArea(e.target.value as TreatmentArea);
+                setAiAttachmentId("");
+              }}
+              className="w-full h-10 rounded-btn border border-slate-300 px-3"
+            >
               {Object.entries(AREA_LABELS).map(([value, label]) => (
                 <option key={value} value={value}>
                   {label}
@@ -523,6 +583,44 @@ export default function TreatmentPlanPage() {
               ))}
             </select>
           </div>
+
+          {(attachmentsByArea[area] || []).length > 0 && (
+            <div className="bg-brand-grayLight rounded-card p-3">
+              <label className="block text-xs font-medium mb-1">
+                Preencher a partir de um PDF já anexado a esta área (RF-04)
+              </label>
+              <div className="flex gap-2">
+                <select
+                  value={aiAttachmentId}
+                  onChange={(e) => setAiAttachmentId(e.target.value)}
+                  className="flex-1 h-9 rounded-btn border border-slate-300 px-2 text-sm"
+                >
+                  <option value="">Selecione um PDF...</option>
+                  {(attachmentsByArea[area] || []).map((a) => (
+                    <option key={a.id} value={a.id}>
+                      {a.original_filename}
+                    </option>
+                  ))}
+                </select>
+                <button
+                  type="button"
+                  disabled={!aiAttachmentId || aiFilling}
+                  onClick={handleAiFill}
+                  className="h-9 rounded-btn bg-white border border-slate-300 px-3 text-xs font-medium disabled:opacity-50"
+                >
+                  {aiFilling ? "Lendo documento..." : "Preencher com IA"}
+                </button>
+              </div>
+              {aiError && <p className="text-danger text-xs mt-1">{aiError}</p>}
+              {aiGenerated && (
+                <p className="text-xs text-brand-turquoise font-medium mt-2">
+                  Gerado por IA — revise os campos abaixo antes de salvar.
+                </p>
+              )}
+              {aiExtractionNote && <p className="text-xs text-warning mt-1">{aiExtractionNote}</p>}
+            </div>
+          )}
+
           <div>
             <label className="block text-sm font-medium mb-1">Objetivo</label>
             <input required value={title} onChange={(e) => setTitle(e.target.value)} className="w-full h-10 rounded-btn border border-slate-300 px-3" />

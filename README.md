@@ -146,6 +146,14 @@ Este repositório está sendo construído **por fases**, seguindo o roadmap da S
   importado em "ABA" nunca aparece nem pode ser aberto a partir da coluna de outra área; o arquivo
   abre no mesmo visualizador seguro (URL assinada e temporária) já usado pelos Recursos Terapêuticos
   desde a Fase 2.
+- **Fase 6 (bloco 8) — Addendum de Melhorias v2.1, RF-05**: dentro de "Novo Objetivo", ao escolher
+  uma área que já tem algum PDF importado (RF-04), aparece um seletor desses documentos e um botão
+  "Preencher com IA" — extrai o texto do PDF e sugere automaticamente título, descrição, critério de
+  domínio e estratégias como rascunho editável, com o aviso "Gerado por IA — revise os campos abaixo
+  antes de salvar". Nada é publicado sozinho: o rascunho só existe no formulário até o profissional
+  clicar em Salvar, e o objetivo salvo mantém um badge "Gerado por IA" visível daí em diante. Se o
+  PDF não tiver texto extraível (ex.: documento escaneado sem OCR), os campos ficam em branco com um
+  aviso explicando o motivo, em vez de uma falha silenciosa.
 
 ## Stack (Seção 4 do PRD)
 

@@ -134,6 +134,18 @@ export interface Objective {
   updated_at: string;
   deleted_at: string | null;
   training_ids: string[];
+  ai_generated: boolean;
+  ai_source_document_id: string | null;
+  ai_reviewed_at: string | null;
+}
+
+export interface ObjectiveAIFillResponse {
+  source_document_id: string;
+  title: string;
+  description: string;
+  criteria: string;
+  strategies: string;
+  extraction_note: string | null;
 }
 
 export interface TreatmentPlanAttachment {

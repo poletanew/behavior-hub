@@ -40,6 +40,16 @@ class Objective(Base, UUIDPrimaryKeyMixin, TimestampMixin, SoftDeleteMixin):
     priority: Mapped[ObjectivePriority] = mapped_column(default=ObjectivePriority.MEDIUM, nullable=False)
     author_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"), nullable=False)
 
+    # Addendum v2.1, RF-05 — rascunho gerado a partir do texto de um PDF já
+    # anexado à área (RF-04); ai_reviewed_at é preenchido no próprio instante da
+    # criação, já que o objetivo só é persistido depois da ação explícita de
+    # "Salvar" do profissional (nunca há publicação automática sem revisão).
+    ai_generated: Mapped[bool] = mapped_column(default=False, nullable=False)
+    ai_source_document_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("treatment_plan_attachments.id"), nullable=True
+    )
+    ai_reviewed_at: Mapped[datetime.datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
     plan: Mapped["TreatmentPlan"] = relationship(back_populates="objectives")
     comments: Mapped[list["ObjectiveComment"]] = relationship(
         back_populates="objective", cascade="all, delete-orphan", order_by="ObjectiveComment.created_at"

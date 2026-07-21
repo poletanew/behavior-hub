@@ -15,6 +15,8 @@ class ObjectiveCreateRequest(BaseModel):
     priority: ObjectivePriority = ObjectivePriority.MEDIUM
     training_ids: list[uuid.UUID] = Field(default_factory=list)
     force: bool = False
+    ai_generated: bool = False
+    ai_source_document_id: uuid.UUID | None = None
 
 
 class ObjectiveUpdateRequest(BaseModel):
@@ -51,9 +53,29 @@ class ObjectiveResponse(BaseModel):
     updated_at: datetime.datetime
     deleted_at: datetime.datetime | None
     training_ids: list[uuid.UUID] = Field(default_factory=list)
+    ai_generated: bool
+    ai_source_document_id: uuid.UUID | None
+    ai_reviewed_at: datetime.datetime | None
 
     class Config:
         from_attributes = True
+
+
+class ObjectiveAIFillRequest(BaseModel):
+    attachment_id: uuid.UUID
+
+
+class ObjectiveAIFillResponse(BaseModel):
+    """RF-05 — rascunho sugerido a partir do texto extraído do PDF; nunca é
+    persistido por esta rota — só vira dado ativo se o profissional revisar e
+    clicar em Salvar no formulário de Novo Objetivo."""
+
+    source_document_id: uuid.UUID
+    title: str
+    description: str
+    criteria: str
+    strategies: str
+    extraction_note: str | None = None
 
 
 class TreatmentPlanAttachmentResponse(BaseModel):

@@ -10,6 +10,8 @@ from app.models.enums import ObjectivePriority, ObjectiveStatus, TreatmentArea
 from app.models.treatment_plan import Objective, TreatmentPlan, TreatmentPlanAttachment
 from app.models.user import User
 from app.schemas.treatment_plan import (
+    ObjectiveAIFillRequest,
+    ObjectiveAIFillResponse,
     ObjectiveCommentCreateRequest,
     ObjectiveCommentResponse,
     ObjectiveCreateRequest,
@@ -56,6 +58,9 @@ def _to_objective_response(db: Session, objective: Objective) -> ObjectiveRespon
         updated_at=objective.updated_at,
         deleted_at=objective.deleted_at,
         training_ids=treatment_plan_service.get_objective_training_ids(db, objective.id),
+        ai_generated=objective.ai_generated,
+        ai_source_document_id=objective.ai_source_document_id,
+        ai_reviewed_at=objective.ai_reviewed_at,
     )
 
 
@@ -119,6 +124,21 @@ def get_attachment(attachment_id: uuid.UUID, db: Session = Depends(get_db), user
     return TreatmentPlanAttachmentWithUrlResponse(
         **_to_attachment_response(db, attachment).model_dump(), view_url=view_url
     )
+
+
+@router.post(
+    "/patients/{patient_id}/treatment-plan/objectives/ai-fill",
+    response_model=ObjectiveAIFillResponse,
+)
+def ai_fill_objective(
+    patient_id: uuid.UUID,
+    payload: ObjectiveAIFillRequest,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """RF-05 — "Preencher com IA": extrai o texto do PDF já anexado à área (RF-04) e
+    sugere título/descrição/estratégias/critério de domínio como rascunho editável."""
+    return treatment_plan_service.generate_objective_draft_from_attachment(db, user, patient_id, payload.attachment_id)
 
 
 @router.post(

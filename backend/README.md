@@ -603,6 +603,38 @@ kwarg `create_type` silenciosamente; só `sqlalchemy.dialects.postgresql.ENUM(..
 de fato suprime a recriação. Ver o comentário na própria migration
 (`6120d163231c_fase6_bloco7_treatment_plan_attachments.py`) para o diagnóstico completo.
 
+## Nota sobre IA no Plano de Tratamento — "Preencher com IA" (Fase 6 bloco 8 — Addendum v2.1, RF-05)
+
+`Objective` ganha três campos novos — `ai_generated` (bool), `ai_source_document_id` (FK para
+`treatment_plan_attachments`) e `ai_reviewed_at`. O addendum é explícito ao pedir que "a partir do
+PDF exportado/importado (RF-04)" a IA sugira os 4 campos — por isso a rota nova
+(`POST /patients/{id}/treatment-plan/objectives/ai-fill`) reaproveita diretamente os anexos já
+criados no Bloco 7, em vez de abrir um upload paralelo dentro do formulário de Novo Objetivo.
+
+**Sem chamada a nenhuma API de IA externa** — mesmo princípio já usado em
+`report_summary_service._draft_text` (Fase 2/14.5): o "Ponto técnico de atenção" do próprio
+addendum recomenda começar simples ("a IA lê o texto e tenta mapear para os 4 campos"), então
+`treatment_plan_service._draft_objective_fields_from_text` extrai o texto do PDF via `pypdf`
+(`file_service.download_object` + `PdfReader`) e mapeia por palavras-chave determinísticas
+(`critério`/`domínio`/`%` para o critério de domínio; `estratégia`/`intervenção`/`prompt`/`ajuda`
+para as estratégias; a primeira linha vira título; o restante vira descrição). Um PDF sem texto
+extraível (documento escaneado sem OCR, por exemplo) não falha silenciosamente — retorna campos
+vazios com `extraction_note` explicando o motivo, para o profissional preencher manualmente.
+
+**Nunca publica sozinho**: a rota de "Preencher com IA" não persiste nada — devolve só o rascunho
+na resposta. O objetivo só grava `ai_generated=true`/`ai_source_document_id`/`ai_reviewed_at` no
+exato momento em que `create_objective` é chamado, ou seja, quando o profissional já revisou (ou
+optou por não revisar) e clicou em Salvar — o mesmo princípio de "a IA pode gerar rascunhos, mas não
+deve publicar automaticamente conteúdo clínico sem revisão" (Seção 12.1) já seguido por
+`report_summary_service` e `resource_service`. `ai_reviewed_at` é preenchido nesse instante, não
+antes, já que não existe um estado de rascunho persistido intermediário — diferente do
+`ai_generated_plan_draft` que o RF-06 (próximo bloco) vai introduzir para Avaliações.
+
+Upload de PDF (RF-04) e "Preencher com IA" (RF-05) compartilham a mesma checagem de permissão
+(`can_edit_area`) — quem pode anexar um documento a uma área também pode gerar um rascunho a partir
+dele; não foi criada uma permissão nova. Dependência nova: `pypdf` (`requirements.txt`), leitura de
+texto de PDF pura em Python, sem binário externo.
+
 ## Estrutura
 
 - `app/models/` — entidades SQLAlchemy (Seção 18/27 do PRD).

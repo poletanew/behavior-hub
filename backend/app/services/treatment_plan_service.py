@@ -1,7 +1,9 @@
 import datetime
+import io
 import uuid
 
 from fastapi import HTTPException, UploadFile, status
+from pypdf import PdfReader
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
@@ -18,7 +20,7 @@ from app.models.patient import Patient, PatientAssignment
 from app.models.training import Training
 from app.models.treatment_plan import Objective, ObjectiveComment, ObjectiveTraining, TreatmentPlan, TreatmentPlanAttachment
 from app.models.user import User
-from app.schemas.treatment_plan import ObjectiveCreateRequest, ObjectiveUpdateRequest
+from app.schemas.treatment_plan import ObjectiveAIFillResponse, ObjectiveCreateRequest, ObjectiveUpdateRequest
 from app.services import audit_service, file_service, notification_service, patient_service, rbac_service
 
 DUPLICATE_SIMILARITY_THRESHOLD = 0.35
@@ -152,6 +154,11 @@ def create_objective(
             },
         )
 
+    if payload.ai_source_document_id is not None:
+        source_attachment = db.get(TreatmentPlanAttachment, payload.ai_source_document_id)
+        if source_attachment is None or source_attachment.plan_id != plan.id:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Source document not found")
+
     objective = Objective(
         plan_id=plan.id,
         area=payload.area,
@@ -161,6 +168,11 @@ def create_objective(
         strategies=payload.strategies,
         priority=payload.priority,
         author_id=user.id,
+        ai_generated=payload.ai_generated,
+        ai_source_document_id=payload.ai_source_document_id if payload.ai_generated else None,
+        # RF-05 — o rascunho gerado por IA só existe em memória no formulário até este
+        # exato instante; salvar É a confirmação de revisão humana exigida pela Seção 12.1.
+        ai_reviewed_at=datetime.datetime.now(datetime.timezone.utc) if payload.ai_generated else None,
     )
     db.add(objective)
     db.flush()
@@ -435,3 +447,67 @@ def get_attachment_view_url(attachment: TreatmentPlanAttachment) -> str:
     """Seção 15/17.2 — mesmo visualizador seguro (URL assinada e temporária) já usado
     para Recursos Terapêuticos."""
     return file_service.generate_presigned_url(attachment.file_key)
+
+
+def _extract_pdf_text(data: bytes) -> str:
+    try:
+        reader = PdfReader(io.BytesIO(data))
+        return "\n".join(page.extract_text() or "" for page in reader.pages).strip()
+    except Exception:
+        # PDF corrompido ou em formato não suportado pelo parser — tratado como
+        # "sem texto extraível", mesmo caminho de um PDF escaneado sem OCR.
+        return ""
+
+
+_CRITERIA_KEYWORDS = ("critério", "criterio", "domínio", "dominio", "%")
+_STRATEGY_KEYWORDS = ("estratégia", "estrategia", "intervenç", "interven", "prompt", "ajuda")
+
+
+def _draft_objective_fields_from_text(text: str) -> dict:
+    """RF-05 — "Ponto técnico de atenção" do addendum recomenda começar simples:
+    ler o texto extraído do PDF e mapear por palavras-chave para os 4 campos do
+    objetivo, sem chamar nenhuma API de IA externa (mesmo princípio de rascunho
+    determinístico já usado em report_summary_service._draft_text)."""
+    lines = [line.strip() for line in text.splitlines() if line.strip()]
+    if not lines:
+        return {
+            "title": "Objetivo a partir de documento anexado",
+            "description": "",
+            "criteria": "",
+            "strategies": "",
+            "extraction_note": (
+                "Não foi possível extrair texto deste PDF (pode ser um documento escaneado "
+                "sem OCR). Preencha os campos manualmente antes de salvar."
+            ),
+        }
+
+    criteria_lines = [line for line in lines if any(k in line.lower() for k in _CRITERIA_KEYWORDS)]
+    strategy_lines = [line for line in lines if any(k in line.lower() for k in _STRATEGY_KEYWORDS)]
+    remaining_lines = [line for line in lines[1:] if line not in criteria_lines and line not in strategy_lines]
+
+    return {
+        "title": lines[0][:255],
+        "description": " ".join(remaining_lines)[:2000]
+        or "Descrição não identificada automaticamente — revise a partir do documento anexado.",
+        "criteria": " ".join(criteria_lines)[:1000]
+        or "Critério de domínio não identificado automaticamente — defina com base no documento anexado.",
+        "strategies": " ".join(strategy_lines)[:1000]
+        or "Estratégias não identificadas automaticamente — defina com base no documento anexado.",
+        "extraction_note": None,
+    }
+
+
+def generate_objective_draft_from_attachment(
+    db: Session, user: User, patient_id: uuid.UUID, attachment_id: uuid.UUID
+) -> ObjectiveAIFillResponse:
+    """RF-05 — "Preencher com IA": rascunho não persistido, só existe na resposta desta
+    rota até o profissional revisar e salvar explicitamente o Novo Objetivo."""
+    patient, attachment = get_attachment_or_404(db, user, attachment_id)
+    if patient.id != patient_id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Attachment not found")
+    if not can_edit_area(db, user, patient, attachment.area):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized to edit this area")
+
+    pdf_bytes = file_service.download_object(attachment.file_key)
+    fields = _draft_objective_fields_from_text(_extract_pdf_text(pdf_bytes))
+    return ObjectiveAIFillResponse(source_document_id=attachment.id, **fields)
