@@ -1,6 +1,7 @@
+import datetime
 import uuid
 
-from sqlalchemy import BigInteger, ForeignKey, String, Text
+from sqlalchemy import BigInteger, DateTime, ForeignKey, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base import Base, SoftDeleteMixin, TimestampMixin, UUIDPrimaryKeyMixin
@@ -28,3 +29,9 @@ class Resource(Base, UUIDPrimaryKeyMixin, TimestampMixin, SoftDeleteMixin):
     visibility: Mapped[ResourceVisibility] = mapped_column(default=ResourceVisibility.PRIVATE, nullable=False)
 
     uploaded_by_user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"), nullable=False)
+
+    # Addendum v2.1, RF-12 — "Criar recurso com IA"; ai_reviewed_at é preenchido
+    # no instante da publicação (mesmo princípio já usado em Objective — o
+    # rascunho só existe em memória até a ação explícita de publicar).
+    ai_generated: Mapped[bool] = mapped_column(default=False, nullable=False)
+    ai_reviewed_at: Mapped[datetime.datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)

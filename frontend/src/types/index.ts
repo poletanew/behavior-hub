@@ -290,10 +290,23 @@ export interface ResourceItem {
   uploaded_by_user_id: string;
   created_at: string;
   deleted_at: string | null;
+  ai_generated: boolean;
+  ai_reviewed_at: string | null;
 }
 
 export interface ResourceWithUrl extends ResourceItem {
   view_url: string;
+}
+
+export type AIResourceKind = "historia_social" | "rotina_visual" | "cartao_comunicacao";
+
+export interface ResourceAIDraft {
+  kind: AIResourceKind;
+  theme: string;
+  age_range: string;
+  title: string;
+  description: string;
+  content_text: string;
 }
 
 export interface DeletedItem {

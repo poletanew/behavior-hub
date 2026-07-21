@@ -163,6 +163,12 @@ Este repositório está sendo construído **por fases**, seguindo o roadmap da S
   Plano de Tratamento" — nunca substitui nem apaga nenhum objetivo já existente, só adiciona os
   novos. A listagem de avaliações passa a mostrar "Ver gráfico" por avaliação e um selo "Rascunho de
   plano (IA)" (ou "Plano ativado", depois de ativado).
+- **Fase 6 (bloco 10) — Addendum de Melhorias v2.1, RF-12**: a aba Recursos ganha o botão "✨ Criar
+  recurso com IA" — um formulário simples (tipo: história social, rotina visual ou cartão de
+  comunicação; tema; faixa etária) gera um rascunho editável (título, descrição, conteúdo) com o
+  aviso "Gerado por IA — revise antes de publicar". O profissional edita livremente e só então clica
+  em "Publicar", que gera um PDF de fato e o adiciona à biblioteca — nada é publicado sozinho. O
+  recurso publicado mantém um badge "Gerado por IA" visível no card da biblioteca.
 
 ## Stack (Seção 4 do PRD)
 

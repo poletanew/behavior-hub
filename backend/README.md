@@ -671,6 +671,31 @@ estruturalmente pelo `raw_scores` (que já tem `domain_label`/`normalized_pct` p
 Fase 4b); o gráfico de barras em si é responsabilidade do frontend (`AssessmentsPage.tsx`,
 `recharts`), o mesmo padrão já usado em Reports.
 
+## Nota sobre "Criar recurso com IA" (Fase 6 bloco 10 — Addendum v2.1, RF-12)
+
+`Resource` ganha `ai_generated` (bool) e `ai_reviewed_at`, mesmo par de campos já usado em
+`Objective` (RF-05/RF-06). O fluxo tem dois passos deliberadamente separados, espelhando
+exatamente a frase do addendum ("gera um rascunho... que o profissional revisa, edita e só então
+publica"):
+
+1. `POST /resources/ai-draft` (`resource_service.generate_ai_draft`) — recebe `kind` (história
+   social/rotina visual/cartão de comunicação), `theme` e `age_range`, devolve um rascunho
+   (título/descrição/conteúdo) que **não é persistido**. O texto vem de um template determinístico
+   por tipo de recurso (`_ai_draft_content`) — sem chamada a nenhuma API de IA externa, mesmo
+   princípio já seguido por `report_summary_service`/`assessment_service`/`treatment_plan_service`.
+2. `POST /resources/ai-publish` (`resource_service.publish_ai_resource`) — só aqui o `Resource` é
+   de fato criado, com `ai_generated=True` e `ai_reviewed_at=now()`. O conteúdo (possivelmente
+   editado pelo profissional) é renderizado em um PDF de verdade via `reportlab`
+   (`_render_ai_resource_pdf` — mesmo padrão de `SimpleDocTemplate`/`Paragraph` já usado em
+   `report_export_service.export_pdf`) e enviado ao MinIO/S3 pelo `file_service` já existente —
+   reaproveita a mesma listagem, visualizador seguro e regra "individual não compartilha com
+   clínica" que já valem para upload manual de recursos.
+
+Diferente de RF-05/RF-06, aqui não há uma entidade de origem externa (PDF anexado, avaliação) para
+vincular via FK — o rascunho é gerado a partir de texto livre (tema + faixa etária) fornecido no
+próprio formulário, então basta os dois campos booleano/timestamp em `Resource`, sem nenhuma FK
+adicional.
+
 ## Estrutura
 
 - `app/models/` — entidades SQLAlchemy (Seção 18/27 do PRD).
