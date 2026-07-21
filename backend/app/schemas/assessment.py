@@ -3,7 +3,7 @@ import uuid
 
 from pydantic import BaseModel, Field
 
-from app.models.enums import AssessmentProtocol
+from app.models.enums import AssessmentProtocol, TreatmentArea
 
 
 class DomainScoreInput(BaseModel):
@@ -31,6 +31,20 @@ class DomainScoreResponse(BaseModel):
     normalized_pct: float
 
 
+class PlanDraftItem(BaseModel):
+    """RF-06 — um objetivo sugerido a partir de um domínio de menor desempenho;
+    sempre editável antes de virar um Objective real via /activate-plan-draft."""
+
+    area: TreatmentArea
+    domain_code: str
+    domain_label: str
+    normalized_pct: float
+    title: str
+    description: str
+    criteria: str
+    strategies: str
+
+
 class AssessmentResponse(BaseModel):
     id: uuid.UUID
     patient_id: uuid.UUID
@@ -40,9 +54,15 @@ class AssessmentResponse(BaseModel):
     raw_scores: list[DomainScoreResponse]
     summary: str | None
     created_at: datetime.datetime
+    ai_generated_plan_draft: list[PlanDraftItem] = Field(default_factory=list)
+    plan_draft_activated_at: datetime.datetime | None
 
     class Config:
         from_attributes = True
+
+
+class ActivatePlanDraftRequest(BaseModel):
+    items: list[PlanDraftItem] = Field(min_length=1)
 
 
 class ProtocolDomainDefinition(BaseModel):

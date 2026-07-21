@@ -1,11 +1,13 @@
 import { FormEvent, useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
+import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { apiRequest } from "../api/client";
 import {
   Assessment,
   AssessmentComparison,
   AssessmentProtocol,
   Patient,
+  PlanDraftItem,
   ProtocolDefinition,
 } from "../types";
 
@@ -13,6 +15,25 @@ const PROTOCOL_LABELS: Record<AssessmentProtocol, string> = {
   vb_mapp: "VB-MAPP",
   ablls_r: "ABLLS-R",
 };
+
+function DomainChart({ assessment }: { assessment: Assessment }) {
+  return (
+    <div className="bg-white rounded-card shadow-sm p-6 mb-6">
+      <h2 className="font-semibold text-brand-navy mb-3">
+        Gráfico de domínios — {new Date(assessment.applied_date).toLocaleDateString("pt-BR")}
+      </h2>
+      <ResponsiveContainer width="100%" height={Math.max(220, assessment.raw_scores.length * 28)}>
+        <BarChart data={assessment.raw_scores} layout="vertical" margin={{ left: 24 }}>
+          <CartesianGrid strokeDasharray="3 3" />
+          <XAxis type="number" domain={[0, 100]} tickFormatter={(v) => `${v}%`} />
+          <YAxis type="category" dataKey="domain_label" width={220} tick={{ fontSize: 12 }} />
+          <Tooltip formatter={(value: number) => `${value}%`} />
+          <Bar dataKey="normalized_pct" name="Desempenho" fill="#14B8A6" />
+        </BarChart>
+      </ResponsiveContainer>
+    </div>
+  );
+}
 
 export default function AssessmentsPage() {
   const { patientId } = useParams<{ patientId: string }>();
@@ -28,6 +49,13 @@ export default function AssessmentsPage() {
 
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [comparison, setComparison] = useState<AssessmentComparison | null>(null);
+
+  const [chartAssessment, setChartAssessment] = useState<Assessment | null>(null);
+  const [draftAssessment, setDraftAssessment] = useState<Assessment | null>(null);
+  const [draftItems, setDraftItems] = useState<PlanDraftItem[]>([]);
+  const [activating, setActivating] = useState(false);
+  const [activateError, setActivateError] = useState<string | null>(null);
+  const [activateSuccess, setActivateSuccess] = useState(false);
 
   function load() {
     if (!patientId) return;
@@ -64,7 +92,7 @@ export default function AssessmentsPage() {
     }
 
     try {
-      await apiRequest(`/patients/${patientId}/assessments`, {
+      const created = await apiRequest<Assessment>(`/patients/${patientId}/assessments`, {
         method: "POST",
         body: { protocol, applied_date: appliedDate, domain_scores },
       });
@@ -72,6 +100,10 @@ export default function AssessmentsPage() {
       setScores({});
       setAppliedDate("");
       load();
+      setChartAssessment(created);
+      if (created.ai_generated_plan_draft.length > 0) {
+        openDraft(created);
+      }
     } catch {
       setError("Não foi possível registrar a avaliação. Verifique a data (uma aplicação por dia por protocolo) e as pontuações.");
     }
@@ -83,6 +115,35 @@ export default function AssessmentsPage() {
     selectedIds.forEach((id) => params.append("assessment_ids", id));
     const data = await apiRequest<AssessmentComparison>(`/patients/${patientId}/assessments/compare?${params.toString()}`);
     setComparison(data);
+  }
+
+  function openDraft(a: Assessment) {
+    setDraftAssessment(a);
+    setDraftItems(a.ai_generated_plan_draft.map((item) => ({ ...item })));
+    setActivateError(null);
+    setActivateSuccess(false);
+  }
+
+  function updateDraftItem(index: number, field: keyof PlanDraftItem, value: string) {
+    setDraftItems((prev) => prev.map((item, i) => (i === index ? { ...item, [field]: value } : item)));
+  }
+
+  async function handleActivateDraft() {
+    if (!draftAssessment) return;
+    setActivating(true);
+    setActivateError(null);
+    try {
+      await apiRequest(`/assessments/${draftAssessment.id}/activate-plan-draft`, {
+        method: "POST",
+        body: { items: draftItems },
+      });
+      setActivateSuccess(true);
+      load();
+    } catch {
+      setActivateError("Não foi possível ativar o plano. O rascunho desta avaliação já pode ter sido ativado.");
+    } finally {
+      setActivating(false);
+    }
   }
 
   if (!patient) return <p className="text-neutralState">Carregando...</p>;
@@ -197,12 +258,108 @@ export default function AssessmentsPage() {
       ) : (
         <div className="bg-white rounded-card shadow-sm divide-y divide-slate-100 mb-6">
           {assessmentsOfProtocol.map((a) => (
-            <label key={a.id} className="flex items-center gap-3 px-4 py-3 text-sm hover:bg-slate-50">
-              <input type="checkbox" checked={selectedIds.includes(a.id)} onChange={() => toggleSelected(a.id)} />
+            <div key={a.id} className="flex items-center gap-3 px-4 py-3 text-sm hover:bg-slate-50">
+              <input
+                type="checkbox"
+                checked={selectedIds.includes(a.id)}
+                onChange={() => toggleSelected(a.id)}
+              />
               <span className="flex-1">{new Date(a.applied_date).toLocaleDateString("pt-BR")}</span>
               <span className="text-neutralState">{a.raw_scores.length} domínio(s)</span>
-            </label>
+              <button
+                onClick={() => setChartAssessment(chartAssessment?.id === a.id ? null : a)}
+                className="text-brand-blue underline text-xs"
+              >
+                {chartAssessment?.id === a.id ? "Ocultar gráfico" : "Ver gráfico"}
+              </button>
+              {a.ai_generated_plan_draft.length > 0 &&
+                (a.plan_draft_activated_at ? (
+                  <span className="text-[10px] uppercase font-semibold px-2 py-1 rounded-full bg-success/10 text-success">
+                    Plano ativado
+                  </span>
+                ) : (
+                  <button
+                    onClick={() => openDraft(a)}
+                    className="text-[10px] uppercase font-semibold px-2 py-1 rounded-full bg-brand-turquoise/10 text-brand-turquoise"
+                  >
+                    Rascunho de plano (IA)
+                  </button>
+                ))}
+            </div>
           ))}
+        </div>
+      )}
+
+      {chartAssessment && <DomainChart assessment={chartAssessment} />}
+
+      {draftAssessment && (
+        <div className="bg-white rounded-card shadow-sm p-6 mb-6">
+          <div className="flex items-center justify-between mb-1">
+            <h2 className="font-semibold text-brand-navy">
+              Rascunho de Plano de Tratamento — {new Date(draftAssessment.applied_date).toLocaleDateString("pt-BR")}
+            </h2>
+            <span className="text-[10px] uppercase font-semibold px-2 py-1 rounded-full bg-brand-turquoise/10 text-brand-turquoise">
+              Gerado por IA — revise antes de ativar
+            </span>
+          </div>
+          <p className="text-xs text-neutralState mb-4">
+            Objetivos sugeridos a partir dos domínios de menor desempenho desta avaliação. Edite os
+            campos livremente antes de ativar — nada é adicionado ao plano de tratamento do paciente
+            até você confirmar.
+          </p>
+          <div className="space-y-4 mb-4">
+            {draftItems.map((item, index) => (
+              <div key={item.domain_code} className="border border-slate-200 rounded-btn p-4 space-y-2">
+                <div className="text-xs text-neutralState">
+                  Domínio: {item.domain_label} ({item.normalized_pct}%)
+                </div>
+                <input
+                  value={item.title}
+                  onChange={(e) => updateDraftItem(index, "title", e.target.value)}
+                  className="w-full h-9 rounded-btn border border-slate-300 px-2 text-sm font-medium"
+                />
+                <textarea
+                  value={item.description}
+                  onChange={(e) => updateDraftItem(index, "description", e.target.value)}
+                  className="w-full rounded-btn border border-slate-300 px-2 py-1.5 text-sm"
+                />
+                <input
+                  value={item.criteria}
+                  onChange={(e) => updateDraftItem(index, "criteria", e.target.value)}
+                  placeholder="Critério de domínio"
+                  className="w-full h-9 rounded-btn border border-slate-300 px-2 text-sm"
+                />
+                <input
+                  value={item.strategies}
+                  onChange={(e) => updateDraftItem(index, "strategies", e.target.value)}
+                  placeholder="Estratégias"
+                  className="w-full h-9 rounded-btn border border-slate-300 px-2 text-sm"
+                />
+              </div>
+            ))}
+          </div>
+          {activateError && <p className="text-danger text-sm mb-2">{activateError}</p>}
+          {activateSuccess ? (
+            <p className="text-success text-sm font-medium">
+              Plano ativado! Os objetivos já aparecem no Plano de Tratamento do paciente.
+            </p>
+          ) : (
+            <div className="flex gap-3">
+              <button
+                onClick={handleActivateDraft}
+                disabled={activating}
+                className="rounded-btn bg-brand-turquoise text-white px-4 py-2 text-sm font-medium disabled:opacity-50"
+              >
+                {activating ? "Ativando..." : "Ativar Plano de Tratamento"}
+              </button>
+              <button
+                onClick={() => setDraftAssessment(null)}
+                className="rounded-btn bg-white border border-slate-300 px-4 py-2 text-sm font-medium"
+              >
+                Fechar
+              </button>
+            </div>
+          )}
         </div>
       )}
 

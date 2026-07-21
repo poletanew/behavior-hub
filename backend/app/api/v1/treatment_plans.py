@@ -60,6 +60,7 @@ def _to_objective_response(db: Session, objective: Objective) -> ObjectiveRespon
         training_ids=treatment_plan_service.get_objective_training_ids(db, objective.id),
         ai_generated=objective.ai_generated,
         ai_source_document_id=objective.ai_source_document_id,
+        ai_source_assessment_id=objective.ai_source_assessment_id,
         ai_reviewed_at=objective.ai_reviewed_at,
     )
 

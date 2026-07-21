@@ -154,6 +154,15 @@ Este repositório está sendo construído **por fases**, seguindo o roadmap da S
   clicar em Salvar, e o objetivo salvo mantém um badge "Gerado por IA" visível daí em diante. Se o
   PDF não tiver texto extraível (ex.: documento escaneado sem OCR), os campos ficam em branco com um
   aviso explicando o motivo, em vez de uma falha silenciosa.
+- **Fase 6 (bloco 9) — Addendum de Melhorias v2.1, RF-06**: ao registrar uma Avaliação Padronizada
+  (VB-MAPP/ABLLS-R) — que já é, na prática, o próprio ato de "concluir" a avaliação — o sistema gera
+  automaticamente um gráfico de barras com o desempenho por domínio e um rascunho de Plano de
+  Tratamento com um objetivo sugerido para cada domínio de menor desempenho, marcado como "Gerado
+  por IA — revise antes de ativar". O rascunho é totalmente editável (título, descrição, critério de
+  domínio, estratégias) e só vira objetivo real do paciente quando o profissional clica em "Ativar
+  Plano de Tratamento" — nunca substitui nem apaga nenhum objetivo já existente, só adiciona os
+  novos. A listagem de avaliações passa a mostrar "Ver gráfico" por avaliação e um selo "Rascunho de
+  plano (IA)" (ou "Plano ativado", depois de ativado).
 
 ## Stack (Seção 4 do PRD)
 

@@ -159,6 +159,13 @@ def create_objective(
         if source_attachment is None or source_attachment.plan_id != plan.id:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Source document not found")
 
+    if payload.ai_source_assessment_id is not None:
+        from app.models.assessment import Assessment  # import local para evitar ciclo de módulos
+
+        source_assessment = db.get(Assessment, payload.ai_source_assessment_id)
+        if source_assessment is None or source_assessment.patient_id != patient.id:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Source assessment not found")
+
     objective = Objective(
         plan_id=plan.id,
         area=payload.area,
@@ -170,8 +177,10 @@ def create_objective(
         author_id=user.id,
         ai_generated=payload.ai_generated,
         ai_source_document_id=payload.ai_source_document_id if payload.ai_generated else None,
-        # RF-05 — o rascunho gerado por IA só existe em memória no formulário até este
-        # exato instante; salvar É a confirmação de revisão humana exigida pela Seção 12.1.
+        ai_source_assessment_id=payload.ai_source_assessment_id if payload.ai_generated else None,
+        # RF-05/RF-06 — o rascunho gerado por IA só existe em memória (formulário
+        # ou resposta de preview) até este exato instante; salvar/ativar É a
+        # confirmação de revisão humana exigida pela Seção 12.1.
         ai_reviewed_at=datetime.datetime.now(datetime.timezone.utc) if payload.ai_generated else None,
     )
     db.add(objective)

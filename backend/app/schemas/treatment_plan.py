@@ -17,6 +17,7 @@ class ObjectiveCreateRequest(BaseModel):
     force: bool = False
     ai_generated: bool = False
     ai_source_document_id: uuid.UUID | None = None
+    ai_source_assessment_id: uuid.UUID | None = None
 
 
 class ObjectiveUpdateRequest(BaseModel):
@@ -55,6 +56,7 @@ class ObjectiveResponse(BaseModel):
     training_ids: list[uuid.UUID] = Field(default_factory=list)
     ai_generated: bool
     ai_source_document_id: uuid.UUID | None
+    ai_source_assessment_id: uuid.UUID | None
     ai_reviewed_at: datetime.datetime | None
 
     class Config:

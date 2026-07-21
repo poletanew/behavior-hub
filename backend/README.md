@@ -635,6 +635,42 @@ Upload de PDF (RF-04) e "Preencher com IA" (RF-05) compartilham a mesma checagem
 dele; não foi criada uma permissão nova. Dependência nova: `pypdf` (`requirements.txt`), leitura de
 texto de PDF pura em Python, sem binário externo.
 
+## Nota sobre IA em Avaliações Padronizadas (Fase 6 bloco 9 — Addendum v2.1, RF-06)
+
+`Assessment` ganha `ai_generated_plan_draft` (JSON, lista de itens sugeridos) e
+`plan_draft_activated_at`. Decisão importante: o modelo de `Assessment` não tem — e nunca teve — um
+estado de rascunho/pendente separado de "concluída"; toda aplicação já é registrada com
+`raw_scores` completo. Por isso, "ao marcar a avaliação como concluída" (linguagem do addendum) é
+tratado como o próprio instante de `create_assessment` — não foi criado um novo status de avaliação
+só para satisfazer essa frase.
+
+`assessment_service._generate_plan_draft` decide quais domínios são "de menor desempenho" com uma
+regra puramente aritmética: domínios com `normalized_pct` abaixo da média desta mesma avaliação
+(se todos empatarem, todos entram no rascunho, garantindo pelo menos um item). Cada item vira um
+objetivo sugerido — título, descrição, critério e estratégias em texto-modelo, sempre editável.
+
+**Decisão de escopo deliberada: todo objetivo sugerido vai para a área ABA.** VB-MAPP e ABLLS-R
+(Seção 30) são instrumentos de Análise do Comportamento Aplicada; o PRD não define um mapeamento
+domínio→área da grade multidisciplinar (Seção 13.1) para os domínios desses protocolos (ex.:
+"Leitura", "Motricidade Fina", "Vestir-se"), e inventar esse mapeamento seria decidir um julgamento
+clínico que o documento não especifica. Mapear tudo para ABA — a área nativa desses protocolos —
+evita esse problema sem perder a funcionalidade pedida.
+
+`ai_generated_plan_draft` **nunca vira `Objective` sozinho.** A nova rota
+`POST /assessments/{id}/activate-plan-draft` recebe os itens (possivelmente editados pelo
+profissional) e reaproveita `treatment_plan_service.create_objective` diretamente para cada um —
+com `force=True`, já que o conteúdo já foi revisado/editado antes do envio, então o alerta de
+duplicidade da Seção 13.2 não se aplica aqui da mesma forma que numa digitação manual avulsa.
+`plan_draft_activated_at` impede uma segunda ativação (409) — evita duplicar os mesmos objetivos se
+o profissional clicar em "Ativar" duas vezes; a avaliação em si e seu rascunho continuam intactos
+para consulta, só a ativação é bloqueada. `Objective.ai_source_assessment_id` (nova FK, paralela ao
+`ai_source_document_id` do RF-05) mantém a rastreabilidade de qual avaliação originou o objetivo.
+
+Nenhum gráfico novo foi persistido no backend — "(a) gera os gráficos de domínio" já está satisfeito
+estruturalmente pelo `raw_scores` (que já tem `domain_label`/`normalized_pct` por domínio desde a
+Fase 4b); o gráfico de barras em si é responsabilidade do frontend (`AssessmentsPage.tsx`,
+`recharts`), o mesmo padrão já usado em Reports.
+
 ## Estrutura
 
 - `app/models/` — entidades SQLAlchemy (Seção 18/27 do PRD).

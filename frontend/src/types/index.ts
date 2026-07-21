@@ -505,6 +505,17 @@ export interface DomainScore {
   normalized_pct: number;
 }
 
+export interface PlanDraftItem {
+  area: TreatmentArea;
+  domain_code: string;
+  domain_label: string;
+  normalized_pct: number;
+  title: string;
+  description: string;
+  criteria: string;
+  strategies: string;
+}
+
 export interface Assessment {
   id: string;
   patient_id: string;
@@ -514,6 +525,8 @@ export interface Assessment {
   raw_scores: DomainScore[];
   summary: string | null;
   created_at: string;
+  ai_generated_plan_draft: PlanDraftItem[];
+  plan_draft_activated_at: string | null;
 }
 
 export interface DomainComparisonPoint {

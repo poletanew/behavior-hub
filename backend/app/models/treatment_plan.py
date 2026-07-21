@@ -48,6 +48,9 @@ class Objective(Base, UUIDPrimaryKeyMixin, TimestampMixin, SoftDeleteMixin):
     ai_source_document_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("treatment_plan_attachments.id"), nullable=True
     )
+    # Addendum v2.1, RF-06 — quando o objetivo vem da ativação de um rascunho de
+    # plano gerado a partir de uma Avaliação Padronizada, em vez de um PDF (RF-05).
+    ai_source_assessment_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("assessments.id"), nullable=True)
     ai_reviewed_at: Mapped[datetime.datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     plan: Mapped["TreatmentPlan"] = relationship(back_populates="objectives")

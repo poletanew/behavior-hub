@@ -240,3 +240,132 @@ def test_assessments_tenant_isolation(client):
 
     forbidden_get = client.get(f"/v1/assessments/{assessment['id']}", headers=clinic_b["headers"])
     assert forbidden_get.status_code == 404
+
+
+def test_completing_assessment_generates_plan_draft_for_weak_domains(client):
+    """RF-06 — ao concluir a avaliação (criação), gera automaticamente um
+    rascunho de objetivos para os domínios de menor desempenho (abaixo da
+    média desta avaliação)."""
+    ctx = register_clinic(client)
+    patient = create_patient(client, ctx["headers"])
+
+    response = client.post(
+        f"/v1/patients/{patient['id']}/assessments",
+        json={
+            "protocol": "vb_mapp",
+            "applied_date": "2026-01-15",
+            "domain_scores": [
+                {"domain_code": "mando", "raw_value": 9},  # 60%
+                {"domain_code": "tato", "raw_value": 15},  # 100%
+            ],
+        },
+        headers=ctx["headers"],
+    )
+    assert response.status_code == 201, response.text
+    draft = response.json()["ai_generated_plan_draft"]
+    assert len(draft) == 1
+    assert draft[0]["domain_code"] == "mando"
+    assert draft[0]["area"] == "aba"
+    assert "Mando" in draft[0]["title"]
+    assert response.json()["plan_draft_activated_at"] is None
+
+
+def test_plan_draft_includes_all_domains_when_tied(client):
+    ctx = register_clinic(client)
+    patient = create_patient(client, ctx["headers"])
+
+    response = client.post(
+        f"/v1/patients/{patient['id']}/assessments",
+        json={
+            "protocol": "vb_mapp",
+            "applied_date": "2026-01-15",
+            "domain_scores": [
+                {"domain_code": "mando", "raw_value": 9},
+                {"domain_code": "tato", "raw_value": 9},
+            ],
+        },
+        headers=ctx["headers"],
+    )
+    draft = response.json()["ai_generated_plan_draft"]
+    assert len(draft) == 2
+
+
+def test_activate_plan_draft_creates_ai_generated_objectives(client):
+    ctx = register_clinic(client)
+    patient = create_patient(client, ctx["headers"])
+    assessment = client.post(
+        f"/v1/patients/{patient['id']}/assessments",
+        json={
+            "protocol": "vb_mapp",
+            "applied_date": "2026-01-15",
+            "domain_scores": [{"domain_code": "mando", "raw_value": 9}, {"domain_code": "tato", "raw_value": 15}],
+        },
+        headers=ctx["headers"],
+    ).json()
+    draft = assessment["ai_generated_plan_draft"]
+
+    response = client.post(
+        f"/v1/assessments/{assessment['id']}/activate-plan-draft",
+        json={"items": draft},
+        headers=ctx["headers"],
+    )
+    assert response.status_code == 200, response.text
+    objectives = response.json()
+    assert len(objectives) == 1
+    assert objectives[0]["ai_generated"] is True
+    assert objectives[0]["ai_source_assessment_id"] == assessment["id"]
+    assert objectives[0]["ai_reviewed_at"] is not None
+
+    plan = client.get(f"/v1/patients/{patient['id']}/treatment-plan", headers=ctx["headers"]).json()
+    assert any(o["title"] == draft[0]["title"] for o in plan["objectives"])
+
+
+def test_activate_plan_draft_twice_conflicts(client):
+    ctx = register_clinic(client)
+    patient = create_patient(client, ctx["headers"])
+    assessment = client.post(
+        f"/v1/patients/{patient['id']}/assessments",
+        json={
+            "protocol": "vb_mapp",
+            "applied_date": "2026-01-15",
+            "domain_scores": [{"domain_code": "mando", "raw_value": 9}, {"domain_code": "tato", "raw_value": 15}],
+        },
+        headers=ctx["headers"],
+    ).json()
+    draft = assessment["ai_generated_plan_draft"]
+
+    first = client.post(
+        f"/v1/assessments/{assessment['id']}/activate-plan-draft", json={"items": draft}, headers=ctx["headers"]
+    )
+    assert first.status_code == 200
+
+    second = client.post(
+        f"/v1/assessments/{assessment['id']}/activate-plan-draft", json={"items": draft}, headers=ctx["headers"]
+    )
+    assert second.status_code == 409
+
+
+def test_professional_can_edit_draft_items_before_activating(client):
+    """"Esse plano rascunho é sempre editável" — o profissional pode alterar o
+    conteúdo antes de enviar para ativação."""
+    ctx = register_clinic(client)
+    patient = create_patient(client, ctx["headers"])
+    assessment = client.post(
+        f"/v1/patients/{patient['id']}/assessments",
+        json={
+            "protocol": "vb_mapp",
+            "applied_date": "2026-01-15",
+            "domain_scores": [{"domain_code": "mando", "raw_value": 9}, {"domain_code": "tato", "raw_value": 15}],
+        },
+        headers=ctx["headers"],
+    ).json()
+    draft = assessment["ai_generated_plan_draft"]
+    draft[0]["title"] = "Título revisado pelo profissional"
+    draft[0]["criteria"] = "90% de acertos em 3 sessões consecutivas"
+
+    response = client.post(
+        f"/v1/assessments/{assessment['id']}/activate-plan-draft", json={"items": draft}, headers=ctx["headers"]
+    )
+    objectives = response.json()
+    assert objectives[0]["title"] == "Título revisado pelo profissional"
+    assert objectives[0]["criteria"] == "90% de acertos em 3 sessões consecutivas"

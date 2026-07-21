@@ -7,13 +7,16 @@ from app.core.deps import get_current_user
 from app.db.session import get_db
 from app.models.enums import AssessmentProtocol
 from app.models.user import User
+from app.api.v1.treatment_plans import _to_objective_response
 from app.schemas.assessment import (
+    ActivatePlanDraftRequest,
     AssessmentComparisonResponse,
     AssessmentCreateRequest,
     AssessmentResponse,
     AssessmentUpdateRequest,
     ProtocolDefinitionResponse,
 )
+from app.schemas.treatment_plan import ObjectiveResponse
 from app.services import assessment_protocols, assessment_service
 
 router = APIRouter(tags=["assessments"])
@@ -76,3 +79,16 @@ def update_assessment(
 @router.delete("/assessments/{assessment_id}", status_code=204)
 def delete_assessment(assessment_id: uuid.UUID, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
     assessment_service.soft_delete_assessment(db, user, assessment_id)
+
+
+@router.post("/assessments/{assessment_id}/activate-plan-draft", response_model=list[ObjectiveResponse])
+def activate_plan_draft(
+    assessment_id: uuid.UUID,
+    payload: ActivatePlanDraftRequest,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """RF-06 — cria os Objectives reais a partir do rascunho de plano (revisado
+    e editável) sugerido ao concluir a avaliação; nunca acontece sozinho."""
+    objectives = assessment_service.activate_plan_draft(db, user, assessment_id, payload)
+    return [_to_objective_response(db, o) for o in objectives]

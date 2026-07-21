@@ -5,11 +5,13 @@ from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.models.assessment import Assessment
-from app.models.enums import AssessmentProtocol, UserType
+from app.models.enums import AssessmentProtocol, TreatmentArea, UserType
 from app.models.patient import Patient
+from app.models.treatment_plan import Objective
 from app.models.user import User
-from app.schemas.assessment import AssessmentCreateRequest, AssessmentUpdateRequest
-from app.services import assessment_protocols, audit_service, patient_service
+from app.schemas.assessment import ActivatePlanDraftRequest, AssessmentCreateRequest, AssessmentUpdateRequest
+from app.schemas.treatment_plan import ObjectiveCreateRequest
+from app.services import assessment_protocols, audit_service, patient_service, treatment_plan_service
 from app.services.rbac_service import can_restore_deleted_data
 
 
@@ -50,6 +52,50 @@ def _build_raw_scores(protocol: AssessmentProtocol, domain_scores: list) -> list
     return rows
 
 
+def _generate_plan_draft(protocol: AssessmentProtocol, raw_scores: list[dict]) -> list[dict]:
+    """RF-06 — "propõe um rascunho de Plano de Tratamento com objetivos básicos
+    por área, com base nos domínios de menor pontuação". Regra determinística,
+    sem chamada a nenhuma API de IA externa (mesmo princípio de
+    treatment_plan_service._draft_objective_fields_from_text): domínios abaixo
+    da média normalized_pct desta própria avaliação são tratados como "de menor
+    desempenho"; se todos empatarem, os de valor mínimo garantem ao menos um
+    item no rascunho.
+
+    Decisão de escopo: VB-MAPP e ABLLS-R são instrumentos de Análise do
+    Comportamento Aplicada (Seção 30) — o PRD não define um mapeamento
+    domínio→área da grade multidisciplinar (Seção 13.1), então mapear cada
+    domínio para uma especialidade diferente seria inventar um julgamento
+    clínico que o documento não especifica. Todos os objetivos sugeridos vão
+    para a área ABA, área nativa desses protocolos."""
+    if not raw_scores:
+        return []
+
+    mean_pct = sum(row["normalized_pct"] for row in raw_scores) / len(raw_scores)
+    weak_domains = [row for row in raw_scores if row["normalized_pct"] < mean_pct]
+    if not weak_domains:
+        min_pct = min(row["normalized_pct"] for row in raw_scores)
+        weak_domains = [row for row in raw_scores if row["normalized_pct"] == min_pct]
+
+    draft = []
+    for row in weak_domains:
+        draft.append(
+            {
+                "area": TreatmentArea.ABA.value,
+                "domain_code": row["domain_code"],
+                "domain_label": row["domain_label"],
+                "normalized_pct": row["normalized_pct"],
+                "title": f"Desenvolver {row['domain_label']}",
+                "description": (
+                    f"Objetivo sugerido a partir da avaliação {protocol.value.upper()} — domínio "
+                    f"\"{row['domain_label']}\" com {row['normalized_pct']}% de desempenho registrado."
+                ),
+                "criteria": "Critério de domínio a definir pelo profissional com base na avaliação.",
+                "strategies": "Estratégias a definir pelo profissional com base na avaliação.",
+            }
+        )
+    return draft
+
+
 def create_assessment(db: Session, user: User, patient_id: uuid.UUID, payload: AssessmentCreateRequest) -> Assessment:
     """Seção 27.2/30.1 — registra uma aplicação de protocolo padronizado.
     Um par (paciente, protocolo, data) nunca se repete (Seção 27.3 — evita
@@ -81,6 +127,10 @@ def create_assessment(db: Session, user: User, patient_id: uuid.UUID, payload: A
         applied_date=payload.applied_date,
         raw_scores=raw_scores,
         summary=payload.summary,
+        # RF-06 — registrar a avaliação já É "marcá-la como concluída" (não há um
+        # estado de rascunho intermediário no modelo de Assessment); o rascunho de
+        # plano é gerado automaticamente neste mesmo instante.
+        ai_generated_plan_draft=_generate_plan_draft(payload.protocol, raw_scores),
     )
     db.add(assessment)
     db.flush()
@@ -260,3 +310,42 @@ def compare_assessments(db: Session, user: User, patient_id: uuid.UUID, protocol
         "domains": domains,
         "interpretive_summary": _interpretive_summary(domains, earliest.applied_date, latest.applied_date),
     }
+
+
+def activate_plan_draft(
+    db: Session, user: User, assessment_id: uuid.UUID, payload: ActivatePlanDraftRequest
+) -> list[Objective]:
+    """RF-06 — "precisa ser aprovado pelo profissional antes de se tornar o
+    plano ativo do paciente — nunca substitui um plano já existente sem
+    confirmação explícita". Cria Objectives reais a partir dos itens do
+    rascunho (editáveis pelo profissional antes deste envio); não apaga nem
+    substitui nenhum objetivo existente, apenas adiciona os novos."""
+    patient, assessment = _get_assessment_or_404(db, user, assessment_id)
+    if assessment.plan_draft_activated_at is not None:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Plan draft already activated")
+
+    created = []
+    for item in payload.items:
+        objective_payload = ObjectiveCreateRequest(
+            area=item.area,
+            title=item.title,
+            description=item.description,
+            criteria=item.criteria,
+            strategies=item.strategies,
+            ai_generated=True,
+            ai_source_assessment_id=assessment.id,
+            force=True,  # já revisado/editado pelo profissional antes de ativar
+        )
+        created.append(treatment_plan_service.create_objective(db, user, patient.id, objective_payload))
+
+    assessment.plan_draft_activated_at = datetime.datetime.now(datetime.timezone.utc)
+    audit_service.record(
+        db,
+        actor_user_id=user.id,
+        action="assessment_plan_draft_activated",
+        entity_type="assessment",
+        entity_id=assessment.id,
+        after={"objective_ids": [str(o.id) for o in created]},
+    )
+    db.commit()
+    return created
