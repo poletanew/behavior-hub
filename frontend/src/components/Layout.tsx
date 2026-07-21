@@ -9,7 +9,7 @@ const navItems = [
   { to: "/patients", label: "Pacientes" },
   { to: "/agenda", label: "Agenda" },
   { to: "/sessions", label: "Atendimentos" },
-  { to: "/training-library", label: "Training Library" },
+  { to: "/training-library", label: "Biblioteca de Treino" },
   { to: "/resources", label: "Recursos" },
 ];
 

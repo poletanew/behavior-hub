@@ -1,8 +1,9 @@
+import datetime
 import uuid
 
 from pydantic import BaseModel, Field
 
-from app.models.enums import TrainingVisibility
+from app.models.enums import TrainingLinkStatus, TrainingVisibility
 
 
 class TrainingCategoryResponse(BaseModel):
@@ -38,6 +39,23 @@ class TrainingResponse(BaseModel):
     notes: str | None
     suggested_age_range: str | None
     visibility: TrainingVisibility
+
+    class Config:
+        from_attributes = True
+
+
+class TrainingPatientLinkCreateRequest(BaseModel):
+    patient_id: uuid.UUID
+
+
+class TrainingPatientLinkResponse(BaseModel):
+    id: uuid.UUID
+    training_id: uuid.UUID
+    training_title: str
+    patient_id: uuid.UUID
+    status: TrainingLinkStatus
+    linked_by_user_id: uuid.UUID
+    linked_at: datetime.datetime
 
     class Config:
         from_attributes = True

@@ -51,6 +51,18 @@ export interface Training {
   visibility: string;
 }
 
+export type TrainingLinkStatus = "prescribed" | "applied";
+
+export interface TrainingPatientLink {
+  id: string;
+  training_id: string;
+  training_title: string;
+  patient_id: string;
+  status: TrainingLinkStatus;
+  linked_by_user_id: string;
+  linked_at: string;
+}
+
 export interface SessionTraining {
   id: string;
   training_id: string;

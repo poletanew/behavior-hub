@@ -9,6 +9,7 @@ import {
   SessionTemplate,
   Training,
   TrainingCategory,
+  TrainingPatientLink,
   User,
 } from "../types";
 import { useAuth } from "../context/AuthContext";
@@ -57,6 +58,7 @@ export default function PatientDetailPage() {
   const [categories, setCategories] = useState<TrainingCategory[]>([]);
   const [trainings, setTrainings] = useState<Training[]>([]);
   const [templates, setTemplates] = useState<SessionTemplate[]>([]);
+  const [trainingLinks, setTrainingLinks] = useState<TrainingPatientLink[]>([]);
   const [professionals, setProfessionals] = useState<User[]>([]);
   const [showNewSession, setShowNewSession] = useState(false);
   const [professionalId, setProfessionalId] = useState("");
@@ -72,6 +74,7 @@ export default function PatientDetailPage() {
     apiRequest<ClinicalSuggestion[]>(`/patients/${patientId}/suggestions`).then(setSuggestions);
     apiRequest<ClinicalSession[]>(`/sessions?patient_id=${patientId}`).then(setSessions);
     apiRequest<SessionTemplate[]>(`/session-templates?patient_id=${patientId}`).then(setTemplates);
+    apiRequest<TrainingPatientLink[]>(`/patients/${patientId}/training-links`).then(setTrainingLinks);
   }
 
   useEffect(load, [patientId]);
@@ -308,16 +311,24 @@ export default function PatientDetailPage() {
                   </div>
                   {trainings
                     .filter((t) => t.category_id === category.id)
-                    .map((training) => (
-                      <label key={training.id} className="flex items-center gap-2 px-3 py-2 text-sm hover:bg-slate-50">
-                        <input
-                          type="checkbox"
-                          checked={selectedTrainingIds.includes(training.id)}
-                          onChange={() => toggleTraining(training.id)}
-                        />
-                        {training.title}
-                      </label>
-                    ))}
+                    .map((training) => {
+                      const link = trainingLinks.find((l) => l.training_id === training.id);
+                      return (
+                        <label key={training.id} className="flex items-center gap-2 px-3 py-2 text-sm hover:bg-slate-50">
+                          <input
+                            type="checkbox"
+                            checked={selectedTrainingIds.includes(training.id)}
+                            onChange={() => toggleTraining(training.id)}
+                          />
+                          {training.title}
+                          {link && (
+                            <span className="rounded px-1.5 py-0.5 text-[10px] font-medium bg-brand-blueLight/20 text-brand-blue">
+                              {link.status === "applied" ? "Aplicado" : "Prescrito"}
+                            </span>
+                          )}
+                        </label>
+                      );
+                    })}
                 </div>
               ))}
             </div>

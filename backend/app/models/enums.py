@@ -224,3 +224,12 @@ class SchoolShift(str, enum.Enum):
     TARDE = "tarde"
     INTEGRAL = "integral"
     NAO_FREQUENTA = "nao_frequenta"
+
+
+class TrainingLinkStatus(str, enum.Enum):
+    """Addendum v2.1, RF-10 — vínculo treino↔paciente ("treino prescrito").
+    Passa de PRESCRIBED para APPLIED automaticamente na primeira sessão que
+    de fato usar esse treino com esse paciente."""
+
+    PRESCRIBED = "prescribed"
+    APPLIED = "applied"

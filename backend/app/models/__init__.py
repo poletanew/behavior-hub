@@ -16,6 +16,7 @@ from app.models.session import ClinicalSession, SessionTraining, Trial
 from app.models.session_template import SessionTemplate, SessionTemplateTraining
 from app.models.stripe_webhook_event import StripeWebhookEvent
 from app.models.training import Training, TrainingCategory
+from app.models.training_patient_link import TrainingPatientLink
 from app.models.treatment_plan import Objective, ObjectiveComment, ObjectiveTraining, TreatmentPlan
 from app.models.user import User
 from app.models.waitlist_entry import WaitlistEntry
@@ -45,6 +46,7 @@ __all__ = [
     "Trial",
     "Training",
     "TrainingCategory",
+    "TrainingPatientLink",
     "TreatmentPlan",
     "Objective",
     "ObjectiveComment",

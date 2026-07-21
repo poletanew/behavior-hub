@@ -120,6 +120,12 @@ Este repositório está sendo construído **por fases**, seguindo o roadmap da S
   pacientes deixa de ser uma tabela simples e passa a ser um grid de cards (avatar com iniciais,
   nome, idade calculada, badge de status, resumo de diagnóstico, segunda linha com escola+turno, e
   um botão "Ver contato" que revela telefone/endereço sem precisar abrir o cadastro completo).
+- **Fase 6 (bloco 5) — Addendum de Melhorias v2.1, RF-10**: Training Library renomeada para
+  "Biblioteca de Treino"; botão "Novo Treinamento" (reaproveita o `POST /trainings` já existente
+  desde a Fase 1, só faltava a tela). Nova entidade `TrainingPatientLink` — botão "Vincular a um
+  paciente" (busca por nome parcial) cria um vínculo treino↔paciente que aparece com o rótulo
+  "Prescrito" na tela de Novo Atendimento daquele paciente, e passa automaticamente para "Aplicado"
+  assim que uma sessão realmente usar esse treino com esse paciente (sem nenhuma ação manual extra).
 
 ## Stack (Seção 4 do PRD)
 

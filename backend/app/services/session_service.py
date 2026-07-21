@@ -16,6 +16,7 @@ from app.services import (
     clinical_suggestion_service,
     patient_service,
     rbac_service,
+    training_service,
 )
 from app.services.calculations import accuracy_pct, independence_pct
 from app.services.plan_service import current_plan
@@ -59,6 +60,8 @@ def create_session(db: DbSession, user: User, payload: SessionCreateRequest) -> 
         if training is None:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Training {training_id} not found")
         db.add(SessionTraining(session_id=session.id, training_id=training_id, sequence=idx))
+
+    training_service.mark_links_applied(db, patient.id, payload.training_ids)
 
     audit_service.record(
         db,
