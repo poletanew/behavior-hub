@@ -11,6 +11,7 @@ from app.models.audit_log import AuditLog
 from app.models.behavior_event import BehaviorEvent
 from app.models.checklist import ChecklistResponse
 from app.models.enums import UserType
+from app.models.family_access import FamilyAudioMessage, FamilyRoutineLog
 from app.models.patient import Patient
 from app.models.reinforcer import Reinforcer
 from app.models.report_summary import ReportSummary
@@ -38,6 +39,8 @@ _PATIENT_ENTITY_TYPES = (
     "reinforcer",
     "anamnesis",
     "checklist_response",
+    "family_routine_log",
+    "family_audio_message",
 )
 
 
@@ -129,6 +132,12 @@ def _patient_scoped_entity_ids(db: Session, patient: Patient) -> dict[str, list[
     checklist_responses = [
         row[0] for row in db.query(ChecklistResponse.id).filter(ChecklistResponse.patient_id == patient.id).all()
     ]
+    routine_logs = [
+        row[0] for row in db.query(FamilyRoutineLog.id).filter(FamilyRoutineLog.patient_id == patient.id).all()
+    ]
+    audio_messages = [
+        row[0] for row in db.query(FamilyAudioMessage.id).filter(FamilyAudioMessage.patient_id == patient.id).all()
+    ]
 
     return {
         "patient": [patient.id],
@@ -142,6 +151,8 @@ def _patient_scoped_entity_ids(db: Session, patient: Patient) -> dict[str, list[
         "reinforcer": reinforcers,
         "anamnesis": anamneses,
         "checklist_response": checklist_responses,
+        "family_routine_log": routine_logs,
+        "family_audio_message": audio_messages,
     }
 
 

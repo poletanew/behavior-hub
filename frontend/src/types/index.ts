@@ -656,6 +656,7 @@ export interface FamilyAccess {
   can_view_team_guidance: boolean;
   can_view_home_materials: boolean;
   can_use_messaging: boolean;
+  can_submit_routine_logs: boolean;
   revoked_at: string | null;
   created_at: string;
 }
@@ -668,6 +669,7 @@ export interface FamilyMyAccess {
   can_view_team_guidance: boolean;
   can_view_home_materials: boolean;
   can_use_messaging: boolean;
+  can_submit_routine_logs: boolean;
 }
 
 export interface FamilyEvolution {
@@ -698,6 +700,24 @@ export interface FamilyMessage {
   sender_user_id: string;
   sender_name: string;
   body: string;
+  created_at: string;
+}
+
+export interface FamilyRoutineLog {
+  id: string;
+  patient_id: string;
+  submitted_by_user_id: string;
+  submitted_by_name: string;
+  content: string;
+  created_at: string;
+}
+
+export interface FamilyAudioMessage {
+  id: string;
+  patient_id: string;
+  submitted_by_user_id: string;
+  submitted_by_name: string;
+  transcription_text: string;
   created_at: string;
 }
 

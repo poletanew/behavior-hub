@@ -6,7 +6,14 @@ from sqlalchemy.orm import Session
 from app.core.deps import get_current_user
 from app.db.session import get_db
 from app.models.user import User
-from app.schemas.family import FamilyAccessResponse, FamilyAccessUpdateRequest, FamilyMessageCreateRequest, FamilyMessageResponse
+from app.schemas.family import (
+    FamilyAccessResponse,
+    FamilyAccessUpdateRequest,
+    FamilyAudioMessageResponse,
+    FamilyMessageCreateRequest,
+    FamilyMessageResponse,
+    FamilyRoutineLogResponse,
+)
 from app.services import family_access_service, family_portal_service
 
 router = APIRouter(tags=["family-access"])
@@ -48,3 +55,15 @@ def create_patient_family_message(
     user: User = Depends(get_current_user),
 ):
     return family_portal_service.post_message_for_team(db, user, patient_id, payload.body)
+
+
+@router.get("/patients/{patient_id}/routine-logs", response_model=list[FamilyRoutineLogResponse])
+def list_patient_routine_logs(patient_id: uuid.UUID, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+    """Addendum v3.0, RF-29 — lado da equipe, visível antes do próximo atendimento."""
+    return family_portal_service.list_routine_logs_for_team(db, user, patient_id)
+
+
+@router.get("/patients/{patient_id}/audio-messages", response_model=list[FamilyAudioMessageResponse])
+def list_patient_audio_messages(patient_id: uuid.UUID, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+    """Addendum v3.0, RF-30 — lado da equipe."""
+    return family_portal_service.list_audio_messages_for_team(db, user, patient_id)

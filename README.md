@@ -223,6 +223,16 @@ Este repositório está sendo construído **por fases**, seguindo o roadmap da S
   responsável foi marcado como aplicador e permite registrar "Apliquei hoje" (com nota opcional);
   essa ação reaproveita o Audit Log já existente, então aparece automaticamente no histórico do
   objetivo do lado da equipe clínica, sem nenhuma tabela ou tela nova.
+- **Fase 7 (Módulo 3.5) — Addendum v3.0, RF-29 e RF-30 — Comunicação com a Família**: nova categoria
+  na whitelist do Family Access ("Registrar rotina") libera, no Portal da Família, uma aba "Rotina"
+  onde o responsável registra sono, alimentação, humor ou eventos importantes antes do próximo
+  atendimento — o registro aparece tanto na página de administração do Portal da Família quanto na
+  Timeline Clínica do paciente, para a equipe ver antes de começar a sessão. A aba "Mensagens" ganha
+  também uma seção de "Notas de voz": o responsável toca em "Ditar", fala, e o texto é transcrito
+  automaticamente pelo próprio navegador (mesmo recurso "Anotação por Voz" da Fase 5) antes de
+  enviar — nenhum áudio é gravado ou enviado a nenhum provedor externo, só o texto chega à equipe.
+  As notas de voz reaproveitam a mesma categoria de mensagens já existente na whitelist, por serem
+  outro formato do mesmo canal de comunicação, não uma categoria de dados nova.
 - **Fase 7 (Módulo 3.4) — Addendum v3.0, RF-26 e RF-28 — Agendamento**: em Configurações da Clínica,
   uma nova seção "Salas de Atendimento" cadastra as salas físicas disponíveis; ao agendar um
   atendimento na Agenda, a sala é opcional, e a mesma sala não pode ter dois atendimentos

@@ -23,6 +23,7 @@ def _enable_all(client, admin_headers, access_id):
         "can_view_team_guidance": True,
         "can_view_home_materials": True,
         "can_use_messaging": True,
+        "can_submit_routine_logs": True,
     }
     response = client.patch(f"/v1/family-accesses/{access_id}", json=payload, headers=admin_headers)
     assert response.status_code == 200, response.text
@@ -431,3 +432,99 @@ def test_applier_objectives_require_active_family_access(client):
         f"/v1/family-portal/patients/{patient['id']}/applier-objectives", headers=new_headers
     )
     assert forbidden.status_code == 404
+
+
+def test_routine_log_gated_by_whitelist(client):
+    """Addendum v3.0, RF-29 — categoria própria na whitelist (can_submit_routine_logs)."""
+    ctx = register_clinic(client)
+    patient = create_patient(client, ctx["headers"])
+    family = _invite_family(client, ctx["headers"], patient["id"])
+
+    denied = client.post(
+        f"/v1/family-portal/patients/{patient['id']}/routine-logs",
+        json={"content": "Dormiu bem, comeu tudo no almoço"},
+        headers=family["headers"],
+    )
+    assert denied.status_code == 403
+
+    access_id = _get_access_id(client, ctx["headers"], patient["id"])
+    client.patch(
+        f"/v1/family-accesses/{access_id}", json={"can_submit_routine_logs": True}, headers=ctx["headers"]
+    )
+
+    allowed = client.post(
+        f"/v1/family-portal/patients/{patient['id']}/routine-logs",
+        json={"content": "Dormiu bem, comeu tudo no almoço"},
+        headers=family["headers"],
+    )
+    assert allowed.status_code == 201, allowed.text
+
+
+def test_family_submits_routine_log_visible_to_team_and_timeline(client):
+    """Addendum v3.0, RF-29 — visível ao profissional antes da próxima sessão."""
+    ctx = register_clinic(client)
+    patient = create_patient(client, ctx["headers"])
+    family = _invite_family(client, ctx["headers"], patient["id"])
+    access_id = _get_access_id(client, ctx["headers"], patient["id"])
+    client.patch(
+        f"/v1/family-accesses/{access_id}", json={"can_submit_routine_logs": True}, headers=ctx["headers"]
+    )
+
+    created = client.post(
+        f"/v1/family-portal/patients/{patient['id']}/routine-logs",
+        json={"content": "Choro antes de dormir, acordou 2x de madrugada"},
+        headers=family["headers"],
+    )
+    assert created.status_code == 201, created.text
+    assert created.json()["submitted_by_name"] == family["user"]["name"]
+
+    family_list = client.get(
+        f"/v1/family-portal/patients/{patient['id']}/routine-logs", headers=family["headers"]
+    )
+    assert len(family_list.json()) == 1
+
+    team_list = client.get(f"/v1/patients/{patient['id']}/routine-logs", headers=ctx["headers"])
+    assert team_list.status_code == 200, team_list.text
+    assert len(team_list.json()) == 1
+    assert team_list.json()[0]["content"] == "Choro antes de dormir, acordou 2x de madrugada"
+
+    timeline = client.get(f"/v1/patients/{patient['id']}/timeline", headers=ctx["headers"])
+    assert timeline.status_code == 200
+    labels = [entry["label"] for entry in timeline.json()]
+    assert "Registro de rotina enviado pela família" in labels
+
+
+def test_audio_message_reuses_messaging_whitelist_category(client):
+    """Addendum v3.0, RF-30 — reaproveita can_use_messaging (não é uma
+    categoria de dados nova, é outro formato de mensagem)."""
+    ctx = register_clinic(client)
+    patient = create_patient(client, ctx["headers"])
+    family = _invite_family(client, ctx["headers"], patient["id"])
+
+    denied = client.post(
+        f"/v1/family-portal/patients/{patient['id']}/audio-messages",
+        json={"transcription_text": "Oi, hoje ele dormiu tarde"},
+        headers=family["headers"],
+    )
+    assert denied.status_code == 403
+
+    access_id = _get_access_id(client, ctx["headers"], patient["id"])
+    client.patch(f"/v1/family-accesses/{access_id}", json={"can_use_messaging": True}, headers=ctx["headers"])
+
+    allowed = client.post(
+        f"/v1/family-portal/patients/{patient['id']}/audio-messages",
+        json={"transcription_text": "Oi, hoje ele dormiu tarde"},
+        headers=family["headers"],
+    )
+    assert allowed.status_code == 201, allowed.text
+    assert allowed.json()["transcription_text"] == "Oi, hoje ele dormiu tarde"
+
+    family_list = client.get(
+        f"/v1/family-portal/patients/{patient['id']}/audio-messages", headers=family["headers"]
+    )
+    assert len(family_list.json()) == 1
+
+    team_list = client.get(f"/v1/patients/{patient['id']}/audio-messages", headers=ctx["headers"])
+    assert team_list.status_code == 200, team_list.text
+    assert len(team_list.json()) == 1
+    assert team_list.json()[0]["submitted_by_name"] == family["user"]["name"]

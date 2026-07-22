@@ -15,6 +15,8 @@ const ENTITY_TYPE_OPTIONS = [
   { value: "reinforcer", label: "Reforçador" },
   { value: "anamnesis", label: "Anamnese" },
   { value: "checklist_response", label: "Checklist aplicado" },
+  { value: "family_routine_log", label: "Registro de rotina" },
+  { value: "family_audio_message", label: "Nota de voz da família" },
   { value: "report_summary", label: "Resumo de relatório" },
   { value: "clinic", label: "Clínica" },
   { value: "invitation", label: "Convite" },
@@ -62,6 +64,8 @@ const ACTION_LABELS: Record<string, string> = {
   anamnesis_created: "Anamnese registrada",
   anamnesis_updated: "Anamnese atualizada",
   checklist_applied: "Checklist aplicado",
+  family_routine_log_submitted: "Registro de rotina enviado pela família",
+  family_audio_message_sent: "Nota de voz enviada pela família",
 };
 
 export default function AuditLogPage() {

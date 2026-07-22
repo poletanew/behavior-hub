@@ -1,16 +1,19 @@
 import { FormEvent, useEffect, useState } from "react";
 import { apiRequest } from "../../api/client";
+import VoiceDictationButton from "../../components/VoiceDictationButton";
 import {
   FamilyApplierObjective,
   FamilyAppointment,
+  FamilyAudioMessage,
   FamilyEvolution,
   FamilyGuidance,
   FamilyMessage,
   FamilyMyAccess,
+  FamilyRoutineLog,
   WhiteLabelSettings,
 } from "../../types";
 
-type TabKey = "evolution" | "appointments" | "guidance" | "materials" | "messages" | "programs";
+type TabKey = "evolution" | "appointments" | "guidance" | "materials" | "messages" | "programs" | "routine";
 
 const TAB_LABELS: Record<TabKey, string> = {
   evolution: "Evolução",
@@ -19,6 +22,7 @@ const TAB_LABELS: Record<TabKey, string> = {
   materials: "Materiais",
   messages: "Mensagens",
   programs: "Meus Programas",
+  routine: "Rotina",
 };
 
 function tabsFor(access: FamilyMyAccess): TabKey[] {
@@ -28,6 +32,7 @@ function tabsFor(access: FamilyMyAccess): TabKey[] {
   if (access.can_view_team_guidance) tabs.push("guidance");
   if (access.can_view_home_materials) tabs.push("materials");
   if (access.can_use_messaging) tabs.push("messages");
+  if (access.can_submit_routine_logs) tabs.push("routine");
   return tabs;
 }
 
@@ -141,6 +146,7 @@ export default function FamilyPortalPage() {
           {tab === "materials" && <MaterialsTab patientId={patientId} />}
           {tab === "messages" && <MessagesTab patientId={patientId} />}
           {tab === "programs" && <ProgramsTab patientId={patientId} />}
+          {tab === "routine" && <RoutineTab patientId={patientId} />}
         </>
       )}
     </div>
@@ -338,27 +344,151 @@ function MessagesTab({ patientId }: { patientId: string }) {
   }
 
   return (
-    <div className="bg-white rounded-card shadow-sm p-6 flex flex-col h-[28rem]">
-      <div className="flex-1 overflow-y-auto space-y-3 mb-4">
-        {messages.length === 0 && <p className="text-center text-neutralState">Nenhuma mensagem ainda.</p>}
-        {messages.map((m) => (
-          <div key={m.id} className="text-sm">
-            <div className="font-medium">{m.sender_name}</div>
-            <div className="text-neutralState">{m.body}</div>
+    <div className="space-y-6">
+      <div className="bg-white rounded-card shadow-sm p-6 flex flex-col h-[28rem]">
+        <div className="flex-1 overflow-y-auto space-y-3 mb-4">
+          {messages.length === 0 && <p className="text-center text-neutralState">Nenhuma mensagem ainda.</p>}
+          {messages.map((m) => (
+            <div key={m.id} className="text-sm">
+              <div className="font-medium">{m.sender_name}</div>
+              <div className="text-neutralState">{m.body}</div>
+            </div>
+          ))}
+        </div>
+        <form onSubmit={handleSend} className="flex gap-2">
+          <input
+            value={body}
+            onChange={(e) => setBody(e.target.value)}
+            placeholder="Escreva uma mensagem..."
+            className="flex-1 h-10 rounded-btn border border-slate-300 px-3"
+          />
+          <VoiceDictationButton
+            onTranscript={(t) => setBody((prev) => (prev ? `${prev} ${t}` : t))}
+          />
+          <button type="submit" className="h-10 rounded-btn bg-brand-turquoise text-white px-4 text-sm font-medium">
+            Enviar
+          </button>
+        </form>
+      </div>
+      <AudioMessagesPanel patientId={patientId} />
+    </div>
+  );
+}
+
+function AudioMessagesPanel({ patientId }: { patientId: string }) {
+  const [audioMessages, setAudioMessages] = useState<FamilyAudioMessage[]>([]);
+  const [transcript, setTranscript] = useState("");
+
+  function load() {
+    apiRequest<FamilyAudioMessage[]>(`/family-portal/patients/${patientId}/audio-messages`).then(setAudioMessages);
+  }
+
+  useEffect(load, [patientId]);
+
+  async function handleSend() {
+    if (!transcript.trim()) return;
+    await apiRequest(`/family-portal/patients/${patientId}/audio-messages`, {
+      method: "POST",
+      body: { transcription_text: transcript },
+    });
+    setTranscript("");
+    load();
+  }
+
+  return (
+    <div className="bg-white rounded-card shadow-sm p-6">
+      <h2 className="font-semibold text-brand-navy mb-1">Notas de voz</h2>
+      <p className="text-xs text-neutralState mb-4">
+        Fale e o texto é transcrito automaticamente no seu navegador antes de enviar — nenhum áudio é gravado.
+      </p>
+      <div className="space-y-3 mb-4">
+        {audioMessages.length === 0 && (
+          <p className="text-sm text-center text-neutralState">Nenhuma nota de voz enviada ainda.</p>
+        )}
+        {audioMessages.map((m) => (
+          <div key={m.id} className="bg-slate-50 rounded-btn px-3 py-2 text-sm">
+            <div className="font-medium">{m.submitted_by_name}</div>
+            <div className="text-neutralState">{m.transcription_text}</div>
           </div>
         ))}
       </div>
-      <form onSubmit={handleSend} className="flex gap-2">
+      <div className="flex gap-2">
         <input
-          value={body}
-          onChange={(e) => setBody(e.target.value)}
-          placeholder="Escreva uma mensagem..."
-          className="flex-1 h-10 rounded-btn border border-slate-300 px-3"
+          value={transcript}
+          onChange={(e) => setTranscript(e.target.value)}
+          placeholder="Toque em Ditar e fale, ou digite aqui..."
+          className="flex-1 h-10 rounded-btn border border-slate-300 px-3 text-sm"
         />
-        <button type="submit" className="h-10 rounded-btn bg-brand-turquoise text-white px-4 text-sm font-medium">
+        <VoiceDictationButton onTranscript={(t) => setTranscript((prev) => (prev ? `${prev} ${t}` : t))} />
+        <button
+          onClick={handleSend}
+          className="h-10 rounded-btn bg-brand-turquoise text-white px-4 text-sm font-medium"
+        >
           Enviar
         </button>
-      </form>
+      </div>
+    </div>
+  );
+}
+
+function RoutineTab({ patientId }: { patientId: string }) {
+  const [logs, setLogs] = useState<FamilyRoutineLog[]>([]);
+  const [content, setContent] = useState("");
+
+  function load() {
+    apiRequest<FamilyRoutineLog[]>(`/family-portal/patients/${patientId}/routine-logs`).then(setLogs);
+  }
+
+  useEffect(load, [patientId]);
+
+  async function handleSubmit(e: FormEvent) {
+    e.preventDefault();
+    if (!content.trim()) return;
+    await apiRequest(`/family-portal/patients/${patientId}/routine-logs`, {
+      method: "POST",
+      body: { content },
+    });
+    setContent("");
+    load();
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="bg-white rounded-card shadow-sm p-6">
+        <h2 className="font-semibold text-brand-navy mb-1">Registrar rotina</h2>
+        <p className="text-sm text-neutralState mb-4">
+          Sono, alimentação, humor ou qualquer evento importante antes do próximo atendimento.
+        </p>
+        <form onSubmit={handleSubmit} className="space-y-2">
+          <textarea
+            value={content}
+            onChange={(e) => setContent(e.target.value)}
+            placeholder="Ex.: dormiu mal, acordou 2x de madrugada..."
+            className="w-full h-24 rounded-btn border border-slate-300 px-3 py-2 text-sm"
+          />
+          <div className="flex justify-end gap-2">
+            <VoiceDictationButton onTranscript={(t) => setContent((prev) => (prev ? `${prev} ${t}` : t))} />
+            <button type="submit" className="h-10 rounded-btn bg-brand-turquoise text-white px-4 text-sm font-medium">
+              Enviar registro
+            </button>
+          </div>
+        </form>
+      </div>
+
+      {logs.length === 0 ? (
+        <div className="bg-white rounded-card shadow-sm p-8 text-center text-neutralState">
+          Nenhum registro de rotina enviado ainda.
+        </div>
+      ) : (
+        logs.map((log) => (
+          <div key={log.id} className="bg-white rounded-card shadow-sm p-6">
+            <div className="text-xs text-neutralState mb-2">
+              {log.submitted_by_name} — {formatDateTime(log.created_at)}
+            </div>
+            <p className="text-sm whitespace-pre-wrap">{log.content}</p>
+          </div>
+        ))
+      )}
     </div>
   );
 }

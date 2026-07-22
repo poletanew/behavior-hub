@@ -7,6 +7,7 @@ from app.models.anamnesis import Anamnesis
 from app.models.assessment import Assessment
 from app.models.audit_log import AuditLog
 from app.models.behavior_event import BehaviorEvent
+from app.models.family_access import FamilyRoutineLog
 from app.models.patient import Patient
 from app.models.report_summary import ReportSummary
 from app.models.session import ClinicalSession
@@ -241,6 +242,24 @@ def _assessment_entries(db: Session, patient: Patient) -> list[dict]:
     ]
 
 
+def _routine_log_entries(db: Session, patient: Patient) -> list[dict]:
+    """Addendum v3.0, RF-29 — "visível ao profissional antes da próxima
+    sessão": reaproveita a Timeline Clínica já consolidada, em vez de exigir
+    uma tela separada só para isso."""
+    logs = db.query(FamilyRoutineLog).filter(FamilyRoutineLog.patient_id == patient.id).all()
+    return [
+        {
+            "id": log.id,
+            "event_type": "family_routine_log_submitted",
+            "occurred_at": log.created_at,
+            "label": "Registro de rotina enviado pela família",
+            "source_type": "family_routine_log",
+            "source_id": log.id,
+        }
+        for log in logs
+    ]
+
+
 def get_patient_timeline(db: Session, patient: Patient) -> list[dict]:
     """Seção 29.2/AC-18 — timeline única consolidando, em ordem cronológica e
     sem duplicados, os eventos clínicos do paciente.
@@ -256,6 +275,7 @@ def get_patient_timeline(db: Session, patient: Patient) -> list[dict]:
         + _assessment_entries(db, patient)
         + _behavior_event_entries(db, patient)
         + _anamnesis_entries(db, patient)
+        + _routine_log_entries(db, patient)
     )
     entries.sort(key=lambda e: (e["occurred_at"], str(e["id"])))
     return entries

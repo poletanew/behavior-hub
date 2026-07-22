@@ -16,6 +16,7 @@ WHITELIST_FIELDS = (
     "can_view_team_guidance",
     "can_view_home_materials",
     "can_use_messaging",
+    "can_submit_routine_logs",
 )
 
 
@@ -36,6 +37,7 @@ def _to_response(db: Session, access: FamilyAccess) -> dict:
         "can_view_team_guidance": access.can_view_team_guidance,
         "can_view_home_materials": access.can_view_home_materials,
         "can_use_messaging": access.can_use_messaging,
+        "can_submit_routine_logs": access.can_submit_routine_logs,
         "revoked_at": access.revoked_at,
         "created_at": access.created_at,
     }

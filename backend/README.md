@@ -931,6 +931,33 @@ tentativa futura de `upgrade` após um `downgrade` falha com "type already exist
   e nenhuma credencial desse tipo está disponível neste projeto. Nenhum schema, campo ou tela foi
   criado para isso — a retomada fica condicionada a uma decisão/credencial futura do usuário.
 
+## Nota sobre Comunicação com a Família — Registro de Rotinas e Notas de Voz (Fase 7 Módulo 3.5 — Addendum v3.0, RF-29 e RF-30)
+
+- **`FamilyRoutineLog`** (RF-29) — sempre enviado pela família (nunca pela equipe, diferente de
+  `FamilyMessage` que é bidirecional). Gate: nova categoria de whitelist `can_submit_routine_logs`
+  em `FamilyAccess`, seguindo à risca a instrução já registrada no docstring do modelo ("qualquer
+  categoria nova... deve nascer aqui como uma nova flag default False, nunca exposta por omissão").
+  `timeline_service._routine_log_entries` adiciona uma entrada por registro na Timeline Clínica já
+  consolidada (Seção 29.2) — resolve o "visível ao profissional antes da próxima sessão" do
+  addendum sem precisar de uma tela nova só para isso. Lado da equipe:
+  `GET /patients/{id}/routine-logs` (read-only, a equipe não registra rotina) reaproveita o gate
+  normal de paciente, igual ao já usado para `family-messages`.
+- **`FamilyAudioMessage`** (RF-30) — o addendum descreve o modelo com um campo `audio_url`, mas o
+  projeto decidiu **não gravar nem armazenar o áudio bruto**: o requisito central do addendum é
+  evitar depender de um provedor de STT pago no servidor, e isso já é resolvido inteiramente pela
+  transcrição no navegador (reaproveita literalmente o mesmo hook/componente da Fase 5 Bloco 5 —
+  `useSpeechToText`/`VoiceDictationButton`, sem nenhuma linha nova de reconhecimento de voz).
+  Armazenar também o áudio gravado exigiria inventar upload/retenção/playback de mídia nova sem
+  necessidade clínica clara, já que a transcrição em si é o conteúdo relevante para a equipe — por
+  isso `FamilyAudioMessage` só persiste `transcription_text`. Gate: reaproveita
+  `can_use_messaging` (categoria já existente) em vez de uma flag nova, porque uma nota de voz é só
+  outro formato de mensagem para a equipe, não uma categoria de dado nova — mesmo raciocínio de
+  "não abrir uma segunda porta de entrada" já usado no RF-25.
+- Ambas as entidades reaproveitam o padrão já estabelecido em `FamilyMessage`/`list_messages_for_team`:
+  uma função de listagem "crua" (`_list_routine_logs`/`_list_audio_messages`) compartilhada entre o
+  endpoint da família (gate por whitelist) e o endpoint da equipe (gate normal de paciente), evitando
+  duplicar a query de junção com `User` para resolver o nome de quem enviou.
+
 ## Estrutura
 
 - `app/models/` — entidades SQLAlchemy (Seção 18/27 do PRD).

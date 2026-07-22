@@ -20,6 +20,7 @@ class FamilyAccessResponse(BaseModel):
     can_view_team_guidance: bool
     can_view_home_materials: bool
     can_use_messaging: bool
+    can_submit_routine_logs: bool
     revoked_at: datetime.datetime | None
     created_at: datetime.datetime
 
@@ -30,6 +31,7 @@ class FamilyAccessUpdateRequest(BaseModel):
     can_view_team_guidance: bool | None = None
     can_view_home_materials: bool | None = None
     can_use_messaging: bool | None = None
+    can_submit_routine_logs: bool | None = None
 
 
 class FamilyMyAccessResponse(BaseModel):
@@ -40,6 +42,7 @@ class FamilyMyAccessResponse(BaseModel):
     can_view_team_guidance: bool
     can_view_home_materials: bool
     can_use_messaging: bool
+    can_submit_routine_logs: bool
 
 
 class FamilyEvolutionResponse(BaseModel):
@@ -97,3 +100,34 @@ class FamilyApplyObjectiveRequest(BaseModel):
 class FamilyApplyObjectiveResponse(BaseModel):
     objective_id: uuid.UUID
     applied_at: datetime.datetime
+
+
+class FamilyRoutineLogCreateRequest(BaseModel):
+    """Addendum v3.0, RF-29 — sono/alimentação/humor/eventos, em texto livre."""
+
+    content: str
+
+
+class FamilyRoutineLogResponse(BaseModel):
+    id: uuid.UUID
+    patient_id: uuid.UUID
+    submitted_by_user_id: uuid.UUID
+    submitted_by_name: str
+    content: str
+    created_at: datetime.datetime
+
+
+class FamilyAudioMessageCreateRequest(BaseModel):
+    """Addendum v3.0, RF-30 — o áudio é transcrito inteiramente no navegador
+    (Web Speech API); só o texto resultante chega ao backend."""
+
+    transcription_text: str
+
+
+class FamilyAudioMessageResponse(BaseModel):
+    id: uuid.UUID
+    patient_id: uuid.UUID
+    submitted_by_user_id: uuid.UUID
+    submitted_by_name: str
+    transcription_text: str
+    created_at: datetime.datetime
