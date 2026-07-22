@@ -280,6 +280,18 @@ Este repositório está sendo construído **por fases**, seguindo o roadmap da S
   PRD (antes, 5 delas — Neuropediatra, Psiquiatra Infantil, Musicoterapeuta, Arteterapeuta,
   Psicomotricista — não tinham nenhuma área da grade multidisciplinar associada e por isso nunca
   conseguiam usar o recurso).
+- **Fase 7 (Módulo 3.9) — Addendum v3.0, RF-38 — Segurança**: este item, ao contrário de todos os
+  outros do addendum, não é um requisito de código — é uma nota de honestidade. ISO 27001, SOC 2 e
+  GDPR são certificações de auditoria externa sobre processos organizacionais, concedidas por um
+  auditor credenciado depois de meses de avaliação; não são funcionalidades que um sistema "implementa"
+  nem selos que uma tela pode exibir de forma verdadeira antes da certificação real acontecer. Por
+  isso nenhuma tela ou selo alegando essas certificações foi criado. O que já existe no código como
+  base técnica para uma eventual certificação futura — controle de acesso por papel (RBAC
+  configurável por clínica, Seção 17.1), log de auditoria (Seção 32.7) e autenticação de dois fatores
+  (Seção 32.8) — está descrito em detalhe no `backend/README.md`; criptografia em trânsito/repouso,
+  backups testados e alta disponibilidade são responsabilidade da camada de hospedagem/infraestrutura,
+  fora do escopo deste código de aplicação. **Esta nota fecha o Addendum v3.0 e a Fase 7 como um
+  todo** — ver `backend/README.md` para o detalhamento completo e a lista de módulos 3.1 a 3.9.
 
 ## Stack (Seção 4 do PRD)
 

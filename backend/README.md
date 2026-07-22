@@ -1061,6 +1061,67 @@ tentativa futura de `upgrade` após um `downgrade` falha com "type already exist
   uma clínica. Adicionado um seletor de especialidade opcional ao formulário de convite (visível para
   papéis `professional`/`supervisor`, omitido para `at`, que não usa `SPECIALTY_TO_AREA`).
 
+## Nota sobre Certificações de Segurança (Fase 7 Módulo 3.9 — Addendum v3.0, RF-38, fecha o Addendum v3.0)
+
+O próprio addendum é explícito: "RF-38 NÃO é um requisito de código." ISO 27001, SOC 2 e GDPR não são
+funcionalidades que se programam — são certificações de auditoria organizacional externa (como a
+empresa gerencia acesso, incidentes, fornecedores e continuidade de negócio), concedidas por um
+auditor credenciado depois de meses de avaliação de processos, não uma configuração de sistema.
+Divulgar publicamente "temos ISO 27001/SOC 2" sem ter passado pela certificação real é um problema
+sério de credibilidade (e, dependendo do contexto, legal) — por isso nenhuma tela, selo ou texto
+alegando essas certificações foi criado em nenhum módulo deste projeto.
+
+O que este addendum pede para deixar explícito é a distinção entre esse selo organizacional e os
+**controles técnicos de suporte** que uma certificação futura exigiria como evidência — e destes, o
+que já existe neste código (não é trabalho novo deste módulo, é o resultado acumulado de fases
+anteriores) é:
+
+- **RBAC configurável por clínica** (Seção 17.1, Fase 3 núcleo) — permissões por papel
+  (`ClinicPermissionSettings`), com granularidade adicional por vínculo profissional↔paciente
+  (`AssignmentPermission`: somente leitura, editar sessões, editar plano da própria área, acesso
+  total) e por especialidade↔área (RF-37, Módulo 3.8 desta mesma fase).
+- **Log de auditoria** (`AuditLog`, Seção 32.7, Fase 3 núcleo) — toda ação sensível registrada com
+  ator, timestamp, entidade afetada e estado antes/depois, com a visão agrupada por paciente do RF-14
+  (Addendum v2.1) e escopo sempre isolado por tenant.
+- **Autenticação de dois fatores** (TOTP, Seção 32.8, Fase 3) — obrigatória para administradores de
+  clínica no plano Enterprise, opcional para os demais perfis.
+- **Isolamento de tenant** (Seção 17) — testado em praticamente todo módulo deste projeto (ver
+  `tests/`) como a defesa central contra vazamento de dado entre clínicas/contas individuais.
+
+Criptografia em trânsito (TLS) e em repouso, backups testados e alta disponibilidade/redundância são
+igualmente reais e necessários para uma certificação, mas são responsabilidade da camada de
+hospedagem/infraestrutura de produção (provedor de nuvem, configuração do banco gerenciado, proxy
+reverso) — não há código de aplicação para "implementar" isso dentro deste repositório backend; são
+requisitos não-funcionais de operação (Seção 20 do PRD) a configurar no ambiente de produção quando
+ele existir, não uma feature deste código-fonte.
+
+**Recomendação, registrada aqui exatamente como o addendum orienta**: tratar certificação formal como
+meta de negócio de médio prazo (Seção 31), não como algo resolvido nesta rodada de desenvolvimento — e
+não anunciar essas siglas em site/material de vendas até a certificação real ser obtida.
+
+### Fechamento do Addendum v3.0 (Fase 7)
+
+Com esta nota, os 9 módulos do Addendum v3.0 (Seções 3.1 a 3.9, RF-18 a RF-38) estão concluídos:
+
+| Módulo | RFs | Resumo |
+| --- | --- | --- |
+| 3.1 Coleta de Dados | RF-18–20 | Modelo ABC (comportamento-alvo), Reforçadores, upload real de Foto/Vídeo |
+| 3.2 Avaliação | RF-21–23 | Anamnese, Checklists personalizados, duplicar avaliação anterior |
+| 3.3 Plano Terapêutico | RF-24–25 | Manutenção/generalização, pais como aplicadores |
+| 3.4 Agendamento | RF-26, 28 | Salas de atendimento, arrastar-e-soltar para reagendar/reordenar |
+| 3.5 Comunicação com a Família | RF-29–30 | Registro de rotina, notas de voz transcritas |
+| 3.6 Relatórios | RF-31–32 | Desempenho do Profissional/AT, do Programa, Previsibilidade Financeira |
+| 3.7 Gráficos | RF-33–35 | Comparação de até 4 avaliações, comportamentos/reforçadores, Curva de Aprendizagem |
+| 3.8 Automatização | RF-36–37 | Pasta de treinos sugerida, IA multidisciplinar para as 12 especialidades |
+| 3.9 Segurança | RF-38 | Esta nota — sem código |
+
+**Único item deliberadamente fora do escopo**: RF-27 (confirmação de agendamento via WhatsApp,
+Módulo 3.4) depende de um provedor de API do WhatsApp Business contratado externamente; sem essa
+credencial configurada, simular o envio produziria uma funcionalidade que parece funcionar mas nunca
+entrega nada de verdade — o addendum pede explicitamente para parar e perguntar nesse caso, em vez de
+fingir. Fica pronto para ligar assim que a credencial existir, reaproveitando o mesmo `Room`/
+`Appointment` já construído no Módulo 3.4.
+
 ## Estrutura
 
 - `app/models/` — entidades SQLAlchemy (Seção 18/27 do PRD).
