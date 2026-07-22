@@ -7,6 +7,9 @@ from app.core.deps import get_current_user
 from app.db.session import get_db
 from app.models.user import User
 from app.schemas.family import (
+    FamilyApplierObjectiveResponse,
+    FamilyApplyObjectiveRequest,
+    FamilyApplyObjectiveResponse,
     FamilyAppointmentResponse,
     FamilyEvolutionResponse,
     FamilyGuidanceResponse,
@@ -66,3 +69,23 @@ def create_patient_message(
     user: User = Depends(get_current_user),
 ):
     return family_portal_service.post_message(db, user, patient_id, payload.body)
+
+
+@router.get("/patients/{patient_id}/applier-objectives", response_model=list[FamilyApplierObjectiveResponse])
+def list_applier_objectives(patient_id: uuid.UUID, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+    """Addendum v3.0, RF-25 — objetivos em que este responsável foi marcado como aplicador."""
+    return family_portal_service.list_applier_objectives(db, user, patient_id)
+
+
+@router.post(
+    "/patients/{patient_id}/applier-objectives/{objective_id}/apply", response_model=FamilyApplyObjectiveResponse
+)
+def apply_objective_today(
+    patient_id: uuid.UUID,
+    objective_id: uuid.UUID,
+    payload: FamilyApplyObjectiveRequest,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """Addendum v3.0, RF-25 — critério de aceite: registrar "apliquei hoje"."""
+    return family_portal_service.record_objective_application(db, user, patient_id, objective_id, payload.notes)

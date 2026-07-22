@@ -1,6 +1,7 @@
 import { FormEvent, useEffect, useState } from "react";
 import { apiRequest } from "../../api/client";
 import {
+  FamilyApplierObjective,
   FamilyAppointment,
   FamilyEvolution,
   FamilyGuidance,
@@ -9,7 +10,7 @@ import {
   WhiteLabelSettings,
 } from "../../types";
 
-type TabKey = "evolution" | "appointments" | "guidance" | "materials" | "messages";
+type TabKey = "evolution" | "appointments" | "guidance" | "materials" | "messages" | "programs";
 
 const TAB_LABELS: Record<TabKey, string> = {
   evolution: "Evolução",
@@ -17,6 +18,7 @@ const TAB_LABELS: Record<TabKey, string> = {
   guidance: "Orientações",
   materials: "Materiais",
   messages: "Mensagens",
+  programs: "Meus Programas",
 };
 
 function tabsFor(access: FamilyMyAccess): TabKey[] {
@@ -54,7 +56,9 @@ export default function FamilyPortalPage() {
   }, [patientId]);
 
   const currentAccess = accesses.find((a) => a.patient_id === patientId) ?? null;
-  const tabs = currentAccess ? tabsFor(currentAccess) : [];
+  // "Meus Programas" (RF-25) não depende da whitelist de categorias — ser
+  // marcado como aplicador de um objetivo é, em si, a autorização.
+  const tabs = currentAccess ? [...tabsFor(currentAccess), "programs" as TabKey] : [];
 
   useEffect(() => {
     if (tabs.length > 0 && (tab === null || !tabs.includes(tab))) {
@@ -136,6 +140,7 @@ export default function FamilyPortalPage() {
           {tab === "guidance" && <GuidanceTab patientId={patientId} />}
           {tab === "materials" && <MaterialsTab patientId={patientId} />}
           {tab === "messages" && <MessagesTab patientId={patientId} />}
+          {tab === "programs" && <ProgramsTab patientId={patientId} />}
         </>
       )}
     </div>
@@ -240,6 +245,74 @@ function MaterialsTab({ patientId }: { patientId: string }) {
       {materials.map((m) => (
         <div key={m.id} className="px-4 py-3 text-sm">
           {m.resource_title}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function ProgramsTab({ patientId }: { patientId: string }) {
+  const [objectives, setObjectives] = useState<FamilyApplierObjective[]>([]);
+  const [notes, setNotes] = useState<Record<string, string>>({});
+  const [applying, setApplying] = useState<string | null>(null);
+
+  function load() {
+    apiRequest<FamilyApplierObjective[]>(`/family-portal/patients/${patientId}/applier-objectives`).then(
+      setObjectives
+    );
+  }
+
+  useEffect(load, [patientId]);
+
+  async function handleApply(objectiveId: string) {
+    setApplying(objectiveId);
+    try {
+      await apiRequest(`/family-portal/patients/${patientId}/applier-objectives/${objectiveId}/apply`, {
+        method: "POST",
+        body: { notes: notes[objectiveId] || null },
+      });
+      setNotes((prev) => ({ ...prev, [objectiveId]: "" }));
+      load();
+    } finally {
+      setApplying(null);
+    }
+  }
+
+  return (
+    <div className="space-y-4">
+      <p className="text-sm text-neutralState">
+        Objetivos em que você foi marcado como aplicador. Registre aqui quando aplicar em casa.
+      </p>
+      {objectives.length === 0 && (
+        <div className="bg-white rounded-card shadow-sm p-6 text-center text-neutralState">
+          Você ainda não foi marcado como aplicador de nenhum objetivo.
+        </div>
+      )}
+      {objectives.map((o) => (
+        <div key={o.objective_id} className="bg-white rounded-card shadow-sm p-6">
+          <div className="flex items-start justify-between gap-2 mb-2">
+            <div className="font-medium text-brand-navy">{o.title}</div>
+            {o.applied_today && (
+              <span className="text-[10px] uppercase font-semibold px-2 py-1 rounded-full bg-success/10 text-success">
+                Aplicado hoje
+              </span>
+            )}
+          </div>
+          <div className="flex gap-2">
+            <input
+              value={notes[o.objective_id] || ""}
+              onChange={(e) => setNotes((prev) => ({ ...prev, [o.objective_id]: e.target.value }))}
+              placeholder="Como foi a aplicação hoje? (opcional)"
+              className="flex-1 h-10 rounded-btn border border-slate-300 px-3 text-sm"
+            />
+            <button
+              onClick={() => handleApply(o.objective_id)}
+              disabled={applying === o.objective_id}
+              className="h-10 rounded-btn bg-brand-turquoise text-white px-4 text-sm font-medium disabled:opacity-50"
+            >
+              Apliquei hoje
+            </button>
+          </div>
         </div>
       ))}
     </div>

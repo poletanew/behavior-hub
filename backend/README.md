@@ -865,6 +865,38 @@ tentativa futura de `upgrade` após um `downgrade` falha com "type already exist
   "sem sobrescrever a original" é garantido pela própria arquitetura já existente, sem precisar de
   um endpoint de duplicação dedicado no backend.
 
+## Nota sobre Plano Terapêutico — Manutenção/Generalização e Pais Aplicadores (Fase 7 Módulo 3.3 — Addendum v3.0, RF-24 e RF-25)
+
+- **Manutenção/generalização (RF-24)** — estende `Objective` (Seção 18) direto, como o addendum pede
+  explicitamente ("sem criar uma tabela paralela"), com dois campos novos: `maintenance_check_date`
+  (`Date`) e `generalization_contexts` (`JSON`, lista de `{context, tested_at, result, notes}`).
+  `update_objective` ganhou um gatilho: na primeira vez que o `status` vira `MASTERED`, agenda
+  `maintenance_check_date = hoje + MAINTENANCE_INTERVAL_DAYS` (constante fixa de 30 dias — o
+  addendum fala do intervalo como exemplo, "ex.: a cada 30 dias", não como uma configuração por
+  clínica, então não criamos uma nova tela de configurações para isso). `ObjectiveResponse.maintenance_due`
+  é calculado na resposta (`maintenance_check_date <= hoje`), não persistido — evita um Celery sweep
+  novo só para marcar uma flag. `POST /objectives/{id}/generalization-contexts` só acrescenta ao
+  array (nunca substitui) e `POST /objectives/{id}/maintenance-checks` (400 se o objetivo não estiver
+  `MASTERED`) reagenda mais 30 dias e loga o resultado (`mantida`/`perdida`) no Audit Log existente.
+- **`ObjectiveApplier`** (RF-25) — tabela nova (`objective_id`, `applier_type` `professional`/`parent`,
+  `applier_user_id`, `added_by_user_id`, `UniqueConstraint(objective_id, applier_user_id)`), porque
+  aqui sim é uma relação N:N (vários aplicadores por objetivo, uma pessoa pode aplicar vários
+  objetivos) que não cabe como campo do `Objective`. `add_applier` (gate: `can_edit_area`, mesmo das
+  demais edições de objetivo) só aceita `applier_type=parent` se o usuário alvo já tiver um
+  `FamilyAccess` ativo (`revoked_at is None`) para o paciente — reaproveita o mesmo consentimento
+  explícito do Portal da Família (Seção 29.6) em vez de abrir uma segunda porta de entrada para dados
+  do paciente; retorna 400 se não tiver, 409 se a pessoa já for aplicadora do objetivo.
+- **Portal da Família — "apliquei hoje" (RF-25)** — `family_portal_service.list_applier_objectives`
+  (gate: `_get_active_access`, o mesmo baseline de todo o Portal da Família) junta `ObjectiveApplier`
+  → `Objective` → `TreatmentPlan` filtrando por `applier_user_id`, e `record_objective_application`
+  audita a ação como `objective_applied` com `actor_user_id` do responsável. Como
+  `treatment_plan_service.get_history` já lê o Audit Log filtrando por `entity_type="objective"`, o
+  "apliquei hoje" da família aparece automaticamente no histórico do objetivo do lado da equipe
+  clínica — zero tabela nova, zero endpoint novo para o profissional consultar isso. No frontend, a
+  aba "Meus Programas" do Portal da Família aparece para qualquer responsável com acesso ativo,
+  independente da whitelist de categorias (Seção 17.2) — ser marcado como aplicador de um objetivo
+  específico já é, em si, a autorização para aquele objetivo puntual.
+
 ## Estrutura
 
 - `app/models/` — entidades SQLAlchemy (Seção 18/27 do PRD).

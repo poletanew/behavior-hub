@@ -1,9 +1,10 @@
 import datetime
 import uuid
+from typing import Literal
 
 from pydantic import BaseModel, Field
 
-from app.models.enums import ObjectivePriority, ObjectiveStatus, TreatmentArea
+from app.models.enums import ApplierType, GeneralizationContext, ObjectivePriority, ObjectiveStatus, TreatmentArea
 
 
 class ObjectiveCreateRequest(BaseModel):
@@ -38,6 +39,16 @@ class DuplicateCandidate(BaseModel):
     similarity: float
 
 
+class GeneralizationContextEntry(BaseModel):
+    """Addendum v3.0, RF-24 — um registro de onde a habilidade dominada já foi
+    testada (clínica, casa, escola, outro) e o resultado observado."""
+
+    context: GeneralizationContext
+    tested_at: datetime.date
+    result: str
+    notes: str | None = None
+
+
 class ObjectiveResponse(BaseModel):
     id: uuid.UUID
     plan_id: uuid.UUID
@@ -58,6 +69,40 @@ class ObjectiveResponse(BaseModel):
     ai_source_document_id: uuid.UUID | None
     ai_source_assessment_id: uuid.UUID | None
     ai_reviewed_at: datetime.datetime | None
+    maintenance_check_date: datetime.date | None
+    maintenance_due: bool = False
+    generalization_contexts: list[GeneralizationContextEntry] = Field(default_factory=list)
+
+    class Config:
+        from_attributes = True
+
+
+class GeneralizationContextCreateRequest(BaseModel):
+    context: GeneralizationContext
+    tested_at: datetime.date
+    result: str = Field(min_length=1)
+    notes: str | None = None
+
+
+class MaintenanceCheckRequest(BaseModel):
+    """RF-24 — resultado do reteste periódico de manutenção."""
+
+    result: Literal["mantida", "perdida"]
+    notes: str | None = None
+
+
+class ObjectiveApplierCreateRequest(BaseModel):
+    applier_type: ApplierType
+    applier_user_id: uuid.UUID
+
+
+class ObjectiveApplierResponse(BaseModel):
+    id: uuid.UUID
+    objective_id: uuid.UUID
+    applier_type: ApplierType
+    applier_user_id: uuid.UUID
+    applier_name: str
+    created_at: datetime.datetime
 
     class Config:
         from_attributes = True

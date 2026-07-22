@@ -78,3 +78,22 @@ class FamilyMessageResponse(BaseModel):
     sender_name: str
     body: str
     created_at: datetime.datetime
+
+
+class FamilyApplierObjectiveResponse(BaseModel):
+    """Addendum v3.0, RF-25 — objetivo em que este responsável foi marcado
+    como aplicador, com indicação se "apliquei hoje" já foi registrado."""
+
+    objective_id: uuid.UUID
+    title: str
+    area: str
+    applied_today: bool
+
+
+class FamilyApplyObjectiveRequest(BaseModel):
+    notes: str | None = None
+
+
+class FamilyApplyObjectiveResponse(BaseModel):
+    objective_id: uuid.UUID
+    applied_at: datetime.datetime

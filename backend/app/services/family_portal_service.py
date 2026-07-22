@@ -2,16 +2,18 @@ import datetime
 import uuid
 
 from fastapi import HTTPException, status
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.models.appointment import Appointment
+from app.models.audit_log import AuditLog
 from app.models.enums import AppointmentStatus, ReportSummaryStatus, UserType
 from app.models.family_access import FamilyAccess, FamilyMessage
 from app.models.patient import Patient
 from app.models.report_summary import ReportSummary
 from app.models.resource import Resource
 from app.models.resource_link import ResourceLink
-from app.models.treatment_plan import Objective, ObjectiveTraining, TreatmentPlan
+from app.models.treatment_plan import Objective, ObjectiveApplier, ObjectiveTraining, TreatmentPlan
 from app.models.user import User
 from app.services import audit_service, report_service, white_label_service
 from app.services.resource_link_service import _to_response as _resource_link_response
@@ -274,3 +276,79 @@ def post_message_for_team(db: Session, staff_user: User, patient_id: uuid.UUID, 
         "body": message.body,
         "created_at": message.created_at,
     }
+
+
+def list_applier_objectives(db: Session, family_user: User, patient_id: uuid.UUID) -> list[dict]:
+    """Addendum v3.0, RF-25 — objetivos em que este responsável foi marcado
+    como aplicador (ObjectiveTraining/treatment_plan_service.add_applier),
+    com indicação se "apliquei hoje" já foi registrado. Diferente das demais
+    seções do Family Portal, RF-25 não depende de nenhuma flag de
+    FamilyAccess: ser aplicador de um objetivo específico já é, em si, a
+    autorização concedida objetivo a objetivo pelo profissional — mas ainda
+    exige acesso ativo ao paciente (_get_active_access), para não vazar dados
+    de um paciente cujo consentimento já foi revogado."""
+    _get_active_access(db, family_user, patient_id)
+
+    rows = (
+        db.query(ObjectiveApplier, Objective)
+        .join(Objective, ObjectiveApplier.objective_id == Objective.id)
+        .join(TreatmentPlan, Objective.plan_id == TreatmentPlan.id)
+        .filter(
+            ObjectiveApplier.applier_user_id == family_user.id,
+            TreatmentPlan.patient_id == patient_id,
+            Objective.deleted_at.is_(None),
+        )
+        .all()
+    )
+    today = datetime.date.today()
+    result = []
+    for _applier, objective in rows:
+        applied_today = (
+            db.query(AuditLog)
+            .filter(
+                AuditLog.entity_type == "objective",
+                AuditLog.entity_id == objective.id,
+                AuditLog.action == "objective_applied",
+                AuditLog.actor_user_id == family_user.id,
+                func.date(AuditLog.timestamp) == today,
+            )
+            .first()
+            is not None
+        )
+        result.append(
+            {"objective_id": objective.id, "title": objective.title, "area": objective.area, "applied_today": applied_today}
+        )
+    return result
+
+
+def record_objective_application(
+    db: Session, family_user: User, patient_id: uuid.UUID, objective_id: uuid.UUID, notes: str | None
+) -> dict:
+    """Addendum v3.0, RF-25 — "registrar 'apliquei hoje'... isso aparece no
+    histórico do objetivo para o profissional ver": reaproveita o AuditLog
+    (mesmo mecanismo de treatment_plan_service.get_history), sem tabela nova."""
+    _get_active_access(db, family_user, patient_id)
+
+    applier = (
+        db.query(ObjectiveApplier)
+        .filter(ObjectiveApplier.objective_id == objective_id, ObjectiveApplier.applier_user_id == family_user.id)
+        .first()
+    )
+    if applier is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="You are not registered as an applier for this objective")
+
+    objective = db.get(Objective, objective_id)
+    plan = db.get(TreatmentPlan, objective.plan_id) if objective else None
+    if objective is None or objective.deleted_at is not None or plan is None or plan.patient_id != patient_id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Objective not found")
+
+    audit_service.record(
+        db,
+        actor_user_id=family_user.id,
+        action="objective_applied",
+        entity_type="objective",
+        entity_id=objective.id,
+        after={"applier": "parent", "notes": notes},
+    )
+    db.commit()
+    return {"objective_id": objective.id, "applied_at": datetime.datetime.now(datetime.timezone.utc)}

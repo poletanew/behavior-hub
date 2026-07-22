@@ -263,3 +263,21 @@ class ChecklistAnswerType(str, enum.Enum):
     YES_NO = "yes_no"
     SCALE = "scale"
     SHORT_TEXT = "short_text"
+
+
+class GeneralizationContext(str, enum.Enum):
+    """Addendum v3.0, RF-24 — onde a generalização de um alvo dominado já foi
+    testada (Seção 13.1: manutenção/generalização)."""
+
+    CLINICA = "clinica"
+    CASA = "casa"
+    ESCOLA = "escola"
+    OUTRO = "outro"
+
+
+class ApplierType(str, enum.Enum):
+    """Addendum v3.0, RF-25 — quem aplica um objetivo: o próprio profissional
+    (padrão) ou um pai/cuidador marcado explicitamente como aplicador."""
+
+    PROFESSIONAL = "professional"
+    PARENT = "parent"

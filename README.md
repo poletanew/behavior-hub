@@ -209,6 +209,20 @@ Este repositório está sendo construído **por fases**, seguindo o roadmap da S
   mesmo paciente mostra "Duplicar avaliação anterior como ponto de partida", que pré-preenche os
   campos com a última aplicação — o profissional só ajusta o que mudou, e a avaliação duplicada
   sempre fica com sua própria data, sem sobrescrever a original.
+- **Fase 7 (Módulo 3.3) — Addendum v3.0, RF-24 e RF-25 — Plano Terapêutico**: cada objetivo do Plano
+  de Tratamento (Seção 13) ganha manutenção/generalização e aplicadores, direto no card, sem tabela
+  nova. Quando um objetivo passa para "Dominado" a primeira vez, um reteste de manutenção é agendado
+  automaticamente 30 dias à frente (badge "⏰ Reteste de manutenção pendente" quando a data chega);
+  "Registrar reteste" reagenda o próximo reteste e fica marcado "mantida" ou "perdida". O mesmo card
+  ganha campos simples para marcar em quais contextos a generalização já foi testada (clínica, casa,
+  escola, outro) com data e resultado observado. "Aplicadores" permite marcar tanto um profissional
+  quanto um pai/cuidador como responsável por aplicar aquele objetivo fora do horário de atendimento
+  — um pai só pode ser marcado se já tiver acesso ativo ao Portal da Família para o paciente (reaproveita
+  o mesmo consentimento explícito da Seção 29.6, em vez de criar uma segunda porta de entrada para
+  dados do paciente). No Portal da Família, a nova aba "Meus Programas" lista os objetivos em que o
+  responsável foi marcado como aplicador e permite registrar "Apliquei hoje" (com nota opcional);
+  essa ação reaproveita o Audit Log já existente, então aparece automaticamente no histórico do
+  objetivo do lado da equipe clínica, sem nenhuma tabela ou tela nova.
 
 ## Stack (Seção 4 do PRD)
 

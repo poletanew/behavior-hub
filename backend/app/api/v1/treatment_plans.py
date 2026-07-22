@@ -10,8 +10,12 @@ from app.models.enums import ObjectivePriority, ObjectiveStatus, TreatmentArea
 from app.models.treatment_plan import Objective, TreatmentPlan, TreatmentPlanAttachment
 from app.models.user import User
 from app.schemas.treatment_plan import (
+    GeneralizationContextCreateRequest,
+    MaintenanceCheckRequest,
     ObjectiveAIFillRequest,
     ObjectiveAIFillResponse,
+    ObjectiveApplierCreateRequest,
+    ObjectiveApplierResponse,
     ObjectiveCommentCreateRequest,
     ObjectiveCommentResponse,
     ObjectiveCreateRequest,
@@ -42,6 +46,9 @@ def _to_attachment_response(db: Session, attachment: TreatmentPlanAttachment) ->
 
 def _to_objective_response(db: Session, objective: Objective) -> ObjectiveResponse:
     plan = db.get(TreatmentPlan, objective.plan_id)
+    maintenance_due = (
+        objective.maintenance_check_date is not None and objective.maintenance_check_date <= datetime.date.today()
+    )
     return ObjectiveResponse(
         id=objective.id,
         plan_id=objective.plan_id,
@@ -62,6 +69,9 @@ def _to_objective_response(db: Session, objective: Objective) -> ObjectiveRespon
         ai_source_document_id=objective.ai_source_document_id,
         ai_source_assessment_id=objective.ai_source_assessment_id,
         ai_reviewed_at=objective.ai_reviewed_at,
+        maintenance_check_date=objective.maintenance_check_date,
+        maintenance_due=maintenance_due,
+        generalization_contexts=objective.generalization_contexts or [],
     )
 
 
@@ -210,3 +220,45 @@ def list_comments(objective_id: uuid.UUID, db: Session = Depends(get_db), user: 
 @router.get("/objectives/{objective_id}/history", response_model=list[ObjectiveHistoryEntry])
 def get_history(objective_id: uuid.UUID, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
     return treatment_plan_service.get_history(db, user, objective_id)
+
+
+@router.post("/objectives/{objective_id}/generalization-contexts", response_model=ObjectiveResponse)
+def record_generalization_context(
+    objective_id: uuid.UUID,
+    payload: GeneralizationContextCreateRequest,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """Addendum v3.0, RF-24 — registrar onde a generalização de um alvo dominado já foi testada."""
+    objective = treatment_plan_service.record_generalization_context(db, user, objective_id, payload)
+    return _to_objective_response(db, objective)
+
+
+@router.post("/objectives/{objective_id}/maintenance-checks", response_model=ObjectiveResponse)
+def record_maintenance_check(
+    objective_id: uuid.UUID,
+    payload: MaintenanceCheckRequest,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """Addendum v3.0, RF-24 — registra o reteste de manutenção e reagenda o próximo lembrete."""
+    objective = treatment_plan_service.record_maintenance_check(db, user, objective_id, payload)
+    return _to_objective_response(db, objective)
+
+
+@router.post(
+    "/objectives/{objective_id}/appliers", response_model=ObjectiveApplierResponse, status_code=status.HTTP_201_CREATED
+)
+def add_applier(
+    objective_id: uuid.UUID,
+    payload: ObjectiveApplierCreateRequest,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """Addendum v3.0, RF-25 — marcar um pai/cuidador (ou profissional) como aplicador de um objetivo."""
+    return treatment_plan_service.add_applier(db, user, objective_id, payload)
+
+
+@router.get("/objectives/{objective_id}/appliers", response_model=list[ObjectiveApplierResponse])
+def list_appliers(objective_id: uuid.UUID, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+    return treatment_plan_service.list_appliers(db, user, objective_id)

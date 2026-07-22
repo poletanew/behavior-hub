@@ -323,3 +323,111 @@ def test_individual_tenant_can_invite_family(client):
         f"/v1/family-portal/patients/{patient['id']}/evolution", headers=family["headers"]
     )
     assert evolution.status_code == 200
+
+
+def _create_objective(client, headers, patient_id, **overrides):
+    payload = {
+        "area": "aba",
+        "title": "Aguardar por 30 segundos com comportamento seguro",
+        "description": "Objetivo de teste",
+        "criteria": "80% de respostas independentes em 3 sessões consecutivas",
+        "strategies": "Aumento gradual do tempo",
+        "priority": "high",
+    }
+    payload.update(overrides)
+    return client.post(f"/v1/patients/{patient_id}/treatment-plan/objectives", json=payload, headers=headers)
+
+
+def test_add_parent_applier_requires_active_family_access(client):
+    """Addendum v3.0, RF-25 — um pai só pode ser marcado como aplicador se já
+    tiver acesso ativo ao Family Portal para o paciente (reaproveita o
+    consentimento explícito de Family Access, sem criar uma segunda porta de entrada)."""
+    ctx = register_clinic(client)
+    patient = create_patient(client, ctx["headers"])
+    objective = _create_objective(client, ctx["headers"], patient["id"]).json()
+    family = _invite_family(client, ctx["headers"], patient["id"])
+
+    access_id = _get_access_id(client, ctx["headers"], patient["id"])
+    revoke = client.post(f"/v1/family-accesses/{access_id}/revoke", headers=ctx["headers"])
+    assert revoke.status_code == 200
+
+    denied = client.post(
+        f"/v1/objectives/{objective['id']}/appliers",
+        json={"applier_type": "parent", "applier_user_id": family["user"]["id"]},
+        headers=ctx["headers"],
+    )
+    assert denied.status_code == 400
+
+
+def test_parent_applier_flow_end_to_end(client):
+    """Addendum v3.0, RF-25 — critério de aceite: pai marcado como aplicador
+    consegue registrar "apliquei hoje", e isso aparece no histórico do objetivo
+    para o profissional (reaproveitando o AuditLog existente)."""
+    ctx = register_clinic(client)
+    patient = create_patient(client, ctx["headers"])
+    objective = _create_objective(client, ctx["headers"], patient["id"]).json()
+    family = _invite_family(client, ctx["headers"], patient["id"])
+
+    added = client.post(
+        f"/v1/objectives/{objective['id']}/appliers",
+        json={"applier_type": "parent", "applier_user_id": family["user"]["id"]},
+        headers=ctx["headers"],
+    )
+    assert added.status_code == 201, added.text
+
+    duplicate = client.post(
+        f"/v1/objectives/{objective['id']}/appliers",
+        json={"applier_type": "parent", "applier_user_id": family["user"]["id"]},
+        headers=ctx["headers"],
+    )
+    assert duplicate.status_code == 409
+
+    listed = client.get(
+        f"/v1/family-portal/patients/{patient['id']}/applier-objectives", headers=family["headers"]
+    )
+    assert listed.status_code == 200, listed.text
+    assert len(listed.json()) == 1
+    assert listed.json()[0]["objective_id"] == objective["id"]
+    assert listed.json()[0]["applied_today"] is False
+
+    apply_response = client.post(
+        f"/v1/family-portal/patients/{patient['id']}/applier-objectives/{objective['id']}/apply",
+        json={"notes": "Praticamos durante o lanche"},
+        headers=family["headers"],
+    )
+    assert apply_response.status_code == 200, apply_response.text
+    assert apply_response.json()["objective_id"] == objective["id"]
+
+    listed_after = client.get(
+        f"/v1/family-portal/patients/{patient['id']}/applier-objectives", headers=family["headers"]
+    ).json()
+    assert listed_after[0]["applied_today"] is True
+
+    history = client.get(f"/v1/objectives/{objective['id']}/history", headers=ctx["headers"])
+    actions = [entry["action"] for entry in history.json()]
+    assert "objective_applied" in actions
+
+
+def test_applier_objectives_require_active_family_access(client):
+    ctx = register_clinic(client)
+    patient = create_patient(client, ctx["headers"])
+    objective = _create_objective(client, ctx["headers"], patient["id"]).json()
+    family = _invite_family(client, ctx["headers"], patient["id"])
+    client.post(
+        f"/v1/objectives/{objective['id']}/appliers",
+        json={"applier_type": "parent", "applier_user_id": family["user"]["id"]},
+        headers=ctx["headers"],
+    )
+
+    access_id = _get_access_id(client, ctx["headers"], patient["id"])
+    client.post(f"/v1/family-accesses/{access_id}/revoke", headers=ctx["headers"])
+
+    relogin = client.post(
+        "/v1/auth/login", json={"email": family["email"], "password": "senha-super-segura-123"}
+    )
+    new_headers = auth_headers(relogin.json())
+
+    forbidden = client.get(
+        f"/v1/family-portal/patients/{patient['id']}/applier-objectives", headers=new_headers
+    )
+    assert forbidden.status_code == 404

@@ -158,6 +158,15 @@ export type TreatmentArea =
 
 export type ObjectiveStatus = "not_started" | "in_progress" | "mastered" | "paused" | "discontinued";
 export type ObjectivePriority = "low" | "medium" | "high";
+export type GeneralizationContext = "clinica" | "casa" | "escola" | "outro";
+export type ApplierType = "professional" | "parent";
+
+export interface GeneralizationContextEntry {
+  context: GeneralizationContext;
+  tested_at: string;
+  result: string;
+  notes: string | null;
+}
 
 export interface Objective {
   id: string;
@@ -178,6 +187,18 @@ export interface Objective {
   ai_generated: boolean;
   ai_source_document_id: string | null;
   ai_reviewed_at: string | null;
+  maintenance_check_date: string | null;
+  maintenance_due: boolean;
+  generalization_contexts: GeneralizationContextEntry[];
+}
+
+export interface ObjectiveApplier {
+  id: string;
+  objective_id: string;
+  applier_type: ApplierType;
+  applier_user_id: string;
+  applier_name: string;
+  created_at: string;
 }
 
 export interface ObjectiveAIFillResponse {
@@ -669,6 +690,13 @@ export interface FamilyMessage {
   sender_name: string;
   body: string;
   created_at: string;
+}
+
+export interface FamilyApplierObjective {
+  objective_id: string;
+  title: string;
+  area: TreatmentArea;
+  applied_today: boolean;
 }
 
 export interface BillingStatus {
