@@ -1,7 +1,7 @@
-import { useEffect, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import { apiRequest, ApiError } from "../api/client";
 import { useAuth } from "../context/AuthContext";
-import { BillingStatus, ClinicPermissionSettings } from "../types";
+import { BillingStatus, ClinicPermissionSettings, Room } from "../types";
 
 type NumberSettingKey = {
   [K in keyof ClinicPermissionSettings]: ClinicPermissionSettings[K] extends number ? K : never;
@@ -114,6 +114,10 @@ export default function ClinicSettingsPage() {
   const [bulkImportError, setBulkImportError] = useState<string | null>(null);
   const [bulkImportSaving, setBulkImportSaving] = useState(false);
 
+  const [rooms, setRooms] = useState<Room[]>([]);
+  const [newRoomName, setNewRoomName] = useState("");
+  const [roomError, setRoomError] = useState<string | null>(null);
+
   const isEnterprise = billingStatus?.subscription_plan === "enterprise" && billingStatus.has_paid_access;
 
   function load() {
@@ -123,9 +127,37 @@ export default function ClinicSettingsPage() {
       .catch(() => setError("Não foi possível carregar as configurações."))
       .finally(() => setLoading(false));
     apiRequest<BillingStatus>("/billing/status").then(setBillingStatus);
+    apiRequest<Room[]>("/rooms").then(setRooms);
   }
 
   useEffect(load, []);
+
+  async function handleCreateRoom(e: FormEvent) {
+    e.preventDefault();
+    setRoomError(null);
+    if (!newRoomName.trim()) return;
+    try {
+      const room = await apiRequest<Room>("/rooms", { method: "POST", body: { name: newRoomName.trim() } });
+      setRooms((prev) => [...prev, room].sort((a, b) => a.name.localeCompare(b.name)));
+      setNewRoomName("");
+    } catch {
+      setRoomError("Não foi possível criar a sala.");
+    }
+  }
+
+  async function handleDeleteRoom(roomId: string) {
+    setRoomError(null);
+    try {
+      await apiRequest(`/rooms/${roomId}`, { method: "DELETE" });
+      setRooms((prev) => prev.filter((r) => r.id !== roomId));
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 409) {
+        setRoomError("Esta sala tem atendimentos futuros e não pode ser removida.");
+      } else {
+        setRoomError("Não foi possível remover a sala.");
+      }
+    }
+  }
 
   async function handleThresholdSave(key: NumberSettingKey, value: number) {
     if (!settings) return;
@@ -316,6 +348,35 @@ export default function ClinicSettingsPage() {
           </div>
         </div>
       )}
+
+      <h2 className="text-lg font-semibold text-brand-navy mt-8 mb-2">Salas de Atendimento</h2>
+      <p className="text-sm text-neutralState mb-4">
+        Cadastre as salas físicas da clínica para vincular a um atendimento na Agenda; a mesma sala
+        não pode ter dois atendimentos sobrepostos (Addendum v3.0, RF-26).
+      </p>
+      {roomError && <p className="text-danger text-sm mb-4">{roomError}</p>}
+      <div className="bg-white rounded-card shadow-sm max-w-2xl divide-y divide-slate-100">
+        {rooms.map((room) => (
+          <div key={room.id} className="flex items-center justify-between gap-4 px-6 py-3">
+            <span className="text-sm font-medium">{room.name}</span>
+            <button onClick={() => handleDeleteRoom(room.id)} className="text-xs text-danger hover:underline">
+              Remover
+            </button>
+          </div>
+        ))}
+        {rooms.length === 0 && <p className="px-6 py-4 text-sm text-neutralState">Nenhuma sala cadastrada ainda.</p>}
+        <form onSubmit={handleCreateRoom} className="flex gap-3 px-6 py-4">
+          <input
+            value={newRoomName}
+            onChange={(e) => setNewRoomName(e.target.value)}
+            placeholder="Nome da sala (ex.: Sala 1)"
+            className="flex-1 h-9 rounded-btn border border-slate-300 px-3 text-sm"
+          />
+          <button type="submit" className="h-9 rounded-btn bg-brand-turquoise text-white px-4 text-sm font-medium">
+            + Adicionar sala
+          </button>
+        </form>
+      </div>
     </div>
   );
 }

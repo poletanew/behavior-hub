@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { apiRequest } from "../api/client";
+import EmptyState from "../components/EmptyState";
 import { DeletedItem } from "../types";
 
 const ENTITY_LABELS: Record<string, string> = {
@@ -38,9 +39,7 @@ export default function DeletedDataPage() {
       {loading ? (
         <p className="text-neutralState">Carregando...</p>
       ) : items.length === 0 ? (
-        <div className="bg-white rounded-card shadow-sm p-10 text-center text-neutralState">
-          Nenhum registro em Dados Excluídos.
-        </div>
+        <EmptyState icon="🗂️" message="Nenhum registro em Dados Excluídos." />
       ) : (
         <div className="bg-white rounded-card shadow-sm overflow-hidden">
           <table className="w-full text-sm">

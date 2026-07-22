@@ -2,12 +2,15 @@ from fastapi import APIRouter
 
 from app.api.v1 import (
     aba,
+    anamnesis,
     appointments,
     assessments,
     at_portal,
     audit_logs,
     auth,
+    behavior_events,
     billing,
+    checklists,
     clinical_alerts,
     clinical_suggestions,
     dashboard,
@@ -20,9 +23,11 @@ from app.api.v1 import (
     patients,
     professionals,
     rbac,
+    reinforcers,
     reports,
     resource_links,
     resources,
+    rooms,
     session_templates,
     sessions,
     supervisor_dashboard,
@@ -37,6 +42,7 @@ api_router = APIRouter(prefix="/v1")
 api_router.include_router(auth.router)
 api_router.include_router(billing.router)
 api_router.include_router(appointments.router)
+api_router.include_router(rooms.router)
 api_router.include_router(assessments.router)
 api_router.include_router(clinical_alerts.router)
 api_router.include_router(clinical_suggestions.router)
@@ -47,6 +53,10 @@ api_router.include_router(patients.router)
 api_router.include_router(professionals.router)
 api_router.include_router(sessions.router)
 api_router.include_router(session_templates.router)
+api_router.include_router(behavior_events.router)
+api_router.include_router(reinforcers.router)
+api_router.include_router(anamnesis.router)
+api_router.include_router(checklists.router)
 api_router.include_router(trainings.router)
 api_router.include_router(dashboard.router)
 api_router.include_router(treatment_plans.router)

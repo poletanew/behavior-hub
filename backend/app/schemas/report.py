@@ -65,6 +65,24 @@ class PeriodComparison(BaseModel):
     delta_pct: float | None = None
 
 
+class BehaviorFrequencyPoint(BaseModel):
+    date: datetime.date
+    frequency_count: int
+    duration_seconds: int
+
+
+class BehaviorFrequencySeries(BaseModel):
+    behavior: str
+    total_events: int
+    points: list[BehaviorFrequencyPoint]
+
+
+class ReinforcerUsagePoint(BaseModel):
+    reinforcer_id: uuid.UUID
+    reinforcer_name: str
+    usage_count: int
+
+
 class ReportDataResponse(BaseModel):
     patient_id: uuid.UUID
     period_start: datetime.date | None
@@ -77,6 +95,8 @@ class ReportDataResponse(BaseModel):
     radar: list[RadarPoint]
     cumulative: list[CumulativePoint]
     heatmap: list[HeatmapAreaPoint]
+    behavior_frequency: list[BehaviorFrequencySeries]
+    reinforcer_usage: list[ReinforcerUsagePoint]
     comparison: PeriodComparison | None = None
 
 

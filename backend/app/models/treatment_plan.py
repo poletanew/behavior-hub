@@ -1,11 +1,11 @@
 import datetime
 import uuid
 
-from sqlalchemy import DateTime, ForeignKey, Integer, String, Text, UniqueConstraint, func
+from sqlalchemy import JSON, Date, DateTime, ForeignKey, Integer, String, Text, UniqueConstraint, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base, SoftDeleteMixin, TimestampMixin, UUIDPrimaryKeyMixin
-from app.models.enums import ObjectivePriority, ObjectiveStatus, TreatmentArea
+from app.models.enums import ApplierType, ObjectivePriority, ObjectiveStatus, TreatmentArea
 
 
 class TreatmentPlan(Base, UUIDPrimaryKeyMixin, TimestampMixin):
@@ -48,7 +48,23 @@ class Objective(Base, UUIDPrimaryKeyMixin, TimestampMixin, SoftDeleteMixin):
     ai_source_document_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("treatment_plan_attachments.id"), nullable=True
     )
+    # Addendum v2.1, RF-06 — quando o objetivo vem da ativação de um rascunho de
+    # plano gerado a partir de uma Avaliação Padronizada, em vez de um PDF (RF-05).
+    ai_source_assessment_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("assessments.id"), nullable=True)
     ai_reviewed_at: Mapped[datetime.datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+    # Addendum v3.0, RF-24 — quando um objetivo é marcado como "Dominado", ele
+    # entra em acompanhamento de manutenção (reteste periódico automático) e
+    # generalização (registro de onde a habilidade já foi testada), em vez de
+    # simplesmente desaparecer. Estende o próprio Objective (Seção 18 do PRD),
+    # sem tabela paralela, conforme instrução explícita do addendum.
+    maintenance_check_date: Mapped[datetime.date | None] = mapped_column(Date, nullable=True)
+    generalization_contexts: Mapped[list | None] = mapped_column(JSON, nullable=True)
+
+    # Addendum v3.0, RF-28 — posição manual dentro da área (arrastar e soltar
+    # para reordenar prioridade dos programas do paciente); novos objetivos
+    # entram no fim da lista da própria área.
+    display_order: Mapped[int] = mapped_column(default=0, nullable=False)
 
     plan: Mapped["TreatmentPlan"] = relationship(back_populates="objectives")
     comments: Mapped[list["ObjectiveComment"]] = relationship(
@@ -103,3 +119,21 @@ class ObjectiveTraining(Base, UUIDPrimaryKeyMixin):
     training_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("trainings.id"), nullable=False, index=True)
 
     objective: Mapped["Objective"] = relationship(back_populates="training_links")
+
+
+class ObjectiveApplier(Base, UUIDPrimaryKeyMixin, TimestampMixin):
+    """Addendum v3.0, RF-25 — pai/cuidador (ou profissional) marcado como
+    aplicador de um objetivo específico, geralmente de generalização em casa
+    (liga diretamente ao RF-24). O registro do "apliquei hoje" em si não vira
+    uma tabela nova — reaproveita AuditLog (action="objective_applied"),
+    mesmo mecanismo já usado pelo histórico do objetivo (Seção 13.1)."""
+
+    __tablename__ = "objective_appliers"
+    __table_args__ = (
+        UniqueConstraint("objective_id", "applier_user_id", name="uq_objective_appliers_objective_user"),
+    )
+
+    objective_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("objectives.id"), nullable=False, index=True)
+    applier_type: Mapped[ApplierType] = mapped_column(nullable=False)
+    applier_user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"), nullable=False, index=True)
+    added_by_user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"), nullable=False)

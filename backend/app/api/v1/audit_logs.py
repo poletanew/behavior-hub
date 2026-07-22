@@ -37,3 +37,10 @@ def list_audit_logs(
         limit=limit,
         offset=offset,
     )
+
+
+@router.get("/patients/{patient_id}", response_model=list[AuditLogResponse])
+def get_patient_audit_trail(patient_id: uuid.UUID, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+    """RF-14 — auditoria agrupada por paciente: todas as ações de todos os
+    profissionais sobre este paciente, em ordem cronológica."""
+    return audit_log_service.get_patient_audit_trail(db, user, patient_id)

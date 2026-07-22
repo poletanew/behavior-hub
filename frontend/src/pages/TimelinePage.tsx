@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { apiRequest } from "../api/client";
+import EmptyState from "../components/EmptyState";
 import { Patient, TimelineEntry } from "../types";
 
 const EVENT_LABELS: Record<string, string> = {
@@ -73,9 +74,7 @@ export default function TimelinePage() {
       {loading ? (
         <p className="text-neutralState">Carregando...</p>
       ) : entries.length === 0 ? (
-        <div className="bg-white rounded-card shadow-sm p-10 text-center text-neutralState">
-          Nenhum evento registrado ainda para este paciente.
-        </div>
+        <EmptyState icon="🕒" message="Nenhum evento registrado ainda para este paciente." />
       ) : (
         <div className="bg-white rounded-card shadow-sm divide-y divide-slate-100">
           {entries.map((entry) => {

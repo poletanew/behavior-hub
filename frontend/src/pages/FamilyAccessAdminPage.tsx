@@ -1,7 +1,7 @@
 import { FormEvent, useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { apiRequest, ApiError } from "../api/client";
-import { FamilyAccess, FamilyMessage, Patient } from "../types";
+import { FamilyAccess, FamilyAudioMessage, FamilyMessage, FamilyRoutineLog, Patient } from "../types";
 
 const WHITELIST_FIELDS: { key: keyof FamilyAccess; label: string }[] = [
   { key: "can_view_evolution_charts", label: "Evolução (gráficos)" },
@@ -9,13 +9,20 @@ const WHITELIST_FIELDS: { key: keyof FamilyAccess; label: string }[] = [
   { key: "can_view_team_guidance", label: "Orientações da equipe" },
   { key: "can_view_home_materials", label: "Materiais para casa" },
   { key: "can_use_messaging", label: "Mensagens com a equipe" },
+  { key: "can_submit_routine_logs", label: "Registrar rotina (sono/alimentação/humor)" },
 ];
+
+function formatDateTime(value: string) {
+  return new Date(value).toLocaleString("pt-BR");
+}
 
 export default function FamilyAccessAdminPage() {
   const { patientId } = useParams<{ patientId: string }>();
   const [patient, setPatient] = useState<Patient | null>(null);
   const [accesses, setAccesses] = useState<FamilyAccess[]>([]);
   const [messages, setMessages] = useState<FamilyMessage[]>([]);
+  const [routineLogs, setRoutineLogs] = useState<FamilyRoutineLog[]>([]);
+  const [audioMessages, setAudioMessages] = useState<FamilyAudioMessage[]>([]);
   const [email, setEmail] = useState("");
   const [lastLink, setLastLink] = useState<string | null>(null);
   const [messageBody, setMessageBody] = useState("");
@@ -26,6 +33,8 @@ export default function FamilyAccessAdminPage() {
     apiRequest<Patient>(`/patients/${patientId}`).then(setPatient);
     apiRequest<FamilyAccess[]>(`/patients/${patientId}/family-accesses`).then(setAccesses);
     apiRequest<FamilyMessage[]>(`/patients/${patientId}/family-messages`).then(setMessages);
+    apiRequest<FamilyRoutineLog[]>(`/patients/${patientId}/routine-logs`).then(setRoutineLogs);
+    apiRequest<FamilyAudioMessage[]>(`/patients/${patientId}/audio-messages`).then(setAudioMessages);
   }
 
   useEffect(load, [patientId]);
@@ -161,6 +170,40 @@ export default function FamilyAccessAdminPage() {
             Enviar
           </button>
         </form>
+      </div>
+
+      <div className="bg-white rounded-card shadow-sm p-6 mt-6">
+        <h2 className="font-semibold text-brand-navy mb-1">Registros de rotina</h2>
+        <p className="text-xs text-neutralState mb-3">
+          Sono, alimentação, humor ou eventos enviados pela família — visível antes do próximo atendimento.
+        </p>
+        <div className="space-y-2 max-h-64 overflow-y-auto">
+          {routineLogs.map((log) => (
+            <div key={log.id} className="bg-slate-50 rounded-btn px-3 py-2 text-sm">
+              <div className="text-xs text-neutralState">
+                {log.submitted_by_name} — {formatDateTime(log.created_at)}
+              </div>
+              <div>{log.content}</div>
+            </div>
+          ))}
+          {routineLogs.length === 0 && <p className="text-sm text-neutralState">Nenhum registro enviado ainda.</p>}
+        </div>
+      </div>
+
+      <div className="bg-white rounded-card shadow-sm p-6 mt-6">
+        <h2 className="font-semibold text-brand-navy mb-1">Notas de voz</h2>
+        <p className="text-xs text-neutralState mb-3">Transcritas no navegador do responsável, sem áudio gravado.</p>
+        <div className="space-y-2 max-h-64 overflow-y-auto">
+          {audioMessages.map((m) => (
+            <div key={m.id} className="bg-slate-50 rounded-btn px-3 py-2 text-sm">
+              <div className="text-xs text-neutralState">
+                {m.submitted_by_name} — {formatDateTime(m.created_at)}
+              </div>
+              <div>{m.transcription_text}</div>
+            </div>
+          ))}
+          {audioMessages.length === 0 && <p className="text-sm text-neutralState">Nenhuma nota de voz enviada ainda.</p>}
+        </div>
       </div>
     </div>
   );

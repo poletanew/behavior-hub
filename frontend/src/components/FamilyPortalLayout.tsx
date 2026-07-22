@@ -1,8 +1,9 @@
-import { Outlet } from "react-router-dom";
+import { Outlet, useLocation } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 
 export default function FamilyPortalLayout() {
   const { user, logout } = useAuth();
+  const location = useLocation();
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -18,7 +19,9 @@ export default function FamilyPortalLayout() {
           </button>
         </div>
       </header>
-      <Outlet />
+      <div key={location.pathname} className="animate-fade-in">
+        <Outlet />
+      </div>
     </div>
   );
 }

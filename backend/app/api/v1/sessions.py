@@ -1,6 +1,6 @@
 import uuid
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, File, Form, UploadFile, status
 from sqlalchemy.orm import Session
 
 from app.core.deps import get_current_user
@@ -9,6 +9,7 @@ from app.models.user import User
 from app.schemas.session import (
     AddTrainingsRequest,
     SessionCreateRequest,
+    SessionMediaUrlResponse,
     SessionResponse,
     SessionTrainingProgressResponse,
     TrialCreateRequest,
@@ -137,3 +138,20 @@ def duplicate_session(
 ):
     """Seção 32.4 — duplicar a sessão anterior do mesmo paciente como ponto de partida."""
     return session_template_service.duplicate_session(db, user, session_id, payload)
+
+
+@router.post("/sessions/{session_id}/media", response_model=SessionResponse)
+async def upload_session_media(
+    session_id: uuid.UUID,
+    duration_seconds: int | None = Form(default=None),
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """Addendum v3.0, RF-20 — "Foto" (Seção 11.2) vira "Foto/Vídeo"."""
+    return await session_service.upload_session_media(db, user, session_id, file=file, duration_seconds=duration_seconds)
+
+
+@router.get("/sessions/{session_id}/media-url", response_model=SessionMediaUrlResponse)
+def get_session_media_url(session_id: uuid.UUID, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+    return session_service.get_session_media_url(db, user, session_id)

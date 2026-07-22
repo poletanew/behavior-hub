@@ -34,6 +34,8 @@ class FamilyAccess(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     can_view_team_guidance: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     can_view_home_materials: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     can_use_messaging: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    # Addendum v3.0, RF-29.
+    can_submit_routine_logs: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 
     # Seção 17.2 — "Revogação... deve ser imediata e registrada em audit log,
     # com encerramento de sessões ativas do responsável" (ver User.token_version).
@@ -53,3 +55,31 @@ class FamilyMessage(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     patient_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("patients.id"), nullable=False, index=True)
     sender_user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"), nullable=False)
     body: Mapped[str] = mapped_column(Text, nullable=False)
+
+
+class FamilyRoutineLog(Base, UUIDPrimaryKeyMixin, TimestampMixin):
+    """Addendum v3.0, RF-29 — registro de rotina (sono/alimentação/humor/
+    eventos) enviado pela família, visível à equipe antes do próximo
+    atendimento. Sempre enviado pela família (nunca pela equipe) — diferente
+    de FamilyMessage, que é bidirecional."""
+
+    __tablename__ = "family_routine_logs"
+
+    patient_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("patients.id"), nullable=False, index=True)
+    submitted_by_user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"), nullable=False)
+    content: Mapped[str] = mapped_column(Text, nullable=False)
+
+
+class FamilyAudioMessage(Base, UUIDPrimaryKeyMixin, TimestampMixin):
+    """Addendum v3.0, RF-30 — "nota de voz" da família para a equipe.
+    Transcrita inteiramente no navegador do responsável via Web Speech API
+    (mesmo padrão do Bloco 5 da Fase 5, `useSpeechToText`/`VoiceDictationButton`),
+    para não depender de um provedor de STT pago no servidor. Só o texto
+    transcrito é armazenado — não existe upload/retenção de áudio bruto neste
+    MVP, já que a transcrição em si é o conteúdo clinicamente relevante."""
+
+    __tablename__ = "family_audio_messages"
+
+    patient_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("patients.id"), nullable=False, index=True)
+    submitted_by_user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"), nullable=False)
+    transcription_text: Mapped[str] = mapped_column(Text, nullable=False)

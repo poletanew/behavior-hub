@@ -2,16 +2,18 @@ import datetime
 import uuid
 
 from fastapi import HTTPException, status
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.models.appointment import Appointment
+from app.models.audit_log import AuditLog
 from app.models.enums import AppointmentStatus, ReportSummaryStatus, UserType
-from app.models.family_access import FamilyAccess, FamilyMessage
+from app.models.family_access import FamilyAccess, FamilyAudioMessage, FamilyMessage, FamilyRoutineLog
 from app.models.patient import Patient
 from app.models.report_summary import ReportSummary
 from app.models.resource import Resource
 from app.models.resource_link import ResourceLink
-from app.models.treatment_plan import Objective, ObjectiveTraining, TreatmentPlan
+from app.models.treatment_plan import Objective, ObjectiveApplier, ObjectiveTraining, TreatmentPlan
 from app.models.user import User
 from app.services import audit_service, report_service, white_label_service
 from app.services.resource_link_service import _to_response as _resource_link_response
@@ -62,6 +64,7 @@ def list_my_accesses(db: Session, family_user: User) -> list[dict]:
             "can_view_team_guidance": access.can_view_team_guidance,
             "can_view_home_materials": access.can_view_home_materials,
             "can_use_messaging": access.can_use_messaging,
+            "can_submit_routine_logs": access.can_submit_routine_logs,
         }
         for access, patient in rows
     ]
@@ -274,3 +277,193 @@ def post_message_for_team(db: Session, staff_user: User, patient_id: uuid.UUID, 
         "body": message.body,
         "created_at": message.created_at,
     }
+
+
+def list_applier_objectives(db: Session, family_user: User, patient_id: uuid.UUID) -> list[dict]:
+    """Addendum v3.0, RF-25 — objetivos em que este responsável foi marcado
+    como aplicador (ObjectiveTraining/treatment_plan_service.add_applier),
+    com indicação se "apliquei hoje" já foi registrado. Diferente das demais
+    seções do Family Portal, RF-25 não depende de nenhuma flag de
+    FamilyAccess: ser aplicador de um objetivo específico já é, em si, a
+    autorização concedida objetivo a objetivo pelo profissional — mas ainda
+    exige acesso ativo ao paciente (_get_active_access), para não vazar dados
+    de um paciente cujo consentimento já foi revogado."""
+    _get_active_access(db, family_user, patient_id)
+
+    rows = (
+        db.query(ObjectiveApplier, Objective)
+        .join(Objective, ObjectiveApplier.objective_id == Objective.id)
+        .join(TreatmentPlan, Objective.plan_id == TreatmentPlan.id)
+        .filter(
+            ObjectiveApplier.applier_user_id == family_user.id,
+            TreatmentPlan.patient_id == patient_id,
+            Objective.deleted_at.is_(None),
+        )
+        .all()
+    )
+    today = datetime.date.today()
+    result = []
+    for _applier, objective in rows:
+        applied_today = (
+            db.query(AuditLog)
+            .filter(
+                AuditLog.entity_type == "objective",
+                AuditLog.entity_id == objective.id,
+                AuditLog.action == "objective_applied",
+                AuditLog.actor_user_id == family_user.id,
+                func.date(AuditLog.timestamp) == today,
+            )
+            .first()
+            is not None
+        )
+        result.append(
+            {"objective_id": objective.id, "title": objective.title, "area": objective.area, "applied_today": applied_today}
+        )
+    return result
+
+
+def record_objective_application(
+    db: Session, family_user: User, patient_id: uuid.UUID, objective_id: uuid.UUID, notes: str | None
+) -> dict:
+    """Addendum v3.0, RF-25 — "registrar 'apliquei hoje'... isso aparece no
+    histórico do objetivo para o profissional ver": reaproveita o AuditLog
+    (mesmo mecanismo de treatment_plan_service.get_history), sem tabela nova."""
+    _get_active_access(db, family_user, patient_id)
+
+    applier = (
+        db.query(ObjectiveApplier)
+        .filter(ObjectiveApplier.objective_id == objective_id, ObjectiveApplier.applier_user_id == family_user.id)
+        .first()
+    )
+    if applier is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="You are not registered as an applier for this objective")
+
+    objective = db.get(Objective, objective_id)
+    plan = db.get(TreatmentPlan, objective.plan_id) if objective else None
+    if objective is None or objective.deleted_at is not None or plan is None or plan.patient_id != patient_id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Objective not found")
+
+    audit_service.record(
+        db,
+        actor_user_id=family_user.id,
+        action="objective_applied",
+        entity_type="objective",
+        entity_id=objective.id,
+        after={"applier": "parent", "notes": notes},
+    )
+    db.commit()
+    return {"objective_id": objective.id, "applied_at": datetime.datetime.now(datetime.timezone.utc)}
+
+
+def _routine_log_response(log: FamilyRoutineLog, submitted_by_name: str) -> dict:
+    return {
+        "id": log.id,
+        "patient_id": log.patient_id,
+        "submitted_by_user_id": log.submitted_by_user_id,
+        "submitted_by_name": submitted_by_name,
+        "content": log.content,
+        "created_at": log.created_at,
+    }
+
+
+def _list_routine_logs(db: Session, patient_id: uuid.UUID) -> list[dict]:
+    rows = (
+        db.query(FamilyRoutineLog, User.name)
+        .join(User, FamilyRoutineLog.submitted_by_user_id == User.id)
+        .filter(FamilyRoutineLog.patient_id == patient_id)
+        .order_by(FamilyRoutineLog.created_at.desc())
+        .all()
+    )
+    return [_routine_log_response(log, name) for log, name in rows]
+
+
+def list_routine_logs(db: Session, family_user: User, patient_id: uuid.UUID) -> list[dict]:
+    access = _get_active_access(db, family_user, patient_id)
+    _require_category(access, "can_submit_routine_logs")
+    return _list_routine_logs(db, patient_id)
+
+
+def create_routine_log(db: Session, family_user: User, patient_id: uuid.UUID, content: str) -> dict:
+    access = _get_active_access(db, family_user, patient_id)
+    _require_category(access, "can_submit_routine_logs")
+
+    log = FamilyRoutineLog(patient_id=patient_id, submitted_by_user_id=family_user.id, content=content)
+    db.add(log)
+    db.flush()
+    audit_service.record(
+        db,
+        actor_user_id=family_user.id,
+        action="family_routine_log_submitted",
+        entity_type="family_routine_log",
+        entity_id=log.id,
+    )
+    db.commit()
+    db.refresh(log)
+    return _routine_log_response(log, family_user.name)
+
+
+def list_routine_logs_for_team(db: Session, staff_user: User, patient_id: uuid.UUID) -> list[dict]:
+    """Lado da equipe — Seção 29.6/RF-29: visível antes do próximo atendimento."""
+    from app.services import patient_service
+
+    patient_service.get_patient_or_404(db, staff_user, patient_id)
+    return _list_routine_logs(db, patient_id)
+
+
+def _audio_message_response(message: FamilyAudioMessage, submitted_by_name: str) -> dict:
+    return {
+        "id": message.id,
+        "patient_id": message.patient_id,
+        "submitted_by_user_id": message.submitted_by_user_id,
+        "submitted_by_name": submitted_by_name,
+        "transcription_text": message.transcription_text,
+        "created_at": message.created_at,
+    }
+
+
+def _list_audio_messages(db: Session, patient_id: uuid.UUID) -> list[dict]:
+    rows = (
+        db.query(FamilyAudioMessage, User.name)
+        .join(User, FamilyAudioMessage.submitted_by_user_id == User.id)
+        .filter(FamilyAudioMessage.patient_id == patient_id)
+        .order_by(FamilyAudioMessage.created_at.desc())
+        .all()
+    )
+    return [_audio_message_response(message, name) for message, name in rows]
+
+
+def list_audio_messages(db: Session, family_user: User, patient_id: uuid.UUID) -> list[dict]:
+    """Addendum v3.0, RF-30 — reaproveita a mesma categoria de whitelist de
+    mensagens de texto (can_use_messaging): é outro formato de mensagem para a
+    equipe, não uma categoria de dados nova."""
+    access = _get_active_access(db, family_user, patient_id)
+    _require_category(access, "can_use_messaging")
+    return _list_audio_messages(db, patient_id)
+
+
+def create_audio_message(db: Session, family_user: User, patient_id: uuid.UUID, transcription_text: str) -> dict:
+    access = _get_active_access(db, family_user, patient_id)
+    _require_category(access, "can_use_messaging")
+
+    message = FamilyAudioMessage(
+        patient_id=patient_id, submitted_by_user_id=family_user.id, transcription_text=transcription_text
+    )
+    db.add(message)
+    db.flush()
+    audit_service.record(
+        db,
+        actor_user_id=family_user.id,
+        action="family_audio_message_sent",
+        entity_type="family_audio_message",
+        entity_id=message.id,
+    )
+    db.commit()
+    db.refresh(message)
+    return _audio_message_response(message, family_user.name)
+
+
+def list_audio_messages_for_team(db: Session, staff_user: User, patient_id: uuid.UUID) -> list[dict]:
+    from app.services import patient_service
+
+    patient_service.get_patient_or_404(db, staff_user, patient_id)
+    return _list_audio_messages(db, patient_id)

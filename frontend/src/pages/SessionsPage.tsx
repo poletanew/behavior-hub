@@ -1,6 +1,7 @@
 import { FormEvent, useEffect, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { apiRequest } from "../api/client";
+import EmptyState from "../components/EmptyState";
 import { ClinicalSession, Patient, Training, TrainingCategory, User } from "../types";
 import { useAuth } from "../context/AuthContext";
 import { professionalDisplayName } from "../utils/specialty";
@@ -181,9 +182,7 @@ export default function SessionsPage() {
       {loading ? (
         <p className="text-neutralState">Carregando...</p>
       ) : sessions.length === 0 ? (
-        <div className="bg-white rounded-card shadow-sm p-10 text-center text-neutralState">
-          Nenhuma sessão registrada ainda.
-        </div>
+        <EmptyState icon="🗒️" message="Nenhuma sessão registrada ainda." />
       ) : (
         <div className="bg-white rounded-card shadow-sm divide-y divide-slate-100">
           {sessions.map((session) => {

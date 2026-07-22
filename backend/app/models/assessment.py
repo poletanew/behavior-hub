@@ -1,7 +1,7 @@
 import datetime
 import uuid
 
-from sqlalchemy import JSON, Date, ForeignKey, Text, UniqueConstraint
+from sqlalchemy import JSON, Date, DateTime, ForeignKey, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base import Base, SoftDeleteMixin, TimestampMixin, UUIDPrimaryKeyMixin
@@ -33,3 +33,10 @@ class Assessment(Base, UUIDPrimaryKeyMixin, TimestampMixin, SoftDeleteMixin):
     applied_date: Mapped[datetime.date] = mapped_column(Date, nullable=False)
     raw_scores: Mapped[list] = mapped_column(JSON, nullable=False)
     summary: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    # Addendum v2.1, RF-06 — ao concluir a avaliação (esta própria criação), um
+    # rascunho de objetivos por domínio de menor desempenho é gerado e guardado
+    # aqui; "ativar" (endpoint dedicado) é que de fato cria os Objectives reais,
+    # sempre por confirmação explícita do profissional.
+    ai_generated_plan_draft: Mapped[list | None] = mapped_column(JSON, nullable=True)
+    plan_draft_activated_at: Mapped[datetime.datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)

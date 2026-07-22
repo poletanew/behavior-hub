@@ -1,9 +1,27 @@
 import { useEffect, useState } from "react";
 import { apiRequest } from "../api/client";
-import { ManagerDashboardData } from "../types";
+import { ChurnRiskLabel, FinancialOutlook, ManagerDashboardData, ProgramPerformanceRow } from "../types";
+
+const CHURN_RISK_LABELS: Record<ChurnRiskLabel, string> = {
+  baixo: "Baixo",
+  alto: "Alto",
+  assinatura_encerrada: "Assinatura encerrada",
+  nao_aplicavel: "Não aplicável (plano Free)",
+};
+
+const CHURN_RISK_COLORS: Record<ChurnRiskLabel, string> = {
+  baixo: "bg-success/10 text-success",
+  alto: "bg-danger/10 text-danger",
+  assinatura_encerrada: "bg-slate-200 text-neutralState",
+  nao_aplicavel: "bg-slate-200 text-neutralState",
+};
+
+const PLAN_LABELS: Record<string, string> = { free: "Free", basic: "Basic", premium: "Premium", enterprise: "Enterprise" };
 
 export default function ManagerDashboardPage() {
   const [data, setData] = useState<ManagerDashboardData | null>(null);
+  const [programRows, setProgramRows] = useState<ProgramPerformanceRow[] | null>(null);
+  const [financialOutlook, setFinancialOutlook] = useState<FinancialOutlook | null>(null);
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
 
@@ -19,6 +37,11 @@ export default function ManagerDashboardPage() {
   }
 
   useEffect(load, []);
+
+  useEffect(() => {
+    apiRequest<ProgramPerformanceRow[]>("/clinic/manager-dashboard/program-performance").then(setProgramRows);
+    apiRequest<FinancialOutlook>("/clinic/manager-dashboard/financial-outlook").then(setFinancialOutlook);
+  }, []);
 
   return (
     <div>
@@ -81,10 +104,78 @@ export default function ManagerDashboardPage() {
         </div>
       )}
 
-      <p className="text-xs text-neutralState mt-6">
-        Indicadores de receita e taxa de faturamento não estão disponíveis: o Behavior Hub ainda não tem
-        um módulo de cobrança por paciente/sessão — apenas a assinatura da própria clínica (ver Planos).
+      <h2 className="text-lg font-semibold text-brand-navy mt-8 mb-2">Desempenho do Programa</h2>
+      <p className="text-sm text-neutralState mb-4">
+        Addendum v3.0, RF-32 — agregado por treino da Training Library, restrito a treinos aplicados
+        a pelo menos 2 pacientes distintos.
       </p>
+      {!programRows ? (
+        <p className="text-neutralState">Carregando...</p>
+      ) : programRows.length === 0 ? (
+        <div className="bg-white rounded-card shadow-sm p-6 text-center text-neutralState">
+          Nenhum treino atingiu o mínimo de 2 pacientes ainda.
+        </div>
+      ) : (
+        <div className="bg-white rounded-card shadow-sm overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-slate-100 text-left text-xs text-neutralState uppercase">
+                <th className="px-4 py-3">Treino</th>
+                <th className="px-4 py-3">Pacientes</th>
+                <th className="px-4 py-3">Objetivos</th>
+                <th className="px-4 py-3">Taxa de domínio</th>
+                <th className="px-4 py-3">Tempo médio até dominar</th>
+              </tr>
+            </thead>
+            <tbody>
+              {programRows.map((row) => (
+                <tr key={row.training_id} className="border-b border-slate-50 last:border-0">
+                  <td className="px-4 py-3 font-medium">{row.training_title}</td>
+                  <td className="px-4 py-3">{row.patients_count}</td>
+                  <td className="px-4 py-3">{row.objectives_count}</td>
+                  <td className="px-4 py-3">{row.mastery_rate_pct}%</td>
+                  <td className="px-4 py-3">
+                    {row.average_days_to_mastery === null ? "—" : `${row.average_days_to_mastery} dias`}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      <h2 className="text-lg font-semibold text-brand-navy mt-8 mb-2">Previsibilidade Financeira</h2>
+      <p className="text-sm text-neutralState mb-4">
+        Addendum v3.0, RF-32 — usa apenas os dados da própria assinatura da clínica com o Behavior
+        Hub (Seção 8.3); não há hoje um valor de receita recorrente por paciente para agregar.
+      </p>
+      {!financialOutlook ? (
+        <p className="text-neutralState">Carregando...</p>
+      ) : (
+        <div className="bg-white rounded-card shadow-sm p-5 max-w-md flex items-center justify-between gap-4">
+          <div>
+            <div className="text-sm">
+              Plano atual: <span className="font-semibold">{PLAN_LABELS[financialOutlook.subscription_plan]}</span>
+            </div>
+            <div className="text-sm text-neutralState mt-1">
+              {financialOutlook.current_period_end
+                ? `Renovação em ${new Date(financialOutlook.current_period_end).toLocaleDateString("pt-BR")}${
+                    financialOutlook.days_until_renewal !== null
+                      ? ` (${financialOutlook.days_until_renewal} dias)`
+                      : ""
+                  }`
+                : "Sem data de renovação (plano sem assinatura ativa)"}
+            </div>
+          </div>
+          <span
+            className={`text-xs uppercase font-semibold px-2 py-1 rounded-full shrink-0 ${
+              CHURN_RISK_COLORS[financialOutlook.churn_risk_label]
+            }`}
+          >
+            Risco: {CHURN_RISK_LABELS[financialOutlook.churn_risk_label]}
+          </span>
+        </div>
+      )}
     </div>
   );
 }

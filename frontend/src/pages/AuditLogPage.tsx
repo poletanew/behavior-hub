@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { apiRequest, ApiError } from "../api/client";
-import { AuditLogEntry } from "../types";
+import EmptyState from "../components/EmptyState";
+import { AuditLogEntry, Patient } from "../types";
 
 const ENTITY_TYPE_OPTIONS = [
   { value: "", label: "Todos os tipos" },
@@ -10,6 +11,12 @@ const ENTITY_TYPE_OPTIONS = [
   { value: "resource", label: "Recurso" },
   { value: "session", label: "Atendimento" },
   { value: "trial", label: "Tentativa" },
+  { value: "behavior_event", label: "Comportamento-alvo (ABC)" },
+  { value: "reinforcer", label: "Reforçador" },
+  { value: "anamnesis", label: "Anamnese" },
+  { value: "checklist_response", label: "Checklist aplicado" },
+  { value: "family_routine_log", label: "Registro de rotina" },
+  { value: "family_audio_message", label: "Nota de voz da família" },
   { value: "report_summary", label: "Resumo de relatório" },
   { value: "clinic", label: "Clínica" },
   { value: "invitation", label: "Convite" },
@@ -49,15 +56,33 @@ const ACTION_LABELS: Record<string, string> = {
   resource_restored: "Recurso restaurado",
   report_summary_generated: "Resumo de relatório gerado",
   report_summary_updated: "Resumo de relatório editado",
+  password_changed: "Senha alterada",
+  user_name_updated: "Nome de usuário atualizado",
+  behavior_event_created: "Comportamento-alvo registrado (ABC)",
+  reinforcer_created: "Reforçador cadastrado",
+  session_media_uploaded: "Foto/vídeo anexado ao atendimento",
+  anamnesis_created: "Anamnese registrada",
+  anamnesis_updated: "Anamnese atualizada",
+  checklist_applied: "Checklist aplicado",
+  family_routine_log_submitted: "Registro de rotina enviado pela família",
+  family_audio_message_sent: "Nota de voz enviada pela família",
 };
 
 export default function AuditLogPage() {
+  const [viewMode, setViewMode] = useState<"action" | "patient">("action");
+
   const [entries, setEntries] = useState<AuditLogEntry[]>([]);
   const [entityType, setEntityType] = useState("");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  const [patients, setPatients] = useState<Patient[]>([]);
+  const [patientSearch, setPatientSearch] = useState("");
+  const [selectedPatientId, setSelectedPatientId] = useState("");
+  const [patientTrail, setPatientTrail] = useState<AuditLogEntry[] | null>(null);
+  const [patientTrailError, setPatientTrailError] = useState<string | null>(null);
 
   function load() {
     setLoading(true);
@@ -79,6 +104,21 @@ export default function AuditLogPage() {
   }
 
   useEffect(load, [entityType, dateFrom, dateTo]);
+  useEffect(() => {
+    apiRequest<Patient[]>("/patients").then(setPatients);
+  }, []);
+
+  function openPatientTrail(patientId: string) {
+    setSelectedPatientId(patientId);
+    setPatientTrail(null);
+    setPatientTrailError(null);
+    apiRequest<AuditLogEntry[]>(`/audit-logs/patients/${patientId}`)
+      .then(setPatientTrail)
+      .catch(() => setPatientTrailError("Não foi possível carregar a auditoria deste paciente."));
+  }
+
+  const filteredPatients = patients.filter((p) => p.name.toLowerCase().includes(patientSearch.toLowerCase()));
+  const selectedPatient = patients.find((p) => p.id === selectedPatientId);
 
   return (
     <div>
@@ -87,75 +127,155 @@ export default function AuditLogPage() {
         Registro de ações relevantes na sua clínica, isolado por tenant.
       </p>
 
-      <div className="bg-white rounded-card shadow-sm p-4 mb-6 flex flex-wrap gap-4 items-end">
-        <div>
-          <label className="block text-xs font-medium mb-1">Tipo de entidade</label>
-          <select
-            value={entityType}
-            onChange={(e) => setEntityType(e.target.value)}
-            className="h-9 rounded-btn border border-slate-300 px-2 text-sm"
-          >
-            {ENTITY_TYPE_OPTIONS.map((opt) => (
-              <option key={opt.value} value={opt.value}>
-                {opt.label}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div>
-          <label className="block text-xs font-medium mb-1">De</label>
-          <input
-            type="date"
-            value={dateFrom}
-            onChange={(e) => setDateFrom(e.target.value)}
-            className="h-9 rounded-btn border border-slate-300 px-2 text-sm"
-          />
-        </div>
-        <div>
-          <label className="block text-xs font-medium mb-1">Até</label>
-          <input
-            type="date"
-            value={dateTo}
-            onChange={(e) => setDateTo(e.target.value)}
-            className="h-9 rounded-btn border border-slate-300 px-2 text-sm"
-          />
-        </div>
+      <div className="flex gap-2 mb-6">
+        <button
+          onClick={() => setViewMode("action")}
+          className={`rounded-btn px-3 py-1.5 text-sm font-medium ${
+            viewMode === "action" ? "bg-brand-navy text-white" : "bg-white border border-slate-300"
+          }`}
+        >
+          Por ação
+        </button>
+        <button
+          onClick={() => setViewMode("patient")}
+          className={`rounded-btn px-3 py-1.5 text-sm font-medium ${
+            viewMode === "patient" ? "bg-brand-navy text-white" : "bg-white border border-slate-300"
+          }`}
+        >
+          Por paciente
+        </button>
       </div>
 
-      {error && <p className="text-danger text-sm mb-4">{error}</p>}
+      {viewMode === "action" ? (
+        <>
+          <div className="bg-white rounded-card shadow-sm p-4 mb-6 flex flex-wrap gap-4 items-end">
+            <div>
+              <label className="block text-xs font-medium mb-1">Tipo de entidade</label>
+              <select
+                value={entityType}
+                onChange={(e) => setEntityType(e.target.value)}
+                className="h-9 rounded-btn border border-slate-300 px-2 text-sm"
+              >
+                {ENTITY_TYPE_OPTIONS.map((opt) => (
+                  <option key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-medium mb-1">De</label>
+              <input
+                type="date"
+                value={dateFrom}
+                onChange={(e) => setDateFrom(e.target.value)}
+                className="h-9 rounded-btn border border-slate-300 px-2 text-sm"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium mb-1">Até</label>
+              <input
+                type="date"
+                value={dateTo}
+                onChange={(e) => setDateTo(e.target.value)}
+                className="h-9 rounded-btn border border-slate-300 px-2 text-sm"
+              />
+            </div>
+          </div>
 
-      {loading ? (
-        <p className="text-neutralState">Carregando...</p>
-      ) : entries.length === 0 && !error ? (
-        <div className="bg-white rounded-card shadow-sm p-10 text-center text-neutralState">
-          Nenhum registro de auditoria encontrado.
-        </div>
-      ) : !error ? (
-        <div className="bg-white rounded-card shadow-sm overflow-hidden">
-          <table className="w-full text-sm">
-            <thead className="bg-brand-navy text-white">
-              <tr>
-                <th className="text-left px-4 py-3">Data/hora</th>
-                <th className="text-left px-4 py-3">Autor</th>
-                <th className="text-left px-4 py-3">Ação</th>
-                <th className="text-left px-4 py-3">Entidade</th>
-              </tr>
-            </thead>
-            <tbody>
-              {entries.map((entry, idx) => (
-                <tr key={entry.id} className={idx % 2 === 1 ? "bg-slate-50" : undefined}>
-                  <td className="px-4 py-3 whitespace-nowrap">
-                    {new Date(entry.timestamp).toLocaleString("pt-BR")}
-                  </td>
-                  <td className="px-4 py-3">{entry.actor_name ?? "Sistema"}</td>
-                  <td className="px-4 py-3">{ACTION_LABELS[entry.action] ?? entry.action}</td>
-                  <td className="px-4 py-3">{ENTITY_TYPE_LABELS[entry.entity_type] ?? entry.entity_type}</td>
-                </tr>
+          {error && <p className="text-danger text-sm mb-4">{error}</p>}
+
+          {loading ? (
+            <p className="text-neutralState">Carregando...</p>
+          ) : entries.length === 0 && !error ? (
+            <EmptyState icon="🔍" message="Nenhum registro de auditoria encontrado." />
+          ) : !error ? (
+            <div className="bg-white rounded-card shadow-sm overflow-hidden">
+              <table className="w-full text-sm">
+                <thead className="bg-brand-navy text-white">
+                  <tr>
+                    <th className="text-left px-4 py-3">Data/hora</th>
+                    <th className="text-left px-4 py-3">Autor</th>
+                    <th className="text-left px-4 py-3">Ação</th>
+                    <th className="text-left px-4 py-3">Entidade</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {entries.map((entry, idx) => (
+                    <tr key={entry.id} className={idx % 2 === 1 ? "bg-slate-50" : undefined}>
+                      <td className="px-4 py-3 whitespace-nowrap">
+                        {new Date(entry.timestamp).toLocaleString("pt-BR")}
+                      </td>
+                      <td className="px-4 py-3">{entry.actor_name ?? "Sistema"}</td>
+                      <td className="px-4 py-3">{ACTION_LABELS[entry.action] ?? entry.action}</td>
+                      <td className="px-4 py-3">{ENTITY_TYPE_LABELS[entry.entity_type] ?? entry.entity_type}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : null}
+        </>
+      ) : (
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="bg-white rounded-card shadow-sm p-4">
+            <input
+              placeholder="Buscar paciente por nome..."
+              value={patientSearch}
+              onChange={(e) => setPatientSearch(e.target.value)}
+              className="w-full h-9 rounded-btn border border-slate-300 px-2 text-sm mb-3"
+            />
+            <ul className="divide-y divide-slate-100 max-h-[60vh] overflow-y-auto">
+              {filteredPatients.map((p) => (
+                <li key={p.id}>
+                  <button
+                    onClick={() => openPatientTrail(p.id)}
+                    className={`w-full text-left px-2 py-2 text-sm rounded-btn ${
+                      selectedPatientId === p.id ? "bg-brand-turquoise/10" : "hover:bg-slate-50"
+                    }`}
+                  >
+                    {p.name}
+                  </button>
+                </li>
               ))}
-            </tbody>
-          </table>
+              {filteredPatients.length === 0 && (
+                <li className="text-neutralState text-sm px-2 py-2">Nenhum paciente encontrado.</li>
+              )}
+            </ul>
+          </div>
+
+          <div className="lg:col-span-2 bg-white rounded-card shadow-sm p-4">
+            {!selectedPatientId ? (
+              <p className="text-neutralState text-sm">Selecione um paciente à esquerda para ver sua auditoria.</p>
+            ) : patientTrailError ? (
+              <p className="text-danger text-sm">{patientTrailError}</p>
+            ) : patientTrail === null ? (
+              <p className="text-neutralState text-sm">Carregando...</p>
+            ) : (
+              <>
+                <h2 className="font-semibold text-brand-navy mb-3">
+                  Auditoria de {selectedPatient?.name} — todas as ações de todos os profissionais
+                </h2>
+                {patientTrail.length === 0 ? (
+                  <p className="text-neutralState text-sm">Nenhuma ação registrada para este paciente ainda.</p>
+                ) : (
+                  <ul className="space-y-2">
+                    {patientTrail.map((entry) => (
+                      <li key={entry.id} className="border-b border-slate-50 pb-2 text-sm">
+                        <span className="text-neutralState">{new Date(entry.timestamp).toLocaleString("pt-BR")}</span>
+                        {" — "}
+                        <span className="font-medium">{entry.actor_name ?? "Sistema"}</span>
+                        {": "}
+                        <span>{ACTION_LABELS[entry.action] ?? entry.action}</span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </>
+            )}
+          </div>
         </div>
-      ) : null}
+      )}
     </div>
   );
 }

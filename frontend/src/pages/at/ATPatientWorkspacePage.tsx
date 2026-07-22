@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { apiRequest } from "../../api/client";
+import EmptyState from "../../components/EmptyState";
 import { ClinicalSession, SessionTrainingProgress, TrainingPatientLink } from "../../types";
 
 const RESULT_LABELS: Record<string, string> = {
@@ -128,9 +129,7 @@ export default function ATPatientWorkspacePage() {
       {links === null ? (
         <p className="text-neutralState">Carregando...</p>
       ) : links.length === 0 ? (
-        <div className="bg-white rounded-card shadow-sm p-10 text-center text-neutralState">
-          Nenhum treino prescrito para este paciente ainda.
-        </div>
+        <EmptyState icon="🎯" message="Nenhum treino prescrito para este paciente ainda." />
       ) : (
         <div className="bg-white rounded-card shadow-sm divide-y divide-slate-100 mb-6">
           {links.map((link) => {

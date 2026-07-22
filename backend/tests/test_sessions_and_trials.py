@@ -1,4 +1,14 @@
+from app.models.clinic import Clinic
+from app.models.enums import SubscriptionPlan, SubscriptionStatus
 from tests.conftest import create_training, create_training_category, register_clinic
+
+
+def _make_paid(db_session, clinic_id, plan=SubscriptionPlan.BASIC):
+    clinic = db_session.query(Clinic).filter(Clinic.id == clinic_id).first()
+    clinic.subscription_plan = plan
+    clinic.subscription_status = SubscriptionStatus.ACTIVE
+    db_session.commit()
+    return clinic
 
 
 def _create_patient(client, headers, name="Paciente Exemplo"):
@@ -177,6 +187,84 @@ def test_deleted_patient_sessions_do_not_appear_in_history(client, db_session):
 
     restore_response = client.post(f"/v1/patients/{patient['id']}/restore", headers=ctx["headers"])
     assert restore_response.status_code == 200
+
+
+def test_free_plan_blocks_session_media_upload(client, db_session, mock_s3):
+    """Addendum v3.0, RF-20 — mesmo bloqueio de plano Free já usado para foto."""
+    ctx = register_clinic(client)
+    patient = _create_patient(client, ctx["headers"])
+    category = create_training_category(db_session)
+    training = create_training(db_session, category)
+    session = _create_session_with_training(client, ctx["headers"], patient["id"], ctx["user"]["id"], str(training.id))
+
+    response = client.post(
+        f"/v1/sessions/{session['id']}/media",
+        files={"file": ("foto.jpg", b"fake-jpeg-bytes", "image/jpeg")},
+        headers=ctx["headers"],
+    )
+    assert response.status_code == 403
+
+
+def test_paid_plan_uploads_photo_to_session(client, db_session, mock_s3):
+    """Addendum v3.0, RF-20 — "Foto" continua funcionando (upload real, não só URL)."""
+    ctx = register_clinic(client)
+    _make_paid(db_session, ctx["user"]["clinic_id"])
+    patient = _create_patient(client, ctx["headers"])
+    category = create_training_category(db_session)
+    training = create_training(db_session, category)
+    session = _create_session_with_training(client, ctx["headers"], patient["id"], ctx["user"]["id"], str(training.id))
+
+    response = client.post(
+        f"/v1/sessions/{session['id']}/media",
+        files={"file": ("foto.jpg", b"fake-jpeg-bytes", "image/jpeg")},
+        headers=ctx["headers"],
+    )
+    assert response.status_code == 200, response.text
+    assert response.json()["media_type"] == "photo"
+
+    url_response = client.get(f"/v1/sessions/{session['id']}/media-url", headers=ctx["headers"])
+    assert url_response.status_code == 200
+    assert url_response.json()["media_type"] == "photo"
+    assert url_response.json()["url"].startswith("http")
+
+
+def test_paid_plan_uploads_short_video_to_session(client, db_session, mock_s3):
+    """Addendum v3.0, RF-20 — "campo Foto vira Foto/Vídeo", upload de vídeo curto."""
+    ctx = register_clinic(client)
+    _make_paid(db_session, ctx["user"]["clinic_id"], plan=SubscriptionPlan.PREMIUM)
+    patient = _create_patient(client, ctx["headers"])
+    category = create_training_category(db_session)
+    training = create_training(db_session, category)
+    session = _create_session_with_training(client, ctx["headers"], patient["id"], ctx["user"]["id"], str(training.id))
+
+    response = client.post(
+        f"/v1/sessions/{session['id']}/media",
+        data={"duration_seconds": "20"},
+        files={"file": ("clipe.mp4", b"fake-mp4-bytes", "video/mp4")},
+        headers=ctx["headers"],
+    )
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["media_type"] == "video"
+    assert body["media_duration_seconds"] == 20
+
+
+def test_video_upload_rejects_duration_over_plan_limit(client, db_session, mock_s3):
+    """RF-20 — "limite de duração ... configurável por plano"."""
+    ctx = register_clinic(client)
+    _make_paid(db_session, ctx["user"]["clinic_id"], plan=SubscriptionPlan.BASIC)
+    patient = _create_patient(client, ctx["headers"])
+    category = create_training_category(db_session)
+    training = create_training(db_session, category)
+    session = _create_session_with_training(client, ctx["headers"], patient["id"], ctx["user"]["id"], str(training.id))
+
+    response = client.post(
+        f"/v1/sessions/{session['id']}/media",
+        data={"duration_seconds": "999"},
+        files={"file": ("clipe.mp4", b"fake-mp4-bytes", "video/mp4")},
+        headers=ctx["headers"],
+    )
+    assert response.status_code == 422
 
     listing_after_restore = client.get("/v1/sessions", headers=ctx["headers"])
     assert len(listing_after_restore.json()) == 1

@@ -5,7 +5,9 @@ import uuid
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 
+from app.models.behavior_event import BehaviorEvent
 from app.models.enums import TrialResult
+from app.models.reinforcer import Reinforcer, SessionReinforcer
 from app.models.session import ClinicalSession, SessionTraining, Trial
 from app.models.training import Training, TrainingCategory
 from app.models.user import User
@@ -216,6 +218,82 @@ def build_cumulative_data(rows: list[_TrialRow]) -> list[dict]:
     return points
 
 
+def build_behavior_frequency_data(
+    db: Session,
+    patient_id: uuid.UUID,
+    *,
+    date_from: datetime.date | None,
+    date_to: datetime.date | None,
+) -> list[dict]:
+    """Addendum v3.0, RF-34 — frequência/duração de comportamentos-alvo (RF-18) ao
+    longo do tempo, agrupados pelo texto do próprio comportamento registrado
+    (não existe uma categoria/nome fixo para behavior-alvo, então o texto
+    exato é o único identificador estável de "qual comportamento" ao longo
+    de várias sessões)."""
+    query = db.query(BehaviorEvent).filter(BehaviorEvent.patient_id == patient_id)
+    if date_from is not None:
+        query = query.filter(BehaviorEvent.occurred_at >= date_from)
+    if date_to is not None:
+        query = query.filter(BehaviorEvent.occurred_at <= datetime.datetime.combine(date_to, datetime.time.max))
+
+    by_behavior: dict[str, dict] = {}
+    for event in query.all():
+        entry = by_behavior.setdefault(event.behavior, {"total_events": 0, "by_date": collections.defaultdict(lambda: [0, 0])})
+        entry["total_events"] += 1
+        day_totals = entry["by_date"][event.occurred_at.date()]
+        day_totals[0] += event.frequency_count or 1
+        day_totals[1] += event.duration_seconds or 0
+
+    return [
+        {
+            "behavior": behavior,
+            "total_events": entry["total_events"],
+            "points": [
+                {"date": d, "frequency_count": totals[0], "duration_seconds": totals[1]}
+                for d, totals in sorted(entry["by_date"].items())
+            ],
+        }
+        for behavior, entry in sorted(by_behavior.items(), key=lambda kv: kv[1]["total_events"], reverse=True)
+    ]
+
+
+def build_reinforcer_usage_data(
+    db: Session,
+    patient_id: uuid.UUID,
+    *,
+    date_from: datetime.date | None,
+    date_to: datetime.date | None,
+) -> list[dict]:
+    """Addendum v3.0, RF-34 — frequência de uso de cada reforçador cadastrado
+    (RF-19) no período filtrado, mesma fonte já usada pelo cadastro de
+    reforçadores (`reinforcer_service.list_reinforcers`), aqui escopada pelas
+    mesmas datas do restante do relatório."""
+    query = (
+        db.query(SessionReinforcer.reinforcer_id, Reinforcer.name, ClinicalSession.occurred_at)
+        .join(Reinforcer, Reinforcer.id == SessionReinforcer.reinforcer_id)
+        .join(ClinicalSession, ClinicalSession.id == SessionReinforcer.session_id)
+        .filter(Reinforcer.patient_id == patient_id, ClinicalSession.deleted_at.is_(None))
+    )
+    if date_from is not None:
+        query = query.filter(ClinicalSession.occurred_at >= date_from)
+    if date_to is not None:
+        query = query.filter(ClinicalSession.occurred_at <= datetime.datetime.combine(date_to, datetime.time.max))
+
+    counts: dict[uuid.UUID, dict] = {}
+    for reinforcer_id, name, _occurred_at in query.all():
+        entry = counts.setdefault(reinforcer_id, {"name": name, "count": 0})
+        entry["count"] += 1
+
+    return sorted(
+        (
+            {"reinforcer_id": rid, "reinforcer_name": entry["name"], "usage_count": entry["count"]}
+            for rid, entry in counts.items()
+        ),
+        key=lambda point: point["usage_count"],
+        reverse=True,
+    )
+
+
 def get_report_data(
     db: Session,
     user: User,
@@ -290,5 +368,7 @@ def get_report_data(
         "radar": build_radar_data(rows),
         "cumulative": build_cumulative_data(rows),
         "heatmap": build_heatmap_data(heatmap_rows),
+        "behavior_frequency": build_behavior_frequency_data(db, patient_id, date_from=date_from, date_to=date_to),
+        "reinforcer_usage": build_reinforcer_usage_data(db, patient_id, date_from=date_from, date_to=date_to),
         "comparison": comparison,
     }

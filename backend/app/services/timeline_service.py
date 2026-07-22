@@ -3,8 +3,11 @@ import uuid
 
 from sqlalchemy.orm import Session
 
+from app.models.anamnesis import Anamnesis
 from app.models.assessment import Assessment
 from app.models.audit_log import AuditLog
+from app.models.behavior_event import BehaviorEvent
+from app.models.family_access import FamilyRoutineLog
 from app.models.patient import Patient
 from app.models.report_summary import ReportSummary
 from app.models.session import ClinicalSession
@@ -184,6 +187,41 @@ def _report_entries(db: Session, patient: Patient) -> list[dict]:
     ]
 
 
+def _behavior_event_entries(db: Session, patient: Patient) -> list[dict]:
+    """Addendum v3.0, RF-18 — "ele aparece na timeline clínica do paciente"."""
+    events = db.query(BehaviorEvent).filter(BehaviorEvent.patient_id == patient.id).all()
+    return [
+        {
+            "id": event.id,
+            "event_type": "behavior_event_recorded",
+            "occurred_at": event.occurred_at,
+            "label": f"Comportamento-alvo registrado ({event.intensity.value if event.intensity else 'intensidade não informada'})",
+            "source_type": "behavior_event",
+            "source_id": event.id,
+        }
+        for event in events
+    ]
+
+
+def _anamnesis_entries(db: Session, patient: Patient) -> list[dict]:
+    """Addendum v3.0, RF-21 — "citada na timeline clínica como um evento
+    fundacional do caso": uma entrada, na data de criação (não de cada edição
+    posterior — a anamnese é um formulário vivo, não uma série de eventos)."""
+    anamnesis = db.query(Anamnesis).filter(Anamnesis.patient_id == patient.id).first()
+    if anamnesis is None:
+        return []
+    return [
+        {
+            "id": anamnesis.id,
+            "event_type": "anamnesis_registered",
+            "occurred_at": anamnesis.created_at,
+            "label": "Anamnese registrada",
+            "source_type": "anamnesis",
+            "source_id": anamnesis.id,
+        }
+    ]
+
+
 def _assessment_entries(db: Session, patient: Patient) -> list[dict]:
     """Seção 29.2 — "avaliações aplicadas"."""
     assessments = (
@@ -204,6 +242,24 @@ def _assessment_entries(db: Session, patient: Patient) -> list[dict]:
     ]
 
 
+def _routine_log_entries(db: Session, patient: Patient) -> list[dict]:
+    """Addendum v3.0, RF-29 — "visível ao profissional antes da próxima
+    sessão": reaproveita a Timeline Clínica já consolidada, em vez de exigir
+    uma tela separada só para isso."""
+    logs = db.query(FamilyRoutineLog).filter(FamilyRoutineLog.patient_id == patient.id).all()
+    return [
+        {
+            "id": log.id,
+            "event_type": "family_routine_log_submitted",
+            "occurred_at": log.created_at,
+            "label": "Registro de rotina enviado pela família",
+            "source_type": "family_routine_log",
+            "source_id": log.id,
+        }
+        for log in logs
+    ]
+
+
 def get_patient_timeline(db: Session, patient: Patient) -> list[dict]:
     """Seção 29.2/AC-18 — timeline única consolidando, em ordem cronológica e
     sem duplicados, os eventos clínicos do paciente.
@@ -217,6 +273,9 @@ def get_patient_timeline(db: Session, patient: Patient) -> list[dict]:
         + _assignment_entries(db, patient)
         + _report_entries(db, patient)
         + _assessment_entries(db, patient)
+        + _behavior_event_entries(db, patient)
+        + _anamnesis_entries(db, patient)
+        + _routine_log_entries(db, patient)
     )
     entries.sort(key=lambda e: (e["occurred_at"], str(e["id"])))
     return entries

@@ -2,7 +2,7 @@ import { FormEvent, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { apiDownload, apiRequest, ApiError } from "../api/client";
 import { useAuth } from "../context/AuthContext";
-import { Appointment, AttendanceRate, CancellationReason, Patient, User as UserType } from "../types";
+import { Appointment, AttendanceRate, CancellationReason, Patient, Room, User as UserType } from "../types";
 
 const STATUS_LABELS: Record<string, string> = {
   scheduled: "Agendada",
@@ -68,15 +68,18 @@ export default function AgendaPage() {
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [patients, setPatients] = useState<Patient[]>([]);
   const [professionals, setProfessionals] = useState<UserType[]>([]);
+  const [rooms, setRooms] = useState<Room[]>([]);
   const [professionalFilter, setProfessionalFilter] = useState("");
   const [patientFilter, setPatientFilter] = useState("");
   const [attendanceRate, setAttendanceRate] = useState<AttendanceRate | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [dragError, setDragError] = useState<string | null>(null);
 
   const [showForm, setShowForm] = useState(false);
   const [formPatientId, setFormPatientId] = useState("");
   const [formProfessionalId, setFormProfessionalId] = useState("");
+  const [formRoomId, setFormRoomId] = useState("");
   const [formStart, setFormStart] = useState("");
   const [formEnd, setFormEnd] = useState("");
   const [formNotes, setFormNotes] = useState("");
@@ -107,6 +110,7 @@ export default function AgendaPage() {
 
   useEffect(() => {
     apiRequest<Patient[]>("/patients").then(setPatients);
+    apiRequest<Room[]>("/rooms").then(setRooms);
     if (isClinic) {
       apiRequest<UserType[]>("/professionals").then(setProfessionals);
     }
@@ -132,20 +136,49 @@ export default function AgendaPage() {
           scheduled_start: new Date(formStart).toISOString(),
           scheduled_end: new Date(formEnd).toISOString(),
           notes: formNotes || null,
+          room_id: formRoomId || null,
         },
       });
       setShowForm(false);
       setFormPatientId("");
       setFormProfessionalId("");
+      setFormRoomId("");
       setFormStart("");
       setFormEnd("");
       setFormNotes("");
       load();
     } catch (err) {
       if (err instanceof ApiError && err.status === 409) {
-        setFormError("Este profissional já tem um atendimento nesse horário.");
+        setFormError("Este profissional (ou sala) já tem um atendimento nesse horário.");
       } else {
         setFormError("Não foi possível agendar. Verifique os dados informados.");
+      }
+    }
+  }
+
+  async function handleDropOnDay(appointmentId: string, targetDay: Date) {
+    setDragError(null);
+    const appointment = appointments.find((a) => a.id === appointmentId);
+    if (!appointment) return;
+    const start = new Date(appointment.scheduled_start);
+    const end = new Date(appointment.scheduled_end);
+    const newStart = new Date(targetDay);
+    newStart.setHours(start.getHours(), start.getMinutes(), 0, 0);
+    const durationMs = end.getTime() - start.getTime();
+    const newEnd = new Date(newStart.getTime() + durationMs);
+    if (newStart.toDateString() === start.toDateString()) return;
+
+    try {
+      await apiRequest(`/appointments/${appointmentId}`, {
+        method: "PATCH",
+        body: { scheduled_start: newStart.toISOString(), scheduled_end: newEnd.toISOString() },
+      });
+      load();
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 409) {
+        setDragError("Não foi possível reagendar: já existe um atendimento nesse novo horário.");
+      } else {
+        setDragError("Não foi possível reagendar este atendimento.");
       }
     }
   }
@@ -223,6 +256,9 @@ export default function AgendaPage() {
           </button>
         </div>
       </div>
+      <p className="text-xs text-neutralState -mt-4 mb-6">
+        Dica: arraste um atendimento agendado/confirmado para outro dia da semana para reagendar.
+      </p>
 
       {showForm && (
         <form onSubmit={handleCreate} className="bg-white rounded-card shadow-sm p-6 mb-6 space-y-4 max-w-2xl">
@@ -261,6 +297,23 @@ export default function AgendaPage() {
               </div>
             )}
           </div>
+          {rooms.length > 0 && (
+            <div>
+              <label className="block text-sm font-medium mb-1">Sala (opcional)</label>
+              <select
+                value={formRoomId}
+                onChange={(e) => setFormRoomId(e.target.value)}
+                className="w-full h-10 rounded-btn border border-slate-300 px-3"
+              >
+                <option value="">Sem sala definida</option>
+                {rooms.map((r) => (
+                  <option key={r.id} value={r.id}>
+                    {r.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium mb-1">Início</label>
@@ -372,13 +425,23 @@ export default function AgendaPage() {
       </div>
 
       {error && <p className="text-danger text-sm mb-4">{error}</p>}
+      {dragError && <p className="text-danger text-sm mb-4">{dragError}</p>}
 
       {loading ? (
         <p className="text-neutralState">Carregando...</p>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-7 gap-3">
           {weekDays.map((day, idx) => (
-            <div key={day.toISOString()} className="bg-white rounded-card shadow-sm overflow-hidden">
+            <div
+              key={day.toISOString()}
+              className="bg-white rounded-card shadow-sm overflow-hidden"
+              onDragOver={(e) => e.preventDefault()}
+              onDrop={(e) => {
+                e.preventDefault();
+                const appointmentId = e.dataTransfer.getData("text/appointment-id");
+                if (appointmentId) handleDropOnDay(appointmentId, day);
+              }}
+            >
               <div className="bg-brand-navy text-white px-3 py-2 text-xs font-semibold">
                 {WEEKDAY_LABELS[idx]}
                 <div className="text-[10px] font-normal opacity-80">
@@ -390,7 +453,17 @@ export default function AgendaPage() {
                   <div className="px-3 py-4 text-xs text-neutralState text-center">Sem atendimentos</div>
                 )}
                 {appointmentsByDay[idx].map((appointment) => (
-                  <div key={appointment.id} className="px-3 py-2 text-xs space-y-1">
+                  <div
+                    key={appointment.id}
+                    className={`px-3 py-2 text-xs space-y-1 ${
+                      appointment.status === "scheduled" || appointment.status === "confirmed"
+                        ? "cursor-move"
+                        : ""
+                    }`}
+                    draggable={appointment.status === "scheduled" || appointment.status === "confirmed"}
+                    onDragStart={(e) => e.dataTransfer.setData("text/appointment-id", appointment.id)}
+                    title="Arraste para outro dia da semana para reagendar"
+                  >
                     <div className="font-medium">
                       {new Date(appointment.scheduled_start).toLocaleTimeString("pt-BR", {
                         hour: "2-digit",
@@ -404,6 +477,7 @@ export default function AgendaPage() {
                     </div>
                     <div>{appointment.patient_name}</div>
                     {isClinic && <div className="text-neutralState">{appointment.professional_name}</div>}
+                    {appointment.room_name && <div className="text-neutralState">Sala: {appointment.room_name}</div>}
                     <span className={`inline-block rounded px-1.5 py-0.5 text-[10px] ${STATUS_COLORS[appointment.status]}`}>
                       {STATUS_LABELS[appointment.status]}
                     </span>

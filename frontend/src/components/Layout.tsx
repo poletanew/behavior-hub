@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { NavLink, Outlet } from "react-router-dom";
+import { NavLink, Outlet, useLocation } from "react-router-dom";
 import { apiRequest } from "../api/client";
 import { useAuth } from "../context/AuthContext";
 import NotificationBell from "./NotificationBell";
@@ -22,6 +22,7 @@ export default function Layout() {
   const canSeeManagerDashboard = user?.user_type === "clinic_admin";
   const [requires2fa, setRequires2fa] = useState(false);
   const [bulkImportEnabled, setBulkImportEnabled] = useState(false);
+  const location = useLocation();
 
   useEffect(() => {
     apiRequest<{ is_2fa_enabled: boolean; required: boolean }>("/auth/2fa/status")
@@ -221,7 +222,7 @@ export default function Layout() {
         <div className="flex justify-end px-8 pt-4">
           <NotificationBell />
         </div>
-        <div className="px-8 pb-8">
+        <div key={location.pathname} className="px-8 pb-8 animate-fade-in">
           <Outlet />
         </div>
       </main>

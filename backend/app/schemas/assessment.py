@@ -3,7 +3,7 @@ import uuid
 
 from pydantic import BaseModel, Field
 
-from app.models.enums import AssessmentProtocol
+from app.models.enums import AssessmentProtocol, TreatmentArea
 
 
 class DomainScoreInput(BaseModel):
@@ -31,6 +31,20 @@ class DomainScoreResponse(BaseModel):
     normalized_pct: float
 
 
+class PlanDraftItem(BaseModel):
+    """RF-06 — um objetivo sugerido a partir de um domínio de menor desempenho;
+    sempre editável antes de virar um Objective real via /activate-plan-draft."""
+
+    area: TreatmentArea
+    domain_code: str
+    domain_label: str
+    normalized_pct: float
+    title: str
+    description: str
+    criteria: str
+    strategies: str
+
+
 class AssessmentResponse(BaseModel):
     id: uuid.UUID
     patient_id: uuid.UUID
@@ -40,9 +54,15 @@ class AssessmentResponse(BaseModel):
     raw_scores: list[DomainScoreResponse]
     summary: str | None
     created_at: datetime.datetime
+    ai_generated_plan_draft: list[PlanDraftItem] = Field(default_factory=list)
+    plan_draft_activated_at: datetime.datetime | None
 
     class Config:
         from_attributes = True
+
+
+class ActivatePlanDraftRequest(BaseModel):
+    items: list[PlanDraftItem] = Field(min_length=1)
 
 
 class ProtocolDomainDefinition(BaseModel):
@@ -61,8 +81,7 @@ class ProtocolDefinitionResponse(BaseModel):
 class DomainComparisonPoint(BaseModel):
     domain_code: str
     domain_label: str
-    earliest_pct: float
-    latest_pct: float
+    values_by_date: dict[str, float]
     gain_absolute_pp: float
     gain_relative_pct: float | None
 
@@ -73,3 +92,20 @@ class AssessmentComparisonResponse(BaseModel):
     applied_dates: list[datetime.date]
     domains: list[DomainComparisonPoint]
     interpretive_summary: str
+
+
+class SuggestedTrainingRef(BaseModel):
+    training_id: uuid.UUID
+    title: str
+    objective: str
+
+
+class SuggestedTrainingFolderEntry(BaseModel):
+    """Addendum v3.0, RF-36 — um domínio de menor desempenho desta avaliação e os
+    treinos da Training Library que já existem no sistema e parecem relevantes
+    a ele; nenhum vínculo é criado aqui, é só a sugestão para revisão."""
+
+    domain_code: str
+    domain_label: str
+    normalized_pct: float
+    trainings: list[SuggestedTrainingRef]

@@ -7,7 +7,13 @@ from app.core.deps import get_current_user
 from app.db.session import get_db
 from app.models.enums import ResourceVisibility
 from app.models.user import User
-from app.schemas.resource import ResourceResponse, ResourceWithUrlResponse
+from app.schemas.resource import (
+    ResourceAIDraftRequest,
+    ResourceAIDraftResponse,
+    ResourceAIPublishRequest,
+    ResourceResponse,
+    ResourceWithUrlResponse,
+)
 from app.services import resource_service
 
 router = APIRouter(prefix="/resources", tags=["therapeutic-resources"])
@@ -46,6 +52,20 @@ async def upload_resource(
         visibility=visibility,
         file=file,
     )
+
+
+@router.post("/ai-draft", response_model=ResourceAIDraftResponse)
+def generate_ai_draft(payload: ResourceAIDraftRequest, user: User = Depends(get_current_user)):
+    """RF-12 — "Criar recurso com IA": rascunho não persistido, só existe
+    nesta resposta até o profissional revisar e publicar explicitamente."""
+    return resource_service.generate_ai_draft(payload.kind, payload.theme, payload.age_range)
+
+
+@router.post("/ai-publish", response_model=ResourceResponse, status_code=status.HTTP_201_CREATED)
+def publish_ai_resource(
+    payload: ResourceAIPublishRequest, db: Session = Depends(get_db), user: User = Depends(get_current_user)
+):
+    return resource_service.publish_ai_resource(db, user, payload)
 
 
 @router.get("/{resource_id}", response_model=ResourceWithUrlResponse)

@@ -154,6 +154,144 @@ Este repositório está sendo construído **por fases**, seguindo o roadmap da S
   clicar em Salvar, e o objetivo salvo mantém um badge "Gerado por IA" visível daí em diante. Se o
   PDF não tiver texto extraível (ex.: documento escaneado sem OCR), os campos ficam em branco com um
   aviso explicando o motivo, em vez de uma falha silenciosa.
+- **Fase 6 (bloco 9) — Addendum de Melhorias v2.1, RF-06**: ao registrar uma Avaliação Padronizada
+  (VB-MAPP/ABLLS-R) — que já é, na prática, o próprio ato de "concluir" a avaliação — o sistema gera
+  automaticamente um gráfico de barras com o desempenho por domínio e um rascunho de Plano de
+  Tratamento com um objetivo sugerido para cada domínio de menor desempenho, marcado como "Gerado
+  por IA — revise antes de ativar". O rascunho é totalmente editável (título, descrição, critério de
+  domínio, estratégias) e só vira objetivo real do paciente quando o profissional clica em "Ativar
+  Plano de Tratamento" — nunca substitui nem apaga nenhum objetivo já existente, só adiciona os
+  novos. A listagem de avaliações passa a mostrar "Ver gráfico" por avaliação e um selo "Rascunho de
+  plano (IA)" (ou "Plano ativado", depois de ativado).
+- **Fase 6 (bloco 10) — Addendum de Melhorias v2.1, RF-12**: a aba Recursos ganha o botão "✨ Criar
+  recurso com IA" — um formulário simples (tipo: história social, rotina visual ou cartão de
+  comunicação; tema; faixa etária) gera um rascunho editável (título, descrição, conteúdo) com o
+  aviso "Gerado por IA — revise antes de publicar". O profissional edita livremente e só então clica
+  em "Publicar", que gera um PDF de fato e o adiciona à biblioteca — nada é publicado sozinho. O
+  recurso publicado mantém um badge "Gerado por IA" visível no card da biblioteca.
+- **Fase 6 (bloco 11) — Addendum de Melhorias v2.1, RF-14**: a aba Auditoria ganha uma segunda visão,
+  "Por paciente", ao lado da já existente "Por ação". Buscar e clicar em um paciente abre uma linha
+  do tempo consolidada com todas as ações registradas por qualquer profissional sobre ele —
+  cadastro, sessões, alterações de plano de tratamento, anexos importados, atribuições, avaliações
+  — em ordem cronológica, com autor e data/hora visíveis, reaproveitando a mesma cobertura de
+  entidades já usada pela Timeline Clínica (Fase 4a).
+- **Fase 6 (bloco 12) — Addendum de Melhorias v2.1, RF-15**: a aba Segurança ganha autoatendimento
+  para trocar o nome de exibição e a senha, sem depender de suporte. Trocar a senha exige a senha
+  atual, encerra imediatamente as demais sessões ativas da conta (reaproveitando o mecanismo de
+  `token_version` já usado pela Seção 17.2/Family Portal) e devolve um par de tokens novo para que a
+  própria sessão que fez a troca continue funcionando sem precisar logar de novo. Como o login é
+  feito por email (não existe um campo de "username" separado), "nome de usuário" foi interpretado
+  como o nome de exibição (`User.name`).
+- **Fase 6 (bloco 13) — Addendum de Melhorias v2.1, RF-17**: injeção transversal de leveza visual no
+  Design System (Seção 24) sem perder o tom profissional. Toda navegação entre telas (Layout
+  principal, espaço do AT e Portal da Família) ganha uma transição suave (fade-in) automática; todo
+  estado vazio de tela principal (Pacientes, Atendimentos, Recursos, Lista de Espera, Dados
+  Excluídos, Relatórios, Avaliações, Timeline, Auditoria, Painel de Supervisão, espaço do AT e a
+  Área de Trabalho) passa a usar um componente `EmptyState` reutilizável, com ícone amigável em vez
+  de só texto cinza; e confirmações de "salvo com sucesso" na aba Segurança ganham uma
+  microanimação curta. As animações respeitam `prefers-reduced-motion`.
+- **Fase 7 (Módulo 3.1) — Addendum v3.0, RF-18 a RF-20 — Coleta de Dados**: o detalhe do atendimento
+  ganha três seções novas. "Comportamento-alvo (modelo ABC)" registra Antecedente → Comportamento →
+  Consequência (com frequência, duração e intensidade), independente das tentativas de treino, e
+  aparece na Timeline Clínica do paciente. "Reforçadores usados nesta sessão" permite cadastrar
+  reforçadores por paciente (o que funciona para motivá-lo) e vinculá-los a uma sessão com nota de
+  efetividade, já mostrando quantas vezes cada um foi usado. "Foto/Vídeo" ganha upload de verdade
+  (antes era só um campo de URL) com limite de duração e tamanho conforme o plano da clínica, mesmo
+  bloqueio do plano Free que já valia para foto.
+- **Fase 7 (Módulo 3.2) — Addendum v3.0, RF-21 a RF-23 — Avaliação**: a ficha do paciente ganha dois
+  links novos. "Anamnese" abre um formulário de admissão (queixa principal, informações de
+  nascimento, histórico de desenvolvimento, marcos de desenvolvimento, histórico familiar) que pode
+  ser preenchido aos poucos e editado depois; a primeira vez que é salvo aparece na Timeline Clínica
+  como evento fundacional do caso. "Checklists" permite montar um checklist reutilizável (pergunta +
+  tipo de resposta: sim/não, escala 1-5 ou texto curto) e reaplicá-lo em vários pacientes; cada
+  aplicação mostra o resultado tabulado e, para as perguntas de escala, um gráfico de barras simples.
+  Na tela de Avaliações Padronizadas, iniciar uma nova aplicação de um protocolo já usado antes no
+  mesmo paciente mostra "Duplicar avaliação anterior como ponto de partida", que pré-preenche os
+  campos com a última aplicação — o profissional só ajusta o que mudou, e a avaliação duplicada
+  sempre fica com sua própria data, sem sobrescrever a original.
+- **Fase 7 (Módulo 3.3) — Addendum v3.0, RF-24 e RF-25 — Plano Terapêutico**: cada objetivo do Plano
+  de Tratamento (Seção 13) ganha manutenção/generalização e aplicadores, direto no card, sem tabela
+  nova. Quando um objetivo passa para "Dominado" a primeira vez, um reteste de manutenção é agendado
+  automaticamente 30 dias à frente (badge "⏰ Reteste de manutenção pendente" quando a data chega);
+  "Registrar reteste" reagenda o próximo reteste e fica marcado "mantida" ou "perdida". O mesmo card
+  ganha campos simples para marcar em quais contextos a generalização já foi testada (clínica, casa,
+  escola, outro) com data e resultado observado. "Aplicadores" permite marcar tanto um profissional
+  quanto um pai/cuidador como responsável por aplicar aquele objetivo fora do horário de atendimento
+  — um pai só pode ser marcado se já tiver acesso ativo ao Portal da Família para o paciente (reaproveita
+  o mesmo consentimento explícito da Seção 29.6, em vez de criar uma segunda porta de entrada para
+  dados do paciente). No Portal da Família, a nova aba "Meus Programas" lista os objetivos em que o
+  responsável foi marcado como aplicador e permite registrar "Apliquei hoje" (com nota opcional);
+  essa ação reaproveita o Audit Log já existente, então aparece automaticamente no histórico do
+  objetivo do lado da equipe clínica, sem nenhuma tabela ou tela nova.
+- **Fase 7 (Módulo 3.5) — Addendum v3.0, RF-29 e RF-30 — Comunicação com a Família**: nova categoria
+  na whitelist do Family Access ("Registrar rotina") libera, no Portal da Família, uma aba "Rotina"
+  onde o responsável registra sono, alimentação, humor ou eventos importantes antes do próximo
+  atendimento — o registro aparece tanto na página de administração do Portal da Família quanto na
+  Timeline Clínica do paciente, para a equipe ver antes de começar a sessão. A aba "Mensagens" ganha
+  também uma seção de "Notas de voz": o responsável toca em "Ditar", fala, e o texto é transcrito
+  automaticamente pelo próprio navegador (mesmo recurso "Anotação por Voz" da Fase 5) antes de
+  enviar — nenhum áudio é gravado ou enviado a nenhum provedor externo, só o texto chega à equipe.
+  As notas de voz reaproveitam a mesma categoria de mensagens já existente na whitelist, por serem
+  outro formato do mesmo canal de comunicação, não uma categoria de dados nova.
+- **Fase 7 (Módulo 3.4) — Addendum v3.0, RF-26 e RF-28 — Agendamento**: em Configurações da Clínica,
+  uma nova seção "Salas de Atendimento" cadastra as salas físicas disponíveis; ao agendar um
+  atendimento na Agenda, a sala é opcional, e a mesma sala não pode ter dois atendimentos
+  sobrepostos (mesma checagem de conflito que já existia para o profissional). Cada card de
+  atendimento na Agenda agora pode ser arrastado para outro dia da semana para reagendar, mantendo
+  o mesmo horário e duração; e cada objetivo do Plano de Tratamento ganha uma pequena alça de
+  arrastar (⠿⠿⠿) para reordenar manualmente a prioridade dos programas dentro da própria área, com a
+  nova ordem persistindo entre sessões. RF-27 (confirmação via WhatsApp) foi propositalmente
+  deixado de fora desta fase: depende de um provedor de API do WhatsApp Business, e nenhuma
+  credencial desse tipo está configurada neste projeto.
+- **Fase 7 (Módulo 3.6) — Addendum v3.0, RF-31 e RF-32 — Relatórios**: novo relatório "Desempenho
+  do Profissional/AT", acessível via "Ver desempenho" tanto no Painel de Supervisão (profissionais e
+  supervisores) quanto na página ABA (auxiliares terapêuticos, que não aparecem no Painel de
+  Supervisão) — mostra atendimentos realizados, consistência de registro (% de sessões com ao menos
+  uma tentativa), percentual médio de acerto e um selo de eficiência do aplicador (alta/média/baixa,
+  conforme a variabilidade de acerto entre sessões), com exportação em PDF; é um relatório individual,
+  diferente do painel agregado por equipe que já existia. Ao criar um objetivo no Plano de Tratamento,
+  agora é possível vincular treinos da Biblioteca de Treino diretamente no formulário (campo "Treinos
+  da Biblioteca vinculados") — esse vínculo já existia no backend desde a Fase 2, mas não tinha nenhuma
+  tela para preenchê-lo. O Painel de Gestão ganha duas seções novas: "Desempenho do Programa" agrega,
+  por treino vinculado, quantos pacientes distintos o usam, taxa de domínio e tempo médio até dominar
+  (só aparece para treinos usados por pelo menos 2 pacientes); e "Previsibilidade Financeira" mostra o
+  plano atual da própria clínica, data de renovação e um selo de risco de cancelamento derivado do
+  status da assinatura no Stripe — deliberadamente restrito à assinatura da própria clínica (sem
+  nenhum papel novo de operador da plataforma nem valores de receita inventados), conforme escolha
+  explícita do responsável pelo produto diante da ambiguidade do texto original do addendum.
+- **Fase 7 (Módulo 3.7) — Addendum v3.0, RF-33 a RF-35 — Gráficos**: a comparação de avaliações em
+  Avaliações Padronizadas passa de 2 para até 4 aplicações do mesmo protocolo selecionadas de uma vez,
+  num único gráfico de linhas (uma linha por data de aplicação, eixo X pelos domínios em comum entre
+  todas as aplicações selecionadas) — reaproveita o mesmo `normalized_pct` de sempre, nenhum cálculo de
+  normalização novo. Em Reports, o gráfico de linha "Evolução do percentual de acerto" agora é
+  apresentado como "Curva de Aprendizagem" (mesmo cálculo, só o rótulo mudou), e dois gráficos novos
+  aparecem sempre que houver pelo menos um evento registrado: "Comportamentos interferentes" (frequência
+  e duração ao longo do tempo de cada comportamento-alvo do modelo ABC, agrupado pelo texto exato do
+  comportamento) e "Reforçadores mais usados" (quantas vezes cada reforçador cadastrado foi usado no
+  período).
+- **Fase 7 (Módulo 3.8) — Addendum v3.0, RF-36 e RF-37 — Automatização**: ao registrar uma avaliação
+  padronizada, o botão "Pasta de treinos sugerida" mostra, para cada área de baixa pontuação já
+  identificada pelo rascunho de plano (RF-06), os treinos da Biblioteca de Treino cujo título ou
+  objetivo mencionam aquele domínio — pronto para revisar e clicar em "Vincular" (mesmo mecanismo já
+  usado na Biblioteca de Treino); nenhum vínculo é criado sozinho, e domínios sem nenhum treino
+  relacionado simplesmente aparecem com a pasta vazia, nunca com uma sugestão inventada. O convite de
+  profissional (página "Profissionais") ganhou um campo de especialidade opcional, e a IA de
+  "Preencher com IA" do Plano de Tratamento agora funciona para as 12 especialidades da Seção 7.2 do
+  PRD (antes, 5 delas — Neuropediatra, Psiquiatra Infantil, Musicoterapeuta, Arteterapeuta,
+  Psicomotricista — não tinham nenhuma área da grade multidisciplinar associada e por isso nunca
+  conseguiam usar o recurso).
+- **Fase 7 (Módulo 3.9) — Addendum v3.0, RF-38 — Segurança**: este item, ao contrário de todos os
+  outros do addendum, não é um requisito de código — é uma nota de honestidade. ISO 27001, SOC 2 e
+  GDPR são certificações de auditoria externa sobre processos organizacionais, concedidas por um
+  auditor credenciado depois de meses de avaliação; não são funcionalidades que um sistema "implementa"
+  nem selos que uma tela pode exibir de forma verdadeira antes da certificação real acontecer. Por
+  isso nenhuma tela ou selo alegando essas certificações foi criado. O que já existe no código como
+  base técnica para uma eventual certificação futura — controle de acesso por papel (RBAC
+  configurável por clínica, Seção 17.1), log de auditoria (Seção 32.7) e autenticação de dois fatores
+  (Seção 32.8) — está descrito em detalhe no `backend/README.md`; criptografia em trânsito/repouso,
+  backups testados e alta disponibilidade são responsabilidade da camada de hospedagem/infraestrutura,
+  fora do escopo deste código de aplicação. **Esta nota fecha o Addendum v3.0 e a Fase 7 como um
+  todo** — ver `backend/README.md` para o detalhamento completo e a lista de módulos 3.1 a 3.9.
 
 ## Stack (Seção 4 do PRD)
 

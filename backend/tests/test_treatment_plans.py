@@ -1,3 +1,4 @@
+import datetime
 import io
 
 from reportlab.pdfgen import canvas
@@ -376,3 +377,212 @@ def test_ai_fill_requires_area_edit_permission(client, mock_s3):
         headers=professional["headers"],
     )
     assert response.status_code == 403
+
+
+def test_ai_fill_works_for_specialties_without_a_dedicated_area(client, mock_s3):
+    """Addendum v3.0, RF-37 — a Seção 7.2 do PRD lista 12 especialidades, mas só 7
+    tinham entrada em SPECIALTY_TO_AREA; as outras 5 (sem área dedicada na grade)
+    nunca conseguiam usar "Preencher com IA" em nenhuma área. Testa 3 delas
+    (Musicoterapeuta, Arteterapeuta, Neuropediatra), todas mapeadas para a área
+    'outra' — mesmo mecanismo de IA (RF-05), mesma revisão humana obrigatória."""
+    for specialty in ["musicoterapeuta", "arteterapeuta", "neuropediatra"]:
+        ctx = register_clinic(client)
+        patient = create_patient(client, ctx["headers"])
+        pdf_bytes = _pdf_with_text("Registro multidisciplinar", "Criterio de dominio: 70%")
+        attachment = _upload_pdf_bytes(client, ctx["headers"], patient["id"], pdf_bytes, area="outra").json()
+
+        professional = invite_and_accept_professional(client, ctx["headers"], specialty=specialty)
+        assign_professional(client, ctx["headers"], patient["id"], professional["user"]["id"], permission="edit_area_plan")
+
+        response = client.post(
+            f"/v1/patients/{patient['id']}/treatment-plan/objectives/ai-fill",
+            json={"attachment_id": attachment["id"]},
+            headers=professional["headers"],
+        )
+        assert response.status_code == 200, f"{specialty}: {response.text}"
+        draft = response.json()
+        assert draft["title"] == "Registro multidisciplinar"
+
+        created = client.post(
+            f"/v1/patients/{patient['id']}/treatment-plan/objectives",
+            json={
+                "area": "outra",
+                "title": draft["title"],
+                "description": draft["description"],
+                "criteria": draft["criteria"],
+                "strategies": draft["strategies"],
+                "priority": "medium",
+                "ai_generated": True,
+                "ai_source_document_id": attachment["id"],
+            },
+            headers=professional["headers"],
+        )
+        assert created.status_code == 201, f"{specialty}: {created.text}"
+        # Seção 12.1 — salvar É a confirmação de revisão humana obrigatória.
+        assert created.json()["ai_reviewed_at"] is not None
+
+
+def test_marking_objective_mastered_auto_schedules_maintenance_check(client):
+    """Addendum v3.0, RF-24 — objetivo dominado gera automaticamente um
+    lembrete de reteste de manutenção 30 dias à frente."""
+    ctx = register_clinic(client)
+    patient = create_patient(client, ctx["headers"])
+    objective = _create_objective(client, ctx["headers"], patient["id"]).json()
+    assert objective["maintenance_check_date"] is None
+    assert objective["maintenance_due"] is False
+
+    mastered = client.patch(
+        f"/v1/objectives/{objective['id']}", json={"status": "mastered"}, headers=ctx["headers"]
+    )
+    assert mastered.status_code == 200, mastered.text
+    body = mastered.json()
+    expected = (datetime.date.today() + datetime.timedelta(days=30)).isoformat()
+    assert body["maintenance_check_date"] == expected
+
+
+def test_recording_generalization_contexts_accumulates_entries(client):
+    """Addendum v3.0, RF-24 — campos simples para marcar onde já foi testado
+    (clínica, casa, escola) e o resultado em cada um."""
+    ctx = register_clinic(client)
+    patient = create_patient(client, ctx["headers"])
+    objective = _create_objective(client, ctx["headers"], patient["id"]).json()
+
+    for context in ("clinica", "casa", "escola"):
+        response = client.post(
+            f"/v1/objectives/{objective['id']}/generalization-contexts",
+            json={"context": context, "tested_at": "2026-07-01", "result": "Generalizou com sucesso"},
+            headers=ctx["headers"],
+        )
+        assert response.status_code == 200, response.text
+
+    final = client.get(f"/v1/objectives/{objective['id']}", headers=ctx["headers"])
+    contexts = final.json()["generalization_contexts"]
+    assert [c["context"] for c in contexts] == ["clinica", "casa", "escola"]
+    assert all(c["result"] == "Generalizou com sucesso" for c in contexts)
+
+
+def test_maintenance_check_requires_mastered_status_and_reschedules(client):
+    """Addendum v3.0, RF-24 — reteste de manutenção só se aplica a objetivos
+    dominados, e reagenda o próximo lembrete."""
+    ctx = register_clinic(client)
+    patient = create_patient(client, ctx["headers"])
+    objective = _create_objective(client, ctx["headers"], patient["id"]).json()
+
+    not_mastered = client.post(
+        f"/v1/objectives/{objective['id']}/maintenance-checks",
+        json={"result": "mantida"},
+        headers=ctx["headers"],
+    )
+    assert not_mastered.status_code == 400
+
+    client.patch(f"/v1/objectives/{objective['id']}", json={"status": "mastered"}, headers=ctx["headers"])
+
+    checked = client.post(
+        f"/v1/objectives/{objective['id']}/maintenance-checks",
+        json={"result": "mantida", "notes": "Manteve o repertório"},
+        headers=ctx["headers"],
+    )
+    assert checked.status_code == 200, checked.text
+    expected = (datetime.date.today() + datetime.timedelta(days=30)).isoformat()
+    assert checked.json()["maintenance_check_date"] == expected
+
+    history = client.get(f"/v1/objectives/{objective['id']}/history", headers=ctx["headers"])
+    actions = [entry["action"] for entry in history.json()]
+    assert "objective_maintenance_checked" in actions
+
+
+def test_add_applier_requires_area_permission(client):
+    """Addendum v3.0, RF-25 — só quem edita a área do objetivo pode marcar aplicadores."""
+    ctx = register_clinic(client)
+    patient = create_patient(client, ctx["headers"])
+    objective = _create_objective(client, ctx["headers"], patient["id"]).json()
+    professional = invite_and_accept_professional(client, ctx["headers"], specialty="fonoaudiologo")
+    assign_professional(client, ctx["headers"], patient["id"], professional["user"]["id"])
+
+    response = client.post(
+        f"/v1/objectives/{objective['id']}/appliers",
+        json={"applier_type": "professional", "applier_user_id": ctx["user"]["id"]},
+        headers=professional["headers"],
+    )
+    assert response.status_code == 403
+
+
+def test_add_professional_applier(client):
+    ctx = register_clinic(client)
+    patient = create_patient(client, ctx["headers"])
+    objective = _create_objective(client, ctx["headers"], patient["id"]).json()
+    professional = invite_and_accept_professional(client, ctx["headers"], specialty="fonoaudiologo")
+    assign_professional(
+        client, ctx["headers"], patient["id"], professional["user"]["id"], permission="edit_area_plan"
+    )
+
+    response = client.post(
+        f"/v1/objectives/{objective['id']}/appliers",
+        json={"applier_type": "professional", "applier_user_id": professional["user"]["id"]},
+        headers=ctx["headers"],
+    )
+    assert response.status_code == 201, response.text
+    assert response.json()["applier_name"] == professional["user"]["name"]
+
+    listed = client.get(f"/v1/objectives/{objective['id']}/appliers", headers=ctx["headers"])
+    assert len(listed.json()) == 1
+
+    duplicate = client.post(
+        f"/v1/objectives/{objective['id']}/appliers",
+        json={"applier_type": "professional", "applier_user_id": professional["user"]["id"]},
+        headers=ctx["headers"],
+    )
+    assert duplicate.status_code == 409
+
+
+def test_reorder_objectives_within_area(client):
+    """Addendum v3.0, RF-28 — arrastar e soltar para reordenar prioridade dos
+    objetivos de uma área do Plano de Tratamento."""
+    ctx = register_clinic(client)
+    patient = create_patient(client, ctx["headers"])
+    first = _create_objective(client, ctx["headers"], patient["id"], title="Primeiro").json()
+    second = _create_objective(client, ctx["headers"], patient["id"], title="Segundo").json()
+    third = _create_objective(client, ctx["headers"], patient["id"], title="Terceiro").json()
+
+    plan = client.get(f"/v1/patients/{patient['id']}/treatment-plan", headers=ctx["headers"]).json()
+    assert [o["title"] for o in plan["objectives"]] == ["Primeiro", "Segundo", "Terceiro"]
+
+    reordered = client.post(
+        f"/v1/patients/{patient['id']}/treatment-plan/objectives/reorder",
+        json={"area": "aba", "ordered_ids": [third["id"], first["id"], second["id"]]},
+        headers=ctx["headers"],
+    )
+    assert reordered.status_code == 200, reordered.text
+    assert [o["title"] for o in reordered.json()] == ["Terceiro", "Primeiro", "Segundo"]
+
+    plan_after = client.get(f"/v1/patients/{patient['id']}/treatment-plan", headers=ctx["headers"]).json()
+    assert [o["title"] for o in plan_after["objectives"]] == ["Terceiro", "Primeiro", "Segundo"]
+
+
+def test_reorder_objectives_requires_area_permission(client):
+    ctx = register_clinic(client)
+    patient = create_patient(client, ctx["headers"])
+    objective = _create_objective(client, ctx["headers"], patient["id"]).json()
+    professional = invite_and_accept_professional(client, ctx["headers"], specialty="fonoaudiologo")
+    assign_professional(client, ctx["headers"], patient["id"], professional["user"]["id"])
+
+    response = client.post(
+        f"/v1/patients/{patient['id']}/treatment-plan/objectives/reorder",
+        json={"area": "aba", "ordered_ids": [objective["id"]]},
+        headers=professional["headers"],
+    )
+    assert response.status_code == 403
+
+
+def test_reorder_objectives_rejects_incomplete_list(client):
+    ctx = register_clinic(client)
+    patient = create_patient(client, ctx["headers"])
+    first = _create_objective(client, ctx["headers"], patient["id"], title="Primeiro").json()
+    _create_objective(client, ctx["headers"], patient["id"], title="Segundo")
+
+    response = client.post(
+        f"/v1/patients/{patient['id']}/treatment-plan/objectives/reorder",
+        json={"area": "aba", "ordered_ids": [first["id"]]},
+        headers=ctx["headers"],
+    )
+    assert response.status_code == 400

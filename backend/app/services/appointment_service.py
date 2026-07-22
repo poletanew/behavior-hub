@@ -8,9 +8,10 @@ from sqlalchemy.orm import Session
 from app.models.appointment import Appointment
 from app.models.enums import AppointmentStatus, CancellationReason, UserType
 from app.models.patient import Patient, PatientAssignment
+from app.models.room import Room
 from app.models.user import User
 from app.schemas.appointment import AppointmentCreateRequest, AppointmentUpdateRequest
-from app.services import audit_service, notification_service, patient_service
+from app.services import audit_service, notification_service, patient_service, room_service
 
 CONSECUTIVE_NO_SHOW_THRESHOLD = 2
 ACTIVE_STATUSES = (AppointmentStatus.SCHEDULED, AppointmentStatus.CONFIRMED, AppointmentStatus.COMPLETED)
@@ -50,6 +51,27 @@ def _has_conflict(
     return db.query(query.exists()).scalar()
 
 
+def _has_room_conflict(
+    db: Session, room_id: uuid.UUID, start: datetime.datetime, end: datetime.datetime, exclude_id=None
+) -> bool:
+    """Addendum v3.0, RF-26 — mesma checagem de conflito já usada para o
+    profissional (Seção 32.2), agora para a sala física."""
+    query = db.query(Appointment).filter(
+        Appointment.room_id == room_id,
+        Appointment.deleted_at.is_(None),
+        Appointment.status.in_(ACTIVE_STATUSES),
+        Appointment.scheduled_start < end,
+        Appointment.scheduled_end > start,
+    )
+    if exclude_id is not None:
+        query = query.filter(Appointment.id != exclude_id)
+    return db.query(query.exists()).scalar()
+
+
+def _validate_room(db: Session, user: User, room_id: uuid.UUID) -> Room:
+    return room_service.get_room_or_404(db, user, room_id)
+
+
 def _validate_professional(db: Session, user: User, professional_id: uuid.UUID) -> User:
     professional = db.get(User, professional_id)
     if professional is None:
@@ -62,7 +84,9 @@ def _validate_professional(db: Session, user: User, professional_id: uuid.UUID) 
     return professional
 
 
-def _to_response_dict(appointment: Appointment, patient_name: str, professional_name: str) -> dict:
+def _to_response_dict(
+    appointment: Appointment, patient_name: str, professional_name: str, room_name: str | None
+) -> dict:
     return {
         "id": appointment.id,
         "patient_id": appointment.patient_id,
@@ -76,6 +100,8 @@ def _to_response_dict(appointment: Appointment, patient_name: str, professional_
         "status_notes": appointment.status_notes,
         "notes": appointment.notes,
         "session_id": appointment.session_id,
+        "room_id": appointment.room_id,
+        "room_name": room_name,
         "deleted_at": appointment.deleted_at,
         "created_at": appointment.created_at,
     }
@@ -92,8 +118,15 @@ def _enrich(db: Session, appointments: list[Appointment]) -> list[dict]:
         u.id: u.name
         for u in db.query(User).filter(User.id.in_({a.professional_id for a in appointments})).all()
     }
+    room_ids = {a.room_id for a in appointments if a.room_id is not None}
+    room_names = {r.id: r.name for r in db.query(Room).filter(Room.id.in_(room_ids)).all()} if room_ids else {}
     return [
-        _to_response_dict(a, patient_names.get(a.patient_id, "?"), professional_names.get(a.professional_id, "?"))
+        _to_response_dict(
+            a,
+            patient_names.get(a.patient_id, "?"),
+            professional_names.get(a.professional_id, "?"),
+            room_names.get(a.room_id) if a.room_id is not None else None,
+        )
         for a in appointments
     ]
 
@@ -108,12 +141,22 @@ def create_appointment(db: Session, user: User, payload: AppointmentCreateReques
             detail="This professional already has an appointment in this time range",
         )
 
+    room = None
+    if payload.room_id is not None:
+        room = _validate_room(db, user, payload.room_id)
+        if _has_room_conflict(db, room.id, payload.scheduled_start, payload.scheduled_end):
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="This room is already booked in this time range",
+            )
+
     appointment = Appointment(
         patient_id=patient.id,
         professional_id=professional.id,
         scheduled_start=payload.scheduled_start,
         scheduled_end=payload.scheduled_end,
         notes=payload.notes,
+        room_id=room.id if room is not None else None,
         status=AppointmentStatus.SCHEDULED,
         created_by_user_id=user.id,
     )
@@ -134,7 +177,7 @@ def create_appointment(db: Session, user: User, payload: AppointmentCreateReques
     )
     db.commit()
     db.refresh(appointment)
-    return _to_response_dict(appointment, patient.name, professional.name)
+    return _to_response_dict(appointment, patient.name, professional.name, room.name if room is not None else None)
 
 
 def get_enriched_appointment(db: Session, user: User, appointment_id: uuid.UUID) -> dict:
@@ -205,9 +248,26 @@ def update_appointment(db: Session, user: User, appointment_id: uuid.UUID, paylo
                 detail="This professional already has an appointment in this time range",
             )
 
+    room_id = appointment.room_id
+    if payload.clear_room:
+        room_id = None
+    elif payload.room_id is not None:
+        room_id = payload.room_id
+
+    room = None
+    if room_id is not None:
+        room = _validate_room(db, user, room_id)
+        if (room.id, start, end) != (appointment.room_id, appointment.scheduled_start, appointment.scheduled_end):
+            if _has_room_conflict(db, room.id, start, end, exclude_id=appointment.id):
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail="This room is already booked in this time range",
+                )
+
     appointment.professional_id = professional.id
     appointment.scheduled_start = start
     appointment.scheduled_end = end
+    appointment.room_id = room.id if room is not None else None
     if payload.notes is not None:
         appointment.notes = payload.notes
 
@@ -217,7 +277,9 @@ def update_appointment(db: Session, user: User, appointment_id: uuid.UUID, paylo
     db.commit()
     db.refresh(appointment)
     patient = db.get(Patient, appointment.patient_id)
-    return _to_response_dict(appointment, patient.name if patient else "?", professional.name)
+    return _to_response_dict(
+        appointment, patient.name if patient else "?", professional.name, room.name if room is not None else None
+    )
 
 
 def confirm_appointment(db: Session, user: User, appointment_id: uuid.UUID) -> dict:

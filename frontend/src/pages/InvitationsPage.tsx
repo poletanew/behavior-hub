@@ -1,5 +1,6 @@
 import { FormEvent, useEffect, useState } from "react";
 import { apiRequest, ApiError } from "../api/client";
+import { SPECIALTIES, specialtyLabel } from "../utils/specialty";
 
 interface Invitation {
   id: string;
@@ -25,6 +26,7 @@ export default function InvitationsPage() {
   const [invitations, setInvitations] = useState<Invitation[]>([]);
   const [email, setEmail] = useState("");
   const [role, setRole] = useState("professional");
+  const [specialty, setSpecialty] = useState("");
   const [lastLink, setLastLink] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -40,11 +42,12 @@ export default function InvitationsPage() {
     try {
       const invitation = await apiRequest<InvitationCreated>("/invitations", {
         method: "POST",
-        body: { email, role },
+        body: { email, role, specialty: role !== "at" && specialty ? specialty : null },
       });
       const link = `${window.location.origin}/invitations/${invitation.raw_token}/accept`;
       setLastLink(link);
       setEmail("");
+      setSpecialty("");
       load();
     } catch (err) {
       if (err instanceof ApiError && err.status === 403) {
@@ -87,6 +90,23 @@ export default function InvitationsPage() {
             <option value="at">Auxiliar Terapêutico (AT)</option>
           </select>
         </div>
+        {role !== "at" && (
+          <div>
+            <label className="block text-sm font-medium mb-1">Especialidade (opcional)</label>
+            <select
+              value={specialty}
+              onChange={(e) => setSpecialty(e.target.value)}
+              className="h-10 rounded-btn border border-slate-300 px-3 text-sm"
+            >
+              <option value="">Não especificada</option>
+              {SPECIALTIES.map((s) => (
+                <option key={s.value} value={s.value}>
+                  {s.label}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
         <button type="submit" className="h-10 rounded-btn bg-brand-turquoise text-white px-4 text-sm font-medium">
           Gerar convite
         </button>
@@ -104,6 +124,7 @@ export default function InvitationsPage() {
             <tr>
               <th className="text-left px-4 py-3">E-mail</th>
               <th className="text-left px-4 py-3">Papel</th>
+              <th className="text-left px-4 py-3">Especialidade</th>
               <th className="text-left px-4 py-3">Status</th>
               <th className="text-left px-4 py-3">Expira em</th>
               <th className="text-right px-4 py-3">Ações</th>
@@ -114,6 +135,7 @@ export default function InvitationsPage() {
               <tr key={inv.id} className={idx % 2 === 1 ? "bg-slate-50" : undefined}>
                 <td className="px-4 py-3">{inv.email}</td>
                 <td className="px-4 py-3">{ROLE_LABELS[inv.role] ?? inv.role}</td>
+                <td className="px-4 py-3">{specialtyLabel(inv.specialty) ?? "—"}</td>
                 <td className="px-4 py-3 capitalize">{inv.status}</td>
                 <td className="px-4 py-3">{new Date(inv.expires_at).toLocaleDateString("pt-BR")}</td>
                 <td className="px-4 py-3 text-right">
@@ -127,7 +149,7 @@ export default function InvitationsPage() {
             ))}
             {invitations.length === 0 && (
               <tr>
-                <td colSpan={5} className="px-4 py-6 text-center text-neutralState">
+                <td colSpan={6} className="px-4 py-6 text-center text-neutralState">
                   Nenhum convite gerado ainda.
                 </td>
               </tr>

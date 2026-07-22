@@ -635,6 +635,493 @@ Upload de PDF (RF-04) e "Preencher com IA" (RF-05) compartilham a mesma checagem
 dele; não foi criada uma permissão nova. Dependência nova: `pypdf` (`requirements.txt`), leitura de
 texto de PDF pura em Python, sem binário externo.
 
+## Nota sobre IA em Avaliações Padronizadas (Fase 6 bloco 9 — Addendum v2.1, RF-06)
+
+`Assessment` ganha `ai_generated_plan_draft` (JSON, lista de itens sugeridos) e
+`plan_draft_activated_at`. Decisão importante: o modelo de `Assessment` não tem — e nunca teve — um
+estado de rascunho/pendente separado de "concluída"; toda aplicação já é registrada com
+`raw_scores` completo. Por isso, "ao marcar a avaliação como concluída" (linguagem do addendum) é
+tratado como o próprio instante de `create_assessment` — não foi criado um novo status de avaliação
+só para satisfazer essa frase.
+
+`assessment_service._generate_plan_draft` decide quais domínios são "de menor desempenho" com uma
+regra puramente aritmética: domínios com `normalized_pct` abaixo da média desta mesma avaliação
+(se todos empatarem, todos entram no rascunho, garantindo pelo menos um item). Cada item vira um
+objetivo sugerido — título, descrição, critério e estratégias em texto-modelo, sempre editável.
+
+**Decisão de escopo deliberada: todo objetivo sugerido vai para a área ABA.** VB-MAPP e ABLLS-R
+(Seção 30) são instrumentos de Análise do Comportamento Aplicada; o PRD não define um mapeamento
+domínio→área da grade multidisciplinar (Seção 13.1) para os domínios desses protocolos (ex.:
+"Leitura", "Motricidade Fina", "Vestir-se"), e inventar esse mapeamento seria decidir um julgamento
+clínico que o documento não especifica. Mapear tudo para ABA — a área nativa desses protocolos —
+evita esse problema sem perder a funcionalidade pedida.
+
+`ai_generated_plan_draft` **nunca vira `Objective` sozinho.** A nova rota
+`POST /assessments/{id}/activate-plan-draft` recebe os itens (possivelmente editados pelo
+profissional) e reaproveita `treatment_plan_service.create_objective` diretamente para cada um —
+com `force=True`, já que o conteúdo já foi revisado/editado antes do envio, então o alerta de
+duplicidade da Seção 13.2 não se aplica aqui da mesma forma que numa digitação manual avulsa.
+`plan_draft_activated_at` impede uma segunda ativação (409) — evita duplicar os mesmos objetivos se
+o profissional clicar em "Ativar" duas vezes; a avaliação em si e seu rascunho continuam intactos
+para consulta, só a ativação é bloqueada. `Objective.ai_source_assessment_id` (nova FK, paralela ao
+`ai_source_document_id` do RF-05) mantém a rastreabilidade de qual avaliação originou o objetivo.
+
+Nenhum gráfico novo foi persistido no backend — "(a) gera os gráficos de domínio" já está satisfeito
+estruturalmente pelo `raw_scores` (que já tem `domain_label`/`normalized_pct` por domínio desde a
+Fase 4b); o gráfico de barras em si é responsabilidade do frontend (`AssessmentsPage.tsx`,
+`recharts`), o mesmo padrão já usado em Reports.
+
+## Nota sobre "Criar recurso com IA" (Fase 6 bloco 10 — Addendum v2.1, RF-12)
+
+`Resource` ganha `ai_generated` (bool) e `ai_reviewed_at`, mesmo par de campos já usado em
+`Objective` (RF-05/RF-06). O fluxo tem dois passos deliberadamente separados, espelhando
+exatamente a frase do addendum ("gera um rascunho... que o profissional revisa, edita e só então
+publica"):
+
+1. `POST /resources/ai-draft` (`resource_service.generate_ai_draft`) — recebe `kind` (história
+   social/rotina visual/cartão de comunicação), `theme` e `age_range`, devolve um rascunho
+   (título/descrição/conteúdo) que **não é persistido**. O texto vem de um template determinístico
+   por tipo de recurso (`_ai_draft_content`) — sem chamada a nenhuma API de IA externa, mesmo
+   princípio já seguido por `report_summary_service`/`assessment_service`/`treatment_plan_service`.
+2. `POST /resources/ai-publish` (`resource_service.publish_ai_resource`) — só aqui o `Resource` é
+   de fato criado, com `ai_generated=True` e `ai_reviewed_at=now()`. O conteúdo (possivelmente
+   editado pelo profissional) é renderizado em um PDF de verdade via `reportlab`
+   (`_render_ai_resource_pdf` — mesmo padrão de `SimpleDocTemplate`/`Paragraph` já usado em
+   `report_export_service.export_pdf`) e enviado ao MinIO/S3 pelo `file_service` já existente —
+   reaproveita a mesma listagem, visualizador seguro e regra "individual não compartilha com
+   clínica" que já valem para upload manual de recursos.
+
+Diferente de RF-05/RF-06, aqui não há uma entidade de origem externa (PDF anexado, avaliação) para
+vincular via FK — o rascunho é gerado a partir de texto livre (tema + faixa etária) fornecido no
+próprio formulário, então basta os dois campos booleano/timestamp em `Resource`, sem nenhuma FK
+adicional.
+
+## Nota sobre Auditoria Agrupada por Paciente (Fase 6 bloco 11 — Addendum v2.1, RF-14)
+
+O addendum descreve o modelo de dados como "`AuditLog` já suporta `patient_id` como entidade
+referenciada; adicionar índice `patient_id` + `timestamp`" — mas o `AuditLog` real (Seção 18) nunca
+teve uma coluna `patient_id`; cada linha só referencia `entity_type`/`entity_id` (ex.:
+`entity_type="objective"`, `entity_id=<uuid do objetivo>`). Adicionar essa coluna de verdade
+exigiria retrofitar os ~60 pontos de chamada de `audit_service.record` espalhados por 18 serviços
+— a maioria (auth, billing, RBAC, white-label) nem é sobre um paciente. Em vez disso,
+`audit_log_service.get_patient_audit_trail` resolve os IDs relevantes por `entity_type` **em tempo
+de consulta**, reaproveitando exatamente a mesma cobertura de entidades já usada por
+`timeline_service.get_patient_timeline` (Fase 4a/Seção 29.2): `patient`, `session`, `objective`
+(via `plan_id`), `treatment_plan_attachment` (via `plan_id` — os "uploads" citados no critério de
+aceite), `patient_assignment` e `assessment`. Diferente da Timeline (que foca em eventos clínicos e
+por isso ignora registros já excluídos), a auditoria inclui explicitamente entidades com soft
+delete já aplicado — "exclusões" e "restaurações" são, ela própria, o dado que a Seção 17 pede para
+mostrar.
+
+Um efeito colateral corrigido en passant: `report_summary_service.generate_summary` gravava
+`entity_id=None` no seu registro de auditoria (o resumo criado nunca era referenciado de volta).
+Passou a gravar `entity_id=summary.id`, permitindo resolver `ReportSummary.patient_id` como as
+demais entidades — pequeno bug de rastreabilidade preexistente, não introduzido por este bloco, mas
+que impedia esse tipo de ação de aparecer na nova visão agrupada.
+
+**Decisão de escopo deliberada**: tentativas individuais (`trial_created`/`updated`/`deleted`) não
+entram na auditoria por paciente — o critério de aceite do addendum fala em "sessões", não em cada
+tentativa isolada, e resolver `Trial` → `SessionTraining` → `ClinicalSession` → paciente
+adicionaria uma junção a mais sem um pedido explícito correspondente.
+
+## Nota sobre Segurança — Autoatendimento (Fase 6 bloco 12 — Addendum v2.1, RF-15)
+
+Duas rotas novas em `app/api/v1/auth.py`, ambas exigindo `get_current_user` (o próprio usuário só
+altera os próprios dados, nunca os de terceiros):
+
+- `POST /auth/change-password` (`ChangePasswordRequest{current_password, new_password}`) — valida a
+  senha atual com `verify_password`, grava o novo hash e **incrementa `user.token_version`**. Esse
+  campo já existia (Seção 17.2, usado para revogar acesso do Family Portal) e embute um claim `ver`
+  em todo JWT emitido; o middleware de autenticação (`app/core/deps.py::get_current_user`) já
+  rejeita qualquer token cujo `ver` não bata mais com o valor salvo no banco. Isso satisfaz
+  literalmente "trocar a senha deve encerrar as demais sessões ativas do usuário" sem precisar de
+  nenhuma tabela de sessões nova. Como o bump de `token_version` também invalidaria o próprio
+  access token que fez a requisição, a rota devolve um par de tokens novo (`TokenResponse`) já
+  válido — o frontend troca os tokens salvos (`setTokens`) e a sessão que trocou a senha continua
+  ativa, exatamente como o texto pede ("as **demais** sessões", não a atual).
+- `PATCH /auth/change-name` (`ChangeNameRequest{name}`) — atualiza `User.name`. **Decisão de
+  escopo**: o addendum fala em "nome de usuário", mas o cadastro (Seção 6.2) nunca teve um campo de
+  username separado — o login é sempre por email. Interpretamos "nome de usuário" como o nome de
+  exibição já existente (`User.name`, mostrado em toda a UI e nos registros de auditoria), em vez de
+  inventar um novo campo de identificador de login que o restante do sistema não usa em lugar
+  nenhum.
+
+Ambas as ações geram entradas em `AuditLog` (`password_changed`, `user_name_updated`), visíveis na
+Auditoria por ação (`entity_type=user`) e na Auditoria por paciente onde aplicável.
+
+## Nota sobre Design System — Leveza Visual Transversal (Fase 6 bloco 13 — Addendum v2.1, RF-17)
+
+Este bloco é 100% frontend — nenhum endpoint, schema ou tabela novos. O addendum pede algo
+propositalmente amplo ("aplicar em cada tela principal do sistema"), então em vez de retocar
+manualmente todas as ~25 telas uma a uma, priorizamos duas mudanças centrais e de baixo risco que
+cobrem o requisito de forma sistemática:
+
+1. **Transição de tela automática para o sistema inteiro**: `Layout.tsx`, `ATWorkspaceLayout.tsx` e
+   `FamilyPortalLayout.tsx` (os três roteadores de topo — clínica, AT e Família) agora envolvem o
+   `<Outlet />` num `<div key={location.pathname} className="animate-fade-in">`. Trocar de rota
+   remonta esse wrapper (a `key` muda), disparando um fade-in curto (`index.css`) em **toda** tela
+   do sistema sem precisar tocar em cada página individualmente — satisfaz literalmente "transição
+   suave ao trocar de aba" do critério de aceite para qualquer tela, presente ou futura.
+2. **Componente `EmptyState` reutilizável** (`frontend/src/components/EmptyState.tsx`): ícone
+   amigável num círculo com a cor de apoio turquesa, título opcional e mensagem, substituindo o
+   antigo bloco `<div className="p-10 text-center text-neutralState">texto cinza</div>` repetido
+   (encontrado idêntico em 13 arquivos). Aplicado às telas principais que podem ficar vazias:
+   Pacientes, Atendimentos, Recursos, Lista de Espera, Dados Excluídos, Relatórios, Avaliações,
+   Timeline, Auditoria, Painel de Supervisão, Espaço do AT (lista de pacientes e treinos
+   prescritos) e o card de "Sessões recentes" da Área de Trabalho.
+
+**Decisão de escopo deliberada**: estados vazios *aninhados* dentro de painéis já preenchidos (ex.:
+"Nenhum comentário ainda" dentro do card de um objetivo, "Nenhum convite gerado ainda" numa célula
+de tabela) foram deixados como texto simples — o critério de aceite fala em "o primeiro contato de
+uma clínica nova com o sistema", isto é, a tela cheia vazia, não cada sub-lista aninhada dentro de
+uma tela já com conteúdo; usar o `EmptyState` (ícone grande em círculo) nesses contextos pequenos
+ficaria desproporcional ao espaço disponível. Uma confirmação animada ao salvar
+(`animate-pop-in`) foi adicionada às mensagens de sucesso da aba Segurança (bloco 12, testado nesta
+mesma sessão) como exemplo do padrão "microanimação curta"; não foi replicada em todos os ~60
+pontos de mensagem de sucesso do sistema pelo mesmo motivo de escopo. Ambas as animações respeitam
+`prefers-reduced-motion: reduce` (acessibilidade, também citada no critério de aceite do RF-17).
+
+Cantos arredondados (`rounded-card`, 12px) e espaçamento generoso nos cards já eram usados de forma
+consistente desde fases anteriores (Seção 24.8 do PRD já estava implementada) — não foram alterados
+para não introduzir uma mudança de densidade em massa sem necessidade.
+
+## Nota sobre Coleta de Dados — Modelo ABC, Reforçadores e Foto/Vídeo (Fase 7 Módulo 3.1 — Addendum v3.0, RF-18 a RF-20)
+
+Primeiro bloco do Addendum v3.0 (RF-18 a RF-38, numeração contínua a partir do v2.1). Três entidades
+novas, todas escopadas por paciente (`clinic_id`/`individual_owner_id` denormalizados, mesmo padrão
+de `Assessment`):
+
+- **`BehaviorEvent`** (RF-18) — modelo ABC (Antecedente/Comportamento/Consequência) completo, com
+  `frequency_count`, `duration_seconds` e `intensity` (enum `baixa/media/alta`), sempre ligado a uma
+  `session_id` mas registrável independentemente das tentativas de treino
+  (`POST /patients/{id}/behavior-events`). Entra na Timeline Clínica
+  (`timeline_service._behavior_event_entries`, Seção 29.2) e na Auditoria por Paciente
+  (`audit_log_service._PATIENT_ENTITY_TYPES`, RF-14/Fase 6 bloco 11) pelo mesmo mecanismo já usado
+  para as demais entidades clínicas — nenhuma tabela ou view nova precisou ser criada para isso.
+- **`Reinforcer`** / **`SessionReinforcer`** (RF-19) — cadastro de reforçador por paciente
+  (`POST /patients/{id}/reinforcers`) e vínculo a uma sessão específica com nota rápida de
+  efetividade (`POST /sessions/{id}/reinforcers`). `GET /patients/{id}/reinforcers` já devolve
+  `usage_count` agregado por reforçador (contagem de `SessionReinforcer`), satisfazendo o critério
+  de aceite "ver quais reforçadores foram mais usados no período" nesta própria rota — o gráfico
+  dedicado (RF-34, Módulo 3.7) reaproveitará os mesmos dados.
+- **`ClinicalSession.media_key`/`media_type`/`media_duration_seconds`** (RF-20) — o campo `photo_url`
+  original (Fase 1) era só uma string de URL sem upload real de fato; permanece intocado por
+  compatibilidade, mas o addendum pede upload de verdade com limite de duração/tamanho por plano, o
+  que exigia a mesma infraestrutura já usada por Resources/TreatmentPlanAttachment
+  (`file_service.upload_object`/`generate_presigned_url`). Novo par de rotas
+  `POST /sessions/{id}/media` (multipart, aceita foto ou vídeo, detecta o tipo pelo `content_type`) e
+  `GET /sessions/{id}/media-url` (URL assinada, mesmo padrão de privacidade da Seção 17.2). Limites
+  por plano (`basic`/`premium`/`enterprise`): duração de vídeo 30s/60s/120s, tamanho de arquivo
+  20MB/50MB/100MB — Free continua bloqueado por completo, igual já valia para `photo_url`.
+
+**Decisões de escopo**: (1) tanto `BehaviorEvent` quanto o vínculo de `Reinforcer` a uma sessão usam
+a mesma permissão "Registrar sessão" (`rbac_service.can_register_session`, Seção 17.1) já usada por
+Trial — nenhum RBAC novo. (2) Foto/vídeo ficou no nível de sessão (não por tentativa individual),
+espelhando onde `photo_url` já vivia; o texto do RF-20 fala em "tentativa/sessão" de forma ambígua,
+e criar um campo de mídia por `Trial` exigiria uma tabela nova sem um critério de aceite que
+realmente precisasse desse nível de granularidade. (3) Nem `BehaviorEvent` nem `Reinforcer` têm
+rotas de edição/exclusão — os critérios de aceite do RF-18/RF-19 só pedem registrar, vincular e
+visualizar; adicionar CRUD completo sem um requisito correspondente seria escopo não pedido.
+
+**Gotcha de migration (mesma classe do Fase 6 bloco 7, documentada por completude)**: `op.add_column`
+numa tabela já existente (`sessions`) não cria automaticamente o tipo Postgres de um enum novo — só
+`create_table` faz isso implicitamente. A migration cria `sessionmediatype` explicitamente via
+`postgresql.ENUM(...).create(bind, checkfirst=True)` antes do `add_column` (com `create_type=False`
+no próprio `add_column`). Efeito colateral menos óbvio: `op.drop_table` também **não** derruba
+automaticamente o enum que uma `create_table` anterior criou implicitamente (aqui,
+`behaviorintensity`) — o `downgrade()` precisa dropar esse tipo explicitamente também, ou uma
+tentativa futura de `upgrade` após um `downgrade` falha com "type already exists".
+
+## Nota sobre Avaliação — Anamnese, Checklists Personalizados e Duplicar Avaliação (Fase 7 Módulo 3.2 — Addendum v3.0, RF-21 a RF-23)
+
+- **`Anamnesis`** (RF-21) — um por paciente (`UniqueConstraint("patient_id")`), campos fixos em vez de
+  JSON livre: diferente de `Assessment.raw_scores` (cujos domínios variam por protocolo), as seções
+  da anamnese são sempre as mesmas (queixa principal, informações de nascimento, histórico/marcos de
+  desenvolvimento, histórico familiar), então um schema fixo é mais simples de validar e exibir do
+  que o `form_data (JSON)` sugerido pela tabela de impacto no modelo de dados do addendum.
+  `PUT /patients/{id}/anamnesis` cria na primeira chamada e edita nas seguintes (é um formulário de
+  admissão vivo, preenchido aos poucos — não um evento imutável); só a criação gera a entrada
+  "evento fundacional" na Timeline Clínica (`timeline_service._anamnesis_entries`), edições
+  posteriores não duplicam a entrada. Gate: `patient_service.assert_full_clinical_access` (mesmo
+  usado por prontuário completo/plano de tratamento/reports) — bloqueia o AT, conforme o texto do
+  RF-21 ("acessível a quem tem permissão de leitura de dados clínicos completos").
+- **`CustomChecklistTemplate` / `ChecklistResponse`** (RF-22) — o profissional monta um template uma
+  vez (`POST /checklist-templates`, título + lista de perguntas com `answer_type` sim/não, escala
+  1-5 ou texto curto — cada pergunta recebe um `id` gerado no momento da criação) e reaplica em
+  quantos pacientes quiser (`POST /patients/{id}/checklist-responses`). O serviço valida que toda
+  pergunta do template foi respondida e que o tipo do valor bate com `answer_type` (bool para
+  sim/não, 1-5 para escala, string não vazia para texto curto). `GET /patients/{id}/checklist-responses`
+  já devolve os itens "achatados" (pergunta + resposta juntas, não dois arrays para cruzar no
+  frontend), o que o critério de aceite chama de "resultado tabulado"; o frontend soma um gráfico de
+  barras simples só para as perguntas do tipo escala (as de sim/não e texto curto não têm eixo
+  numérico para plotar, então ficam só na tabela).
+- **RF-23 (duplicar avaliação anterior)** — implementado inteiramente no frontend, sem rota nova:
+  `AssessmentsPage.tsx` já carrega todas as aplicações do protocolo selecionado; um botão "Duplicar
+  avaliação anterior como ponto de partida" (visível só quando já existe pelo menos uma aplicação
+  anterior do mesmo protocolo para o paciente) pré-preenche o estado local do formulário com os
+  `raw_scores` da aplicação mais recente. Como o formulário de criação já exige uma nova
+  `applied_date` antes de habilitar o envio, e o POST de `/patients/{id}/assessments` sempre cria um
+  registro novo (nunca atualiza um existente — `Assessment` não tem endpoint de update de scores),
+  "sem sobrescrever a original" é garantido pela própria arquitetura já existente, sem precisar de
+  um endpoint de duplicação dedicado no backend.
+
+## Nota sobre Plano Terapêutico — Manutenção/Generalização e Pais Aplicadores (Fase 7 Módulo 3.3 — Addendum v3.0, RF-24 e RF-25)
+
+- **Manutenção/generalização (RF-24)** — estende `Objective` (Seção 18) direto, como o addendum pede
+  explicitamente ("sem criar uma tabela paralela"), com dois campos novos: `maintenance_check_date`
+  (`Date`) e `generalization_contexts` (`JSON`, lista de `{context, tested_at, result, notes}`).
+  `update_objective` ganhou um gatilho: na primeira vez que o `status` vira `MASTERED`, agenda
+  `maintenance_check_date = hoje + MAINTENANCE_INTERVAL_DAYS` (constante fixa de 30 dias — o
+  addendum fala do intervalo como exemplo, "ex.: a cada 30 dias", não como uma configuração por
+  clínica, então não criamos uma nova tela de configurações para isso). `ObjectiveResponse.maintenance_due`
+  é calculado na resposta (`maintenance_check_date <= hoje`), não persistido — evita um Celery sweep
+  novo só para marcar uma flag. `POST /objectives/{id}/generalization-contexts` só acrescenta ao
+  array (nunca substitui) e `POST /objectives/{id}/maintenance-checks` (400 se o objetivo não estiver
+  `MASTERED`) reagenda mais 30 dias e loga o resultado (`mantida`/`perdida`) no Audit Log existente.
+- **`ObjectiveApplier`** (RF-25) — tabela nova (`objective_id`, `applier_type` `professional`/`parent`,
+  `applier_user_id`, `added_by_user_id`, `UniqueConstraint(objective_id, applier_user_id)`), porque
+  aqui sim é uma relação N:N (vários aplicadores por objetivo, uma pessoa pode aplicar vários
+  objetivos) que não cabe como campo do `Objective`. `add_applier` (gate: `can_edit_area`, mesmo das
+  demais edições de objetivo) só aceita `applier_type=parent` se o usuário alvo já tiver um
+  `FamilyAccess` ativo (`revoked_at is None`) para o paciente — reaproveita o mesmo consentimento
+  explícito do Portal da Família (Seção 29.6) em vez de abrir uma segunda porta de entrada para dados
+  do paciente; retorna 400 se não tiver, 409 se a pessoa já for aplicadora do objetivo.
+- **Portal da Família — "apliquei hoje" (RF-25)** — `family_portal_service.list_applier_objectives`
+  (gate: `_get_active_access`, o mesmo baseline de todo o Portal da Família) junta `ObjectiveApplier`
+  → `Objective` → `TreatmentPlan` filtrando por `applier_user_id`, e `record_objective_application`
+  audita a ação como `objective_applied` com `actor_user_id` do responsável. Como
+  `treatment_plan_service.get_history` já lê o Audit Log filtrando por `entity_type="objective"`, o
+  "apliquei hoje" da família aparece automaticamente no histórico do objetivo do lado da equipe
+  clínica — zero tabela nova, zero endpoint novo para o profissional consultar isso. No frontend, a
+  aba "Meus Programas" do Portal da Família aparece para qualquer responsável com acesso ativo,
+  independente da whitelist de categorias (Seção 17.2) — ser marcado como aplicador de um objetivo
+  específico já é, em si, a autorização para aquele objetivo puntual.
+
+## Nota sobre Agendamento — Salas e Arrastar-e-soltar (Fase 7 Módulo 3.4 — Addendum v3.0, RF-26 e RF-28)
+
+- **`Room`** (RF-26) — segue o mesmo padrão de tenant dos demais modelos (`clinic_id` OU
+  `individual_owner_id`, nunca os dois), consistente com `Appointment` e todos os modelos
+  adicionados desde a Fase 4. `Appointment.room_id` é opcional (nem todo atendimento usa uma sala
+  física — ex.: telessaúde). `_has_room_conflict` em `appointment_service.py` é uma cópia direta do
+  padrão já usado para `_has_conflict` (profissional): mesma janela de tempo, mesmos status ativos
+  (`SCHEDULED`/`CONFIRMED`/`COMPLETED`), aplicado tanto em `create_appointment` quanto em
+  `update_appointment`. `room_service.delete_room` recusa (409) remover uma sala com atendimentos
+  futuros ativos, em vez de silenciosamente deixá-los sem sala. A UI de gestão de salas fica em
+  Configurações da Clínica, restrita a quem já vê essa página (admin/supervisor) — contas
+  individuais podem criar salas pela API (mesma consistência de tenant), mas RF-26 fala
+  explicitamente de "salas" no plural, um cenário de clínica multi-sala, não de profissional
+  autônomo, então não foi criada uma tela dedicada para elas.
+- **Arrastar e soltar na Agenda (RF-28)** — implementado como reagendamento por dia: arrastar o
+  card de um atendimento para outra coluna de dia da semana mantém o mesmo horário e duração,
+  mudando só a data (`PATCH /appointments/{id}` com os novos `scheduled_start`/`scheduled_end`,
+  reaproveitando toda a validação de conflito que já existia para edição manual). Não foi
+  implementado arrastar para mudar o horário dentro do mesmo dia, já que a grade da Agenda é uma
+  visão por coluna-de-dia (Seção 32.2), sem uma grade horária granular para soltar em cima.
+- **`Objective.display_order` e reordenar por área (RF-28)** — campo inteiro novo em `Objective`,
+  populado com a posição na criação (append ao fim da área) e usado como critério de ordenação
+  primário (`area, display_order, created_at`) em `get_treatment_plan`. `POST
+  /patients/{id}/treatment-plan/objectives/reorder` recebe a lista completa de IDs da área na nova
+  ordem e reescreve `display_order` de todos eles; recusa (400) se a lista não bater exatamente com
+  os objetivos ativos da área, para não silenciosamente perder algum objetivo de uma reordenação
+  parcial. O frontend expõe uma pequena alça de arrastar (⠿⠿⠿) acima de cada card em vez de tornar o
+  card inteiro arrastável, para não conflitar com a seleção de texto nos campos de comentário e
+  formulários internos do próprio card.
+- **RF-27 (confirmação via WhatsApp) — não implementado nesta fase**, por decisão já confirmada
+  anteriormente com o usuário: depende de um provedor de API do WhatsApp Business (BSP) contratado,
+  e nenhuma credencial desse tipo está disponível neste projeto. Nenhum schema, campo ou tela foi
+  criado para isso — a retomada fica condicionada a uma decisão/credencial futura do usuário.
+
+## Nota sobre Comunicação com a Família — Registro de Rotinas e Notas de Voz (Fase 7 Módulo 3.5 — Addendum v3.0, RF-29 e RF-30)
+
+- **`FamilyRoutineLog`** (RF-29) — sempre enviado pela família (nunca pela equipe, diferente de
+  `FamilyMessage` que é bidirecional). Gate: nova categoria de whitelist `can_submit_routine_logs`
+  em `FamilyAccess`, seguindo à risca a instrução já registrada no docstring do modelo ("qualquer
+  categoria nova... deve nascer aqui como uma nova flag default False, nunca exposta por omissão").
+  `timeline_service._routine_log_entries` adiciona uma entrada por registro na Timeline Clínica já
+  consolidada (Seção 29.2) — resolve o "visível ao profissional antes da próxima sessão" do
+  addendum sem precisar de uma tela nova só para isso. Lado da equipe:
+  `GET /patients/{id}/routine-logs` (read-only, a equipe não registra rotina) reaproveita o gate
+  normal de paciente, igual ao já usado para `family-messages`.
+- **`FamilyAudioMessage`** (RF-30) — o addendum descreve o modelo com um campo `audio_url`, mas o
+  projeto decidiu **não gravar nem armazenar o áudio bruto**: o requisito central do addendum é
+  evitar depender de um provedor de STT pago no servidor, e isso já é resolvido inteiramente pela
+  transcrição no navegador (reaproveita literalmente o mesmo hook/componente da Fase 5 Bloco 5 —
+  `useSpeechToText`/`VoiceDictationButton`, sem nenhuma linha nova de reconhecimento de voz).
+  Armazenar também o áudio gravado exigiria inventar upload/retenção/playback de mídia nova sem
+  necessidade clínica clara, já que a transcrição em si é o conteúdo relevante para a equipe — por
+  isso `FamilyAudioMessage` só persiste `transcription_text`. Gate: reaproveita
+  `can_use_messaging` (categoria já existente) em vez de uma flag nova, porque uma nota de voz é só
+  outro formato de mensagem para a equipe, não uma categoria de dado nova — mesmo raciocínio de
+  "não abrir uma segunda porta de entrada" já usado no RF-25.
+- Ambas as entidades reaproveitam o padrão já estabelecido em `FamilyMessage`/`list_messages_for_team`:
+  uma função de listagem "crua" (`_list_routine_logs`/`_list_audio_messages`) compartilhada entre o
+  endpoint da família (gate por whitelist) e o endpoint da equipe (gate normal de paciente), evitando
+  duplicar a query de junção com `User` para resolver o nome de quem enviou.
+
+## Nota sobre Relatórios — Desempenho do Profissional/AT, do Programa e Previsibilidade Financeira (Fase 7 Módulo 3.6 — Addendum v3.0, RF-31 e RF-32)
+
+- **RF-31 — `professional_performance_service.get_professional_performance`**: relatório individual
+  (diferente do Painel de Supervisão, que agrega por equipe), acessível tanto a `CLINIC_ADMIN` quanto
+  a `SUPERVISOR` (`_require_team_view`, mesma checagem já usada em `supervisor_dashboard_service`).
+  Como o Painel de Supervisão filtra `User.user_type.in_((PROFESSIONAL, SUPERVISOR))` e portanto nunca
+  lista ATs, o link "Ver desempenho" para AT foi colocado na própria página ABA, ao lado de cada AT na
+  lista já existente — mesma rota (`/professionals/{id}/performance`), duas portas de entrada.
+  Definições concretas para termos que o addendum deixa em aberto:
+  - **Consistência de registro** = % de sessões do profissional com pelo menos uma tentativa
+    registrada (`registration_consistency_pct`). Uma sessão criada mas sem nenhuma tentativa conta
+    contra o profissional — é o sinal mais direto de "sessão que aconteceu mas não foi documentada".
+  - **Eficiência do aplicador** = desvio-padrão populacional do % de acerto entre as sessões do
+    profissional (`procedure_variability_pp`, em pontos percentuais), classificado em
+    alta/média/baixa por dois limiares fixos (`HIGH_EFFICIENCY_MAX_VARIABILITY_PP = 10`,
+    `MEDIUM_EFFICIENCY_MAX_VARIABILITY_PP = 20`). A leitura é: quanto mais estável o desempenho de
+    sessão para sessão, mais "eficiente" (previsível) é a aplicação — não uma medida de quão alto é
+    o acerto em si (isso já é o indicador separado `average_accuracy_pct`).
+  - Exportação em PDF reaproveita o mesmo padrão (`SimpleDocTemplate`/`Table`/`TableStyle`) do export
+    de relatório de paciente já existente em `report_export_service.py`.
+- **RF-32 — `program_performance_service.get_program_performance`**: agrega objetivos por treino da
+  Training Library (via `ObjectiveTraining`, existente desde a Fase 2 mas sem nenhuma tela para
+  preenchê-lo — corrigido nesta fase com um campo multi-seleção "Treinos da Biblioteca vinculados" no
+  formulário de novo objetivo do Plano de Tratamento), restrito a `CLINIC_ADMIN`
+  (`_require_manager_view`, mesma checagem de `manager_dashboard_service`). Só entram na lista treinos
+  usados por pelo menos `MIN_PATIENTS_FOR_PROGRAM_STATS = 2` pacientes distintos — instrução explícita
+  do próprio addendum ("mínimo 2 pacientes"), aplicada como filtro rígido para nunca expor o
+  desempenho individual de um único paciente disfarçado de "programa". `average_days_to_mastery` é
+  calculado a partir do próprio Audit Log (primeira transição de status para `mastered` de cada
+  objetivo), sem precisar de nenhuma coluna nova de data.
+- **RF-32 — `manager_dashboard_service.get_financial_outlook`**: o addendum descreve "previsibilidade
+  financeira" em termos que pressupõem uma base de clientes agregada (projeção de receita recorrente,
+  estimativa de churn), mas o projeto só integra o Stripe no nível de cada clínica assinando o próprio
+  Behavior Hub (Seção 8.3) — não existe hoje nenhum dado de receita por paciente para agregar. Diante
+  dessa ambiguidade, o escopo foi confirmado explicitamente com o responsável pelo produto entre três
+  opções (visão por clínica da própria assinatura / novo papel de operador da plataforma agregando
+  todas as clínicas / só o agregado de Desempenho do Programa) — a opção escolhida foi a primeira:
+  uma extensão do Painel de Gestão já restrito a `CLINIC_ADMIN`, sem nenhum papel novo, mostrando
+  plano atual, data de renovação e um selo qualitativo de risco de cancelamento (`churn_risk_label`)
+  derivado unicamente de `Clinic.subscription_status` (`CHURN_RISK_BY_STATUS`) — nunca um valor de
+  receita em R$, já que nenhum dado desse tipo existe localmente (só os price IDs do Stripe).
+
+## Nota sobre Gráficos — Comparação de Avaliações, Comportamentos/Reforçadores e Curva de Aprendizagem (Fase 7 Módulo 3.7 — Addendum v3.0, RF-33 a RF-35)
+
+- **RF-33 — `assessment_service.compare_assessments`**: reescrito para retornar um ponto por domínio
+  *por data selecionada* (`values_by_date: dict[str, float]`, chave = `applied_date.isoformat()`), em
+  vez da estrutura anterior que só guardava `earliest_pct`/`latest_pct` (a mais antiga contra a mais
+  recente do conjunto, ignorando qualquer aplicação intermediária). Isso é o que torna "comparar até 4"
+  um recurso real: com 3-4 aplicações selecionadas, cada uma aparece como sua própria linha no gráfico,
+  não apenas as duas extremidades. `MAX_ASSESSMENTS_TO_COMPARE = 4` é validado no service (400 se
+  ultrapassado); a normalização em si continua sendo só `normalized_pct` (Seção 30.1.1), como o
+  addendum pede explicitamente para reaproveitar. Só entram no gráfico os domínios em comum entre
+  *todas* as aplicações selecionadas (interseção, não só entre a primeira e a última) — garante que
+  cada linha do gráfico tenha um ponto em cada data, sem buracos.
+- **RF-34 — `report_service.build_behavior_frequency_data`/`build_reinforcer_usage_data`**: dois
+  datasets novos no mesmo endpoint de Reports (`GET /reports/patients/{id}`), escopados pelos mesmos
+  `date_from`/`date_to` do restante do relatório. `BehaviorEvent` (RF-18) não tem nenhum campo de
+  categoria/nome — o texto exato de `behavior` é o único identificador estável de "qual comportamento"
+  ao longo de várias sessões, então o agrupamento é por esse texto literal. `Reinforcer`/
+  `SessionReinforcer` (RF-19) já existiam com esse uso futuro documentado no próprio docstring do
+  modelo ("reaproveitado... pelo gráfico de reforçadores (RF-34)") — a contagem por reforçador aqui só
+  precisou ganhar o filtro de data que o restante do relatório já tinha. Os dois gráficos aparecem no
+  frontend independentemente de `total_trials` (diferente dos 6 gráficos originais, que dependem de
+  tentativas de treino) — um paciente pode ter eventos ABC/reforçadores registrados sem nenhuma
+  tentativa ainda.
+- **RF-35 — nenhuma mudança de cálculo**: o rótulo do gráfico de linha existente em Reports passou de
+  "Evolução do percentual de acerto" para "Curva de Aprendizagem" (título) mantendo o texto técnico
+  como subtítulo — exatamente como o critério de aceite pede ("apenas o rótulo... passa a incluir
+  Curva de Aprendizagem"). `build_line_series` não foi tocado.
+
+## Nota sobre Automatização — Pasta de Treinos Sugerida e IA Multidisciplinar Ampliada (Fase 7 Módulo 3.8 — Addendum v3.0, RF-36 e RF-37)
+
+- **RF-36 — `assessment_service.get_suggested_training_folder`**: compartilha `_weak_domains` com o
+  rascunho de plano do RF-06 (mesma definição de "área de baixa pontuação" nos dois lugares), e reusa
+  a listagem de treinos já visível ao usuário (`training_service.list_trainings`, RF-10 do Addendum
+  v2.1) — nenhuma associação nova domínio→treino é inventada, é busca textual sobre dados já
+  existentes. Calculado sob demanda a cada chamada (diferente de `ai_generated_plan_draft`, que é
+  congelado na criação da avaliação) para sempre refletir o estado atual da Training Library.
+  **Bug descoberto e corrigido durante o desenvolvimento**: a primeira versão comparava o rótulo do
+  domínio como substring crua contra título/objetivo (via `ILIKE`), e isso produzia falsos positivos
+  ridículos — buscar o domínio "Mando" "casava" com o treino "Empilhar blocos" só porque seu texto
+  contém a palavra "for**mando**"; buscar "Tato" "casava" com "Contato visual" (con**tato**). Corrigido
+  trocando para casamento por **palavra inteira** (`\b<rótulo>\b`, case-insensitive, calculado em
+  Python sobre a lista de treinos já carregada — evitar depender de regex do lado do banco e sua
+  sintaxe de escape separada). Coberto por teste de regressão dedicado
+  (`test_suggested_training_folder_ignores_substring_false_positives`). Vincular um treino sugerido ao
+  paciente usa o endpoint `POST /trainings/{id}/link` já existente — nada de vínculo automático.
+- **RF-37 — `SPECIALTY_TO_AREA` (app/models/enums.py)**: a Seção 7.2 do PRD lista 12 especialidades,
+  mas o dicionário só mapeava 7 para uma `TreatmentArea` nomeada; as 5 restantes (Neuropediatra,
+  Psiquiatra Infantil, Musicoterapeuta, Arteterapeuta, Psicomotricista) retornavam `None` em
+  `SPECIALTY_TO_AREA.get(user.specialty)`, e como `can_edit_area` (usado tanto para criar objetivo
+  quanto para `generate_objective_draft_from_attachment`/"Preencher com IA") compara esse valor contra
+  a área do anexo, essas 5 especialidades nunca conseguiam editar nenhuma área com permissão
+  `EDIT_AREA_PLAN` — incluindo o próprio mecanismo de IA que o RF-37 pede para ampliar. Corrigido
+  mapeando as 5 para `TreatmentArea.OUTRA` (a área "catch-all" que já existe na grade), em vez de
+  inventar uma associação clínica 1:1 que o PRD não especifica (ex.: Psicomotricista não é Terapia
+  Ocupacional). **Gap adjacente também corrigido**: a página de convite de profissional (`/invitations`)
+  nunca expunha um campo de especialidade — o backend já aceitava `specialty` na criação do convite
+  (usado em registro individual e nos testes), mas nenhuma tela de convite de clínica preenchia esse
+  campo, o que tornava o próprio mapeamento inatingível na prática para profissionais convidados por
+  uma clínica. Adicionado um seletor de especialidade opcional ao formulário de convite (visível para
+  papéis `professional`/`supervisor`, omitido para `at`, que não usa `SPECIALTY_TO_AREA`).
+
+## Nota sobre Certificações de Segurança (Fase 7 Módulo 3.9 — Addendum v3.0, RF-38, fecha o Addendum v3.0)
+
+O próprio addendum é explícito: "RF-38 NÃO é um requisito de código." ISO 27001, SOC 2 e GDPR não são
+funcionalidades que se programam — são certificações de auditoria organizacional externa (como a
+empresa gerencia acesso, incidentes, fornecedores e continuidade de negócio), concedidas por um
+auditor credenciado depois de meses de avaliação de processos, não uma configuração de sistema.
+Divulgar publicamente "temos ISO 27001/SOC 2" sem ter passado pela certificação real é um problema
+sério de credibilidade (e, dependendo do contexto, legal) — por isso nenhuma tela, selo ou texto
+alegando essas certificações foi criado em nenhum módulo deste projeto.
+
+O que este addendum pede para deixar explícito é a distinção entre esse selo organizacional e os
+**controles técnicos de suporte** que uma certificação futura exigiria como evidência — e destes, o
+que já existe neste código (não é trabalho novo deste módulo, é o resultado acumulado de fases
+anteriores) é:
+
+- **RBAC configurável por clínica** (Seção 17.1, Fase 3 núcleo) — permissões por papel
+  (`ClinicPermissionSettings`), com granularidade adicional por vínculo profissional↔paciente
+  (`AssignmentPermission`: somente leitura, editar sessões, editar plano da própria área, acesso
+  total) e por especialidade↔área (RF-37, Módulo 3.8 desta mesma fase).
+- **Log de auditoria** (`AuditLog`, Seção 32.7, Fase 3 núcleo) — toda ação sensível registrada com
+  ator, timestamp, entidade afetada e estado antes/depois, com a visão agrupada por paciente do RF-14
+  (Addendum v2.1) e escopo sempre isolado por tenant.
+- **Autenticação de dois fatores** (TOTP, Seção 32.8, Fase 3) — obrigatória para administradores de
+  clínica no plano Enterprise, opcional para os demais perfis.
+- **Isolamento de tenant** (Seção 17) — testado em praticamente todo módulo deste projeto (ver
+  `tests/`) como a defesa central contra vazamento de dado entre clínicas/contas individuais.
+
+Criptografia em trânsito (TLS) e em repouso, backups testados e alta disponibilidade/redundância são
+igualmente reais e necessários para uma certificação, mas são responsabilidade da camada de
+hospedagem/infraestrutura de produção (provedor de nuvem, configuração do banco gerenciado, proxy
+reverso) — não há código de aplicação para "implementar" isso dentro deste repositório backend; são
+requisitos não-funcionais de operação (Seção 20 do PRD) a configurar no ambiente de produção quando
+ele existir, não uma feature deste código-fonte.
+
+**Recomendação, registrada aqui exatamente como o addendum orienta**: tratar certificação formal como
+meta de negócio de médio prazo (Seção 31), não como algo resolvido nesta rodada de desenvolvimento — e
+não anunciar essas siglas em site/material de vendas até a certificação real ser obtida.
+
+### Fechamento do Addendum v3.0 (Fase 7)
+
+Com esta nota, os 9 módulos do Addendum v3.0 (Seções 3.1 a 3.9, RF-18 a RF-38) estão concluídos:
+
+| Módulo | RFs | Resumo |
+| --- | --- | --- |
+| 3.1 Coleta de Dados | RF-18–20 | Modelo ABC (comportamento-alvo), Reforçadores, upload real de Foto/Vídeo |
+| 3.2 Avaliação | RF-21–23 | Anamnese, Checklists personalizados, duplicar avaliação anterior |
+| 3.3 Plano Terapêutico | RF-24–25 | Manutenção/generalização, pais como aplicadores |
+| 3.4 Agendamento | RF-26, 28 | Salas de atendimento, arrastar-e-soltar para reagendar/reordenar |
+| 3.5 Comunicação com a Família | RF-29–30 | Registro de rotina, notas de voz transcritas |
+| 3.6 Relatórios | RF-31–32 | Desempenho do Profissional/AT, do Programa, Previsibilidade Financeira |
+| 3.7 Gráficos | RF-33–35 | Comparação de até 4 avaliações, comportamentos/reforçadores, Curva de Aprendizagem |
+| 3.8 Automatização | RF-36–37 | Pasta de treinos sugerida, IA multidisciplinar para as 12 especialidades |
+| 3.9 Segurança | RF-38 | Esta nota — sem código |
+
+**Único item deliberadamente fora do escopo**: RF-27 (confirmação de agendamento via WhatsApp,
+Módulo 3.4) depende de um provedor de API do WhatsApp Business contratado externamente; sem essa
+credencial configurada, simular o envio produziria uma funcionalidade que parece funcionar mas nunca
+entrega nada de verdade — o addendum pede explicitamente para parar e perguntar nesse caso, em vez de
+fingir. Fica pronto para ligar assim que a credencial existir, reaproveitando o mesmo `Room`/
+`Appointment` já construído no Módulo 3.4.
+
 ## Estrutura
 
 - `app/models/` — entidades SQLAlchemy (Seção 18/27 do PRD).

@@ -1,15 +1,18 @@
 import datetime
+import re
 import uuid
 
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.models.assessment import Assessment
-from app.models.enums import AssessmentProtocol, UserType
+from app.models.enums import AssessmentProtocol, TreatmentArea, UserType
 from app.models.patient import Patient
+from app.models.treatment_plan import Objective
 from app.models.user import User
-from app.schemas.assessment import AssessmentCreateRequest, AssessmentUpdateRequest
-from app.services import assessment_protocols, audit_service, patient_service
+from app.schemas.assessment import ActivatePlanDraftRequest, AssessmentCreateRequest, AssessmentUpdateRequest
+from app.schemas.treatment_plan import ObjectiveCreateRequest
+from app.services import assessment_protocols, audit_service, patient_service, training_service, treatment_plan_service
 from app.services.rbac_service import can_restore_deleted_data
 
 
@@ -50,6 +53,56 @@ def _build_raw_scores(protocol: AssessmentProtocol, domain_scores: list) -> list
     return rows
 
 
+def _weak_domains(raw_scores: list[dict]) -> list[dict]:
+    """RF-06/RF-36 — domínios abaixo da média normalized_pct desta própria
+    avaliação são tratados como "de menor desempenho"; se todos empatarem, os
+    de valor mínimo garantem ao menos um domínio identificado. Compartilhado
+    entre o rascunho de plano (RF-06) e a pasta de treinos sugerida (RF-36) —
+    mesma definição de "área de baixa pontuação" nos dois lugares."""
+    if not raw_scores:
+        return []
+
+    mean_pct = sum(row["normalized_pct"] for row in raw_scores) / len(raw_scores)
+    weak = [row for row in raw_scores if row["normalized_pct"] < mean_pct]
+    if not weak:
+        min_pct = min(row["normalized_pct"] for row in raw_scores)
+        weak = [row for row in raw_scores if row["normalized_pct"] == min_pct]
+    return weak
+
+
+def _generate_plan_draft(protocol: AssessmentProtocol, raw_scores: list[dict]) -> list[dict]:
+    """RF-06 — "propõe um rascunho de Plano de Tratamento com objetivos básicos
+    por área, com base nos domínios de menor pontuação". Regra determinística,
+    sem chamada a nenhuma API de IA externa (mesmo princípio de
+    treatment_plan_service._draft_objective_fields_from_text).
+
+    Decisão de escopo: VB-MAPP e ABLLS-R são instrumentos de Análise do
+    Comportamento Aplicada (Seção 30) — o PRD não define um mapeamento
+    domínio→área da grade multidisciplinar (Seção 13.1), então mapear cada
+    domínio para uma especialidade diferente seria inventar um julgamento
+    clínico que o documento não especifica. Todos os objetivos sugeridos vão
+    para a área ABA, área nativa desses protocolos."""
+    weak_domains = _weak_domains(raw_scores)
+    draft = []
+    for row in weak_domains:
+        draft.append(
+            {
+                "area": TreatmentArea.ABA.value,
+                "domain_code": row["domain_code"],
+                "domain_label": row["domain_label"],
+                "normalized_pct": row["normalized_pct"],
+                "title": f"Desenvolver {row['domain_label']}",
+                "description": (
+                    f"Objetivo sugerido a partir da avaliação {protocol.value.upper()} — domínio "
+                    f"\"{row['domain_label']}\" com {row['normalized_pct']}% de desempenho registrado."
+                ),
+                "criteria": "Critério de domínio a definir pelo profissional com base na avaliação.",
+                "strategies": "Estratégias a definir pelo profissional com base na avaliação.",
+            }
+        )
+    return draft
+
+
 def create_assessment(db: Session, user: User, patient_id: uuid.UUID, payload: AssessmentCreateRequest) -> Assessment:
     """Seção 27.2/30.1 — registra uma aplicação de protocolo padronizado.
     Um par (paciente, protocolo, data) nunca se repete (Seção 27.3 — evita
@@ -81,6 +134,10 @@ def create_assessment(db: Session, user: User, patient_id: uuid.UUID, payload: A
         applied_date=payload.applied_date,
         raw_scores=raw_scores,
         summary=payload.summary,
+        # RF-06 — registrar a avaliação já É "marcá-la como concluída" (não há um
+        # estado de rascunho intermediário no modelo de Assessment); o rascunho de
+        # plano é gerado automaticamente neste mesmo instante.
+        ai_generated_plan_draft=_generate_plan_draft(payload.protocol, raw_scores),
     )
     db.add(assessment)
     db.flush()
@@ -117,6 +174,62 @@ def _get_assessment_or_404(db: Session, user: User, assessment_id: uuid.UUID, *,
 def get_assessment(db: Session, user: User, assessment_id: uuid.UUID) -> Assessment:
     _patient, assessment = _get_assessment_or_404(db, user, assessment_id)
     return assessment
+
+
+MAX_SUGGESTED_TRAININGS_PER_DOMAIN = 5
+
+
+def _mentions_domain_label(text: str, domain_label: str) -> bool:
+    """Addendum v3.0, RF-36 — casamento por palavra inteira (não substring
+    cru), para não sugerir treinos irrelevantes só porque o rótulo do
+    domínio aparece "escondido" dentro de outra palavra (ex.: buscar "Mando"
+    com substring simples também "casaria" com "for-MANDO"; buscar "Tato"
+    também "casaria" com "Con-TATO"). `\\b` exige que a fronteira da palavra
+    seja um caractere não alfanumérico (ou início/fim de string) dos dois
+    lados do termo buscado."""
+    pattern = r"\b" + re.escape(domain_label) + r"\b"
+    return re.search(pattern, text, re.IGNORECASE) is not None
+
+
+def get_suggested_training_folder(db: Session, user: User, assessment_id: uuid.UUID) -> list[dict]:
+    """Addendum v3.0, RF-36 — "montar automaticamente uma pasta... dos treinos da
+    Training Library que já existem no sistema e são relevantes às áreas de
+    menor pontuação identificadas, prontos para revisão e vinculação ao
+    paciente". Reaproveita a mesma listagem de treinos já visíveis ao usuário
+    (RF-10 do Addendum v2.1, training_service.list_trainings) e casa o rótulo
+    do domínio contra título/objetivo por palavra inteira — nenhuma
+    associação nova domínio→treino é inventada aqui. Domínios cujo rótulo não
+    tem nenhum treino com título/objetivo semelhante simplesmente retornam
+    uma lista vazia (nunca um treino inventado ou não relacionado só para
+    preencher a pasta).
+
+    Calculado sob demanda (não congelado na criação da avaliação, diferente de
+    `ai_generated_plan_draft`) para sempre refletir o estado atual da Training
+    Library — um treino pode ser criado, editado ou removido depois."""
+    _patient, assessment = _get_assessment_or_404(db, user, assessment_id)
+    weak_domains = _weak_domains(assessment.raw_scores)
+    if not weak_domains:
+        return []
+
+    all_trainings = training_service.list_trainings(db, user)
+
+    folder = []
+    for row in weak_domains:
+        matches = [
+            t for t in all_trainings if _mentions_domain_label(t.title, row["domain_label"]) or _mentions_domain_label(t.objective, row["domain_label"])
+        ]
+        folder.append(
+            {
+                "domain_code": row["domain_code"],
+                "domain_label": row["domain_label"],
+                "normalized_pct": row["normalized_pct"],
+                "trainings": [
+                    {"training_id": t.id, "title": t.title, "objective": t.objective}
+                    for t in matches[:MAX_SUGGESTED_TRAININGS_PER_DOMAIN]
+                ],
+            }
+        )
+    return folder
 
 
 def update_assessment(db: Session, user: User, assessment_id: uuid.UUID, payload: AssessmentUpdateRequest) -> Assessment:
@@ -208,14 +321,25 @@ def _interpretive_summary(domains: list[dict], earliest_date: datetime.date, lat
     return " ".join(parts)
 
 
+MAX_ASSESSMENTS_TO_COMPARE = 4
+
+
 def compare_assessments(db: Session, user: User, patient_id: uuid.UUID, protocol: AssessmentProtocol, assessment_ids: list[uuid.UUID]) -> dict:
-    """Seção 30.2/AC-19 — ganho absoluto e percentual por domínio entre a
-    aplicação mais antiga e a mais recente do conjunto selecionado, usando
-    normalized_pct (não raw_value, já que max_value pode variar entre
-    aplicações — Seção 30.1.1)."""
+    """Addendum v3.0, RF-33 — amplia a comparação de 2 para até 4 aplicações do
+    mesmo protocolo, reaproveitando normalized_pct (não raw_value, já que
+    max_value pode variar entre aplicações — Seção 30.1.1 do PRD; nenhum
+    cálculo de normalização novo foi criado). Só entram no gráfico os
+    domínios em comum entre TODAS as aplicações selecionadas (não só a mais
+    antiga e a mais recente), para que cada linha do gráfico tenha um ponto
+    em cada data."""
     patient_service.get_patient_or_404(db, user, patient_id)
     if len(assessment_ids) < 2:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="At least two assessments are required to compare")
+    if len(assessment_ids) > MAX_ASSESSMENTS_TO_COMPARE:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"At most {MAX_ASSESSMENTS_TO_COMPARE} assessments can be compared at once",
+        )
 
     assessments = (
         db.query(Assessment)
@@ -231,23 +355,28 @@ def compare_assessments(db: Session, user: User, patient_id: uuid.UUID, protocol
     if len(assessments) != len(set(assessment_ids)):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="One or more assessments not found for this patient/protocol")
 
+    scores_by_assessment = [{row["domain_code"]: row for row in a.raw_scores} for a in assessments]
+    common_codes = set(scores_by_assessment[0])
+    for scores in scores_by_assessment[1:]:
+        common_codes &= set(scores)
     earliest, latest = assessments[0], assessments[-1]
-    earliest_by_domain = {row["domain_code"]: row for row in earliest.raw_scores}
-    latest_by_domain = {row["domain_code"]: row for row in latest.raw_scores}
-    common_codes = [code for code in earliest_by_domain if code in latest_by_domain]
+    ordered_codes = [code for code in scores_by_assessment[0] if code in common_codes]
 
     domains = []
-    for code in common_codes:
-        earliest_pct = earliest_by_domain[code]["normalized_pct"]
-        latest_pct = latest_by_domain[code]["normalized_pct"]
+    for code in ordered_codes:
+        values_by_date = {
+            a.applied_date.isoformat(): scores[code]["normalized_pct"]
+            for a, scores in zip(assessments, scores_by_assessment)
+        }
+        earliest_pct = scores_by_assessment[0][code]["normalized_pct"]
+        latest_pct = scores_by_assessment[-1][code]["normalized_pct"]
         gain_absolute = round(latest_pct - earliest_pct, 1)
         gain_relative = round(gain_absolute / earliest_pct * 100, 1) if earliest_pct else None
         domains.append(
             {
                 "domain_code": code,
-                "domain_label": latest_by_domain[code]["domain_label"],
-                "earliest_pct": earliest_pct,
-                "latest_pct": latest_pct,
+                "domain_label": scores_by_assessment[-1][code]["domain_label"],
+                "values_by_date": values_by_date,
                 "gain_absolute_pp": gain_absolute,
                 "gain_relative_pct": gain_relative,
             }
@@ -260,3 +389,42 @@ def compare_assessments(db: Session, user: User, patient_id: uuid.UUID, protocol
         "domains": domains,
         "interpretive_summary": _interpretive_summary(domains, earliest.applied_date, latest.applied_date),
     }
+
+
+def activate_plan_draft(
+    db: Session, user: User, assessment_id: uuid.UUID, payload: ActivatePlanDraftRequest
+) -> list[Objective]:
+    """RF-06 — "precisa ser aprovado pelo profissional antes de se tornar o
+    plano ativo do paciente — nunca substitui um plano já existente sem
+    confirmação explícita". Cria Objectives reais a partir dos itens do
+    rascunho (editáveis pelo profissional antes deste envio); não apaga nem
+    substitui nenhum objetivo existente, apenas adiciona os novos."""
+    patient, assessment = _get_assessment_or_404(db, user, assessment_id)
+    if assessment.plan_draft_activated_at is not None:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Plan draft already activated")
+
+    created = []
+    for item in payload.items:
+        objective_payload = ObjectiveCreateRequest(
+            area=item.area,
+            title=item.title,
+            description=item.description,
+            criteria=item.criteria,
+            strategies=item.strategies,
+            ai_generated=True,
+            ai_source_assessment_id=assessment.id,
+            force=True,  # já revisado/editado pelo profissional antes de ativar
+        )
+        created.append(treatment_plan_service.create_objective(db, user, patient.id, objective_payload))
+
+    assessment.plan_draft_activated_at = datetime.datetime.now(datetime.timezone.utc)
+    audit_service.record(
+        db,
+        actor_user_id=user.id,
+        action="assessment_plan_draft_activated",
+        entity_type="assessment",
+        entity_id=assessment.id,
+        after={"objective_ids": [str(o.id) for o in created]},
+    )
+    db.commit()
+    return created

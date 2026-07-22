@@ -2,20 +2,37 @@ import { FormEvent, useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { apiRequest, apiUpload, ApiError } from "../api/client";
 import {
+  ApplierType,
   DuplicateCandidate,
+  FamilyAccess,
+  GeneralizationContext,
   Objective,
   ObjectiveAIFillResponse,
+  ObjectiveApplier,
   ObjectiveComment,
   ObjectivePriority,
   ObjectiveStatus,
   Patient,
   ResourceItem,
   ResourceLink,
+  Training,
   TreatmentArea,
   TreatmentPlan,
   TreatmentPlanAttachment,
   User,
 } from "../types";
+
+const GENERALIZATION_CONTEXT_LABELS: Record<GeneralizationContext, string> = {
+  clinica: "Clínica",
+  casa: "Casa",
+  escola: "Escola",
+  outro: "Outro",
+};
+
+const APPLIER_TYPE_LABELS: Record<ApplierType, string> = {
+  professional: "Profissional",
+  parent: "Pai/cuidador",
+};
 
 const AREA_LABELS: Record<TreatmentArea, string> = {
   psicologia: "Psicologia",
@@ -51,11 +68,15 @@ function ObjectiveCard({
   onChanged,
   professionals,
   resources,
+  familyAccesses,
+  trainings,
 }: {
   objective: Objective;
   onChanged: () => void;
   professionals: User[];
   resources: ResourceItem[];
+  familyAccesses: FamilyAccess[];
+  trainings: Training[];
 }) {
   const [expanded, setExpanded] = useState(false);
   const [comments, setComments] = useState<ObjectiveComment[]>([]);
@@ -65,6 +86,19 @@ function ObjectiveCard({
   const [linkResourceId, setLinkResourceId] = useState("");
   const [linkRelevance, setLinkRelevance] = useState(3);
 
+  const [appliers, setAppliers] = useState<ObjectiveApplier[]>([]);
+  const [applierType, setApplierType] = useState<ApplierType>("professional");
+  const [applierUserId, setApplierUserId] = useState("");
+  const [applierError, setApplierError] = useState<string | null>(null);
+
+  const [genContext, setGenContext] = useState<GeneralizationContext>("clinica");
+  const [genTestedAt, setGenTestedAt] = useState(() => new Date().toISOString().slice(0, 10));
+  const [genResult, setGenResult] = useState("");
+  const [genNotes, setGenNotes] = useState("");
+
+  const [maintenanceResult, setMaintenanceResult] = useState<"mantida" | "perdida">("mantida");
+  const [maintenanceNotes, setMaintenanceNotes] = useState("");
+
   function loadComments() {
     apiRequest<ObjectiveComment[]>(`/objectives/${objective.id}/comments`).then(setComments);
   }
@@ -73,10 +107,15 @@ function ObjectiveCard({
     apiRequest<ResourceLink[]>(`/objectives/${objective.id}/resource-links`).then(setResourceLinks);
   }
 
+  function loadAppliers() {
+    apiRequest<ObjectiveApplier[]>(`/objectives/${objective.id}/appliers`).then(setAppliers);
+  }
+
   useEffect(() => {
     if (expanded) {
       loadComments();
       loadResourceLinks();
+      loadAppliers();
     }
   }, [expanded]);
 
@@ -123,6 +162,52 @@ function ObjectiveCard({
     loadComments();
   }
 
+  async function submitApplier(e: FormEvent) {
+    e.preventDefault();
+    setApplierError(null);
+    if (!applierUserId) return;
+    try {
+      await apiRequest(`/objectives/${objective.id}/appliers`, {
+        method: "POST",
+        body: { applier_type: applierType, applier_user_id: applierUserId },
+      });
+      setApplierUserId("");
+      loadAppliers();
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 400) {
+        setApplierError("Este responsável ainda não tem acesso ativo ao Portal da Família para este paciente.");
+      } else if (err instanceof ApiError && err.status === 409) {
+        setApplierError("Esta pessoa já é aplicadora deste objetivo.");
+      } else {
+        setApplierError("Não foi possível adicionar o aplicador.");
+      }
+    }
+  }
+
+  async function submitGeneralizationContext(e: FormEvent) {
+    e.preventDefault();
+    if (!genResult) return;
+    await apiRequest(`/objectives/${objective.id}/generalization-contexts`, {
+      method: "POST",
+      body: { context: genContext, tested_at: genTestedAt, result: genResult, notes: genNotes || null },
+    });
+    setGenResult("");
+    setGenNotes("");
+    onChanged();
+  }
+
+  async function submitMaintenanceCheck(e: FormEvent) {
+    e.preventDefault();
+    await apiRequest(`/objectives/${objective.id}/maintenance-checks`, {
+      method: "POST",
+      body: { result: maintenanceResult, notes: maintenanceNotes || null },
+    });
+    setMaintenanceNotes("");
+    onChanged();
+  }
+
+  const activeFamilyAccesses = familyAccesses.filter((a) => !a.revoked_at);
+
   return (
     <div className="bg-white rounded-card shadow-sm p-4 mb-3">
       <div className="flex items-start justify-between gap-2">
@@ -136,6 +221,11 @@ function ObjectiveCard({
             )}
           </div>
           <div className="text-xs text-neutralState mt-0.5">Prioridade: {PRIORITY_LABELS[objective.priority]}</div>
+          {objective.maintenance_due && (
+            <div className="text-[10px] font-semibold text-warning mt-1">
+              ⏰ Reteste de manutenção pendente
+            </div>
+          )}
         </div>
         <span className={`text-[10px] uppercase font-semibold px-2 py-1 rounded-full ${STATUS_COLORS[objective.status]}`}>
           {STATUS_LABELS[objective.status]}
@@ -157,6 +247,15 @@ function ObjectiveCard({
           {objective.strategies && (
             <p>
               <span className="font-medium">Estratégias:</span> {objective.strategies}
+            </p>
+          )}
+          {objective.training_ids.length > 0 && (
+            <p>
+              <span className="font-medium">Treinos vinculados:</span>{" "}
+              {objective.training_ids
+                .map((id) => trainings.find((t) => t.id === id)?.title)
+                .filter(Boolean)
+                .join(", ") || "—"}
             </p>
           )}
           <div className="flex flex-wrap gap-2 pt-2">
@@ -263,6 +362,146 @@ function ObjectiveCard({
                 Vincular
               </button>
             </form>
+          </div>
+
+          {objective.status === "mastered" && (
+            <div className="pt-3 border-t border-slate-100 mt-2">
+              <div className="font-medium text-xs uppercase text-neutralState mb-2">
+                Manutenção e generalização (Addendum RF-24)
+              </div>
+              <p className="text-xs text-neutralState mb-2">
+                {objective.maintenance_check_date
+                  ? `Próximo reteste de manutenção: ${formatDate(objective.maintenance_check_date)}${
+                      objective.maintenance_due ? " (pendente)" : ""
+                    }`
+                  : "Sem reteste de manutenção agendado."}
+              </p>
+              <form onSubmit={submitMaintenanceCheck} className="flex flex-wrap gap-2 mb-3">
+                <select
+                  value={maintenanceResult}
+                  onChange={(e) => setMaintenanceResult(e.target.value as "mantida" | "perdida")}
+                  className="h-8 text-xs rounded-btn border border-slate-300 px-2"
+                >
+                  <option value="mantida">Habilidade mantida</option>
+                  <option value="perdida">Habilidade perdida</option>
+                </select>
+                <input
+                  value={maintenanceNotes}
+                  onChange={(e) => setMaintenanceNotes(e.target.value)}
+                  placeholder="Observações (opcional)"
+                  className="h-8 text-xs rounded-btn border border-slate-300 px-2 flex-1 min-w-[140px]"
+                />
+                <button type="submit" className="h-8 rounded-btn bg-white border border-slate-300 px-3 text-xs font-medium">
+                  Registrar reteste
+                </button>
+              </form>
+
+              <ul className="space-y-1 mb-2">
+                {(objective.generalization_contexts || []).map((entry, idx) => (
+                  <li key={idx} className="bg-slate-50 rounded-btn px-3 py-2 text-xs">
+                    <span className="font-medium">{GENERALIZATION_CONTEXT_LABELS[entry.context]}</span>
+                    {" — "}
+                    {formatDate(entry.tested_at)}: {entry.result}
+                    {entry.notes && <div className="text-neutralState">{entry.notes}</div>}
+                  </li>
+                ))}
+                {(objective.generalization_contexts || []).length === 0 && (
+                  <li className="text-xs text-neutralState">Generalização ainda não testada em nenhum contexto.</li>
+                )}
+              </ul>
+              <form onSubmit={submitGeneralizationContext} className="flex flex-wrap gap-2">
+                <select
+                  value={genContext}
+                  onChange={(e) => setGenContext(e.target.value as GeneralizationContext)}
+                  className="h-8 text-xs rounded-btn border border-slate-300 px-2"
+                >
+                  {Object.entries(GENERALIZATION_CONTEXT_LABELS).map(([value, label]) => (
+                    <option key={value} value={value}>
+                      {label}
+                    </option>
+                  ))}
+                </select>
+                <input
+                  type="date"
+                  required
+                  value={genTestedAt}
+                  onChange={(e) => setGenTestedAt(e.target.value)}
+                  className="h-8 text-xs rounded-btn border border-slate-300 px-2"
+                />
+                <input
+                  required
+                  value={genResult}
+                  onChange={(e) => setGenResult(e.target.value)}
+                  placeholder="Resultado observado"
+                  className="h-8 text-xs rounded-btn border border-slate-300 px-2 flex-1 min-w-[140px]"
+                />
+                <input
+                  value={genNotes}
+                  onChange={(e) => setGenNotes(e.target.value)}
+                  placeholder="Notas (opcional)"
+                  className="h-8 text-xs rounded-btn border border-slate-300 px-2 flex-1 min-w-[140px]"
+                />
+                <button type="submit" className="h-8 rounded-btn bg-brand-turquoise text-white px-3 text-xs font-medium">
+                  Registrar
+                </button>
+              </form>
+            </div>
+          )}
+
+          <div className="pt-3 border-t border-slate-100 mt-2">
+            <div className="font-medium text-xs uppercase text-neutralState mb-2">
+              Aplicadores (Addendum RF-25)
+            </div>
+            <ul className="space-y-1 mb-2">
+              {appliers.map((a) => (
+                <li key={a.id} className="bg-slate-50 rounded-btn px-3 py-2 text-xs">
+                  {a.applier_name} — {APPLIER_TYPE_LABELS[a.applier_type]}
+                </li>
+              ))}
+              {appliers.length === 0 && (
+                <li className="text-xs text-neutralState">Nenhum aplicador marcado ainda.</li>
+              )}
+            </ul>
+            <form onSubmit={submitApplier} className="flex flex-wrap gap-2">
+              <select
+                value={applierType}
+                onChange={(e) => {
+                  setApplierType(e.target.value as ApplierType);
+                  setApplierUserId("");
+                }}
+                className="h-8 text-xs rounded-btn border border-slate-300 px-2"
+              >
+                <option value="professional">Profissional</option>
+                <option value="parent">Pai/cuidador</option>
+              </select>
+              <select
+                value={applierUserId}
+                onChange={(e) => setApplierUserId(e.target.value)}
+                className="h-8 text-xs rounded-btn border border-slate-300 px-2 flex-1 min-w-[140px]"
+              >
+                <option value="">Selecione...</option>
+                {applierType === "professional"
+                  ? professionals.map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.name}
+                      </option>
+                    ))
+                  : activeFamilyAccesses.map((a) => (
+                      <option key={a.family_user_id} value={a.family_user_id}>
+                        {a.family_user_name}
+                      </option>
+                    ))}
+              </select>
+              <button type="submit" className="h-8 rounded-btn bg-white border border-slate-300 px-3 text-xs font-medium">
+                Marcar como aplicador
+              </button>
+            </form>
+            {applierType === "parent" && activeFamilyAccesses.length === 0 && (
+              <p className="text-xs text-neutralState mt-1">
+                Nenhum responsável com acesso ativo ao Portal da Família para este paciente.
+              </p>
+            )}
+            {applierError && <p className="text-danger text-xs mt-1">{applierError}</p>}
           </div>
         </div>
       )}
@@ -382,6 +621,10 @@ export default function TreatmentPlanPage() {
   const [error, setError] = useState<string | null>(null);
   const [professionals, setProfessionals] = useState<User[]>([]);
   const [resources, setResources] = useState<ResourceItem[]>([]);
+  const [familyAccesses, setFamilyAccesses] = useState<FamilyAccess[]>([]);
+  const [trainings, setTrainings] = useState<Training[]>([]);
+  const [selectedTrainingIds, setSelectedTrainingIds] = useState<string[]>([]);
+  const [draggedObjectiveId, setDraggedObjectiveId] = useState<string | null>(null);
   const [aiAttachmentId, setAiAttachmentId] = useState("");
   const [aiFilling, setAiFilling] = useState(false);
   const [aiError, setAiError] = useState<string | null>(null);
@@ -391,6 +634,7 @@ export default function TreatmentPlanPage() {
   useEffect(() => {
     apiRequest<User[]>("/professionals").then(setProfessionals);
     apiRequest<ResourceItem[]>("/resources").then(setResources);
+    apiRequest<Training[]>("/trainings").then(setTrainings);
   }, []);
 
   function load() {
@@ -400,6 +644,9 @@ export default function TreatmentPlanPage() {
     if (areaFilter) params.set("area", areaFilter);
     if (statusFilter) params.set("status", statusFilter);
     apiRequest<TreatmentPlan>(`/patients/${patientId}/treatment-plan?${params.toString()}`).then(setPlan);
+    apiRequest<FamilyAccess[]>(`/patients/${patientId}/family-accesses`)
+      .then(setFamilyAccesses)
+      .catch(() => setFamilyAccesses([]));
   }
 
   useEffect(load, [patientId, areaFilter, statusFilter]);
@@ -410,6 +657,7 @@ export default function TreatmentPlanPage() {
     setCriteria("");
     setStrategies("");
     setPriority("medium");
+    setSelectedTrainingIds([]);
     setDuplicateCandidates(null);
     setError(null);
     setAiAttachmentId("");
@@ -456,6 +704,7 @@ export default function TreatmentPlanPage() {
           strategies: strategies || null,
           priority,
           force,
+          training_ids: selectedTrainingIds,
           ai_generated: aiGenerated,
           ai_source_document_id: aiGenerated ? aiAttachmentId : null,
         },
@@ -479,6 +728,25 @@ export default function TreatmentPlanPage() {
     e.preventDefault();
     setError(null);
     await submitObjective(false);
+  }
+
+  async function handleReorderDrop(area: TreatmentArea, targetObjectiveId: string) {
+    if (!draggedObjectiveId || draggedObjectiveId === targetObjectiveId) return;
+    const current = objectivesByArea[area] || [];
+    const ids = current.map((o) => o.id);
+    const fromIndex = ids.indexOf(draggedObjectiveId);
+    const toIndex = ids.indexOf(targetObjectiveId);
+    setDraggedObjectiveId(null);
+    if (fromIndex === -1 || toIndex === -1) return;
+
+    const reordered = [...ids];
+    reordered.splice(fromIndex, 1);
+    reordered.splice(toIndex, 0, draggedObjectiveId);
+    await apiRequest(`/patients/${patientId}/treatment-plan/objectives/reorder`, {
+      method: "POST",
+      body: { area, ordered_ids: reordered },
+    });
+    load();
   }
 
   const objectivesByArea: Record<string, Objective[]> = {};
@@ -647,6 +915,25 @@ export default function TreatmentPlanPage() {
               ))}
             </select>
           </div>
+          <div>
+            <label className="block text-sm font-medium mb-1">Treinos da Biblioteca vinculados</label>
+            <select
+              multiple
+              value={selectedTrainingIds}
+              onChange={(e) => setSelectedTrainingIds(Array.from(e.target.selectedOptions, (o) => o.value))}
+              className="w-full h-28 rounded-btn border border-slate-300 px-3 text-sm"
+            >
+              {trainings.map((t) => (
+                <option key={t.id} value={t.id}>
+                  {t.title}
+                </option>
+              ))}
+            </select>
+            <p className="text-xs text-neutralState mt-1">
+              Opcional — usado no relatório de Desempenho do Programa (Addendum v3.0, RF-32). Segure Ctrl/Cmd
+              para selecionar mais de um.
+            </p>
+          </div>
           {error && <p className="text-danger text-sm">{error}</p>}
           <div className="flex gap-3">
             <button type="submit" className="rounded-btn bg-brand-turquoise text-white px-4 py-2 text-sm font-medium">
@@ -665,13 +952,26 @@ export default function TreatmentPlanPage() {
             <div key={areaKey} className="bg-white rounded-card shadow-sm p-4">
               <h2 className="font-semibold text-brand-navy mb-2">{AREA_LABELS[areaKey]}</h2>
               {(objectivesByArea[areaKey] || []).map((objective) => (
-                <ObjectiveCard
-                  key={objective.id}
-                  objective={objective}
-                  onChanged={load}
-                  professionals={professionals}
-                  resources={resources}
-                />
+                <div key={objective.id}>
+                  <div
+                    draggable
+                    onDragStart={() => setDraggedObjectiveId(objective.id)}
+                    onDragOver={(e) => e.preventDefault()}
+                    onDrop={() => handleReorderDrop(areaKey, objective.id)}
+                    className="flex items-center justify-center h-4 text-slate-300 hover:text-slate-500 cursor-move select-none text-xs"
+                    title="Arraste para reordenar a prioridade nesta área"
+                  >
+                    ⠿⠿⠿
+                  </div>
+                  <ObjectiveCard
+                    objective={objective}
+                    onChanged={load}
+                    professionals={professionals}
+                    resources={resources}
+                    familyAccesses={familyAccesses}
+                    trainings={trainings}
+                  />
+                </div>
               ))}
               {(objectivesByArea[areaKey] || []).length === 0 && (
                 <p className="text-xs text-neutralState mb-2">Nenhum objetivo nesta área ainda.</p>

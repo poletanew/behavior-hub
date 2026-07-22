@@ -10,20 +10,42 @@ from sqlalchemy.orm import Session
 from app.models.audit_log import AuditLog
 from app.models.enums import (
     SPECIALTY_TO_AREA,
+    ApplierType,
     AssignmentPermission,
     ObjectivePriority,
     ObjectiveStatus,
     TreatmentArea,
     UserType,
 )
+from app.models.family_access import FamilyAccess
 from app.models.patient import Patient, PatientAssignment
 from app.models.training import Training
-from app.models.treatment_plan import Objective, ObjectiveComment, ObjectiveTraining, TreatmentPlan, TreatmentPlanAttachment
+from app.models.treatment_plan import (
+    Objective,
+    ObjectiveApplier,
+    ObjectiveComment,
+    ObjectiveTraining,
+    TreatmentPlan,
+    TreatmentPlanAttachment,
+)
 from app.models.user import User
-from app.schemas.treatment_plan import ObjectiveAIFillResponse, ObjectiveCreateRequest, ObjectiveUpdateRequest
+from app.schemas.treatment_plan import (
+    GeneralizationContextCreateRequest,
+    MaintenanceCheckRequest,
+    ObjectiveAIFillResponse,
+    ObjectiveApplierCreateRequest,
+    ObjectiveCreateRequest,
+    ObjectiveReorderRequest,
+    ObjectiveUpdateRequest,
+)
 from app.services import audit_service, file_service, notification_service, patient_service, rbac_service
 
 DUPLICATE_SIMILARITY_THRESHOLD = 0.35
+# Addendum v3.0, RF-24 — "reteste periódico automático (ex.: a cada 30 dias)".
+# O addendum dá isso como exemplo, não como parâmetro configurável por
+# clínica; um intervalo fixo evita adicionar uma tela de configuração nova
+# para um requisito que não pede isso explicitamente.
+MAINTENANCE_INTERVAL_DAYS = 30
 
 
 def _normalize(text: str) -> str:
@@ -98,8 +120,46 @@ def get_treatment_plan(
     if date_to is not None:
         query = query.filter(Objective.created_at <= date_to)
 
-    objectives = query.order_by(Objective.area, Objective.created_at).all()
+    objectives = query.order_by(Objective.area, Objective.display_order, Objective.created_at).all()
     return plan, objectives
+
+
+def reorder_objectives(
+    db: Session, user: User, patient_id: uuid.UUID, payload: ObjectiveReorderRequest
+) -> list[Objective]:
+    """Addendum v3.0, RF-28 — arrastar e soltar para reordenar prioridade dos
+    objetivos de uma área do Plano de Tratamento."""
+    patient = patient_service.get_patient_or_404(db, user, patient_id)
+    plan = get_or_create_plan(db, patient)
+
+    if not can_edit_area(db, user, patient, payload.area):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized to edit this area")
+
+    objectives = (
+        db.query(Objective)
+        .filter(Objective.plan_id == plan.id, Objective.area == payload.area, Objective.deleted_at.is_(None))
+        .all()
+    )
+    objectives_by_id = {o.id: o for o in objectives}
+    if set(payload.ordered_ids) != set(objectives_by_id.keys()):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="ordered_ids must contain exactly the active objectives of this area",
+        )
+
+    for index, objective_id in enumerate(payload.ordered_ids):
+        objectives_by_id[objective_id].display_order = index
+
+    audit_service.record(
+        db,
+        actor_user_id=user.id,
+        action="objectives_reordered",
+        entity_type="treatment_plan",
+        entity_id=plan.id,
+        after={"area": payload.area.value, "ordered_ids": [str(i) for i in payload.ordered_ids]},
+    )
+    db.commit()
+    return sorted(objectives_by_id.values(), key=lambda o: o.display_order)
 
 
 def find_duplicate_candidates(db: Session, plan: TreatmentPlan, title: str) -> list[dict]:
@@ -159,6 +219,20 @@ def create_objective(
         if source_attachment is None or source_attachment.plan_id != plan.id:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Source document not found")
 
+    if payload.ai_source_assessment_id is not None:
+        from app.models.assessment import Assessment  # import local para evitar ciclo de módulos
+
+        source_assessment = db.get(Assessment, payload.ai_source_assessment_id)
+        if source_assessment is None or source_assessment.patient_id != patient.id:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Source assessment not found")
+
+    # Addendum v3.0, RF-28 — novo objetivo entra no fim da ordem manual da área.
+    next_order = (
+        db.query(Objective)
+        .filter(Objective.plan_id == plan.id, Objective.area == payload.area, Objective.deleted_at.is_(None))
+        .count()
+    )
+
     objective = Objective(
         plan_id=plan.id,
         area=payload.area,
@@ -168,10 +242,13 @@ def create_objective(
         strategies=payload.strategies,
         priority=payload.priority,
         author_id=user.id,
+        display_order=next_order,
         ai_generated=payload.ai_generated,
         ai_source_document_id=payload.ai_source_document_id if payload.ai_generated else None,
-        # RF-05 — o rascunho gerado por IA só existe em memória no formulário até este
-        # exato instante; salvar É a confirmação de revisão humana exigida pela Seção 12.1.
+        ai_source_assessment_id=payload.ai_source_assessment_id if payload.ai_generated else None,
+        # RF-05/RF-06 — o rascunho gerado por IA só existe em memória (formulário
+        # ou resposta de preview) até este exato instante; salvar/ativar É a
+        # confirmação de revisão humana exigida pela Seção 12.1.
         ai_reviewed_at=datetime.datetime.now(datetime.timezone.utc) if payload.ai_generated else None,
     )
     db.add(objective)
@@ -234,8 +311,18 @@ def update_objective(
         "criteria": objective.criteria,
         "strategies": objective.strategies,
     }
+    before_status = objective.status
     for field, value in payload.model_dump(exclude_unset=True).items():
         setattr(objective, field, value)
+
+    if (
+        objective.status == ObjectiveStatus.MASTERED
+        and before_status != ObjectiveStatus.MASTERED
+        and objective.maintenance_check_date is None
+    ):
+        # Addendum v3.0, RF-24 — "um objetivo dominado gera automaticamente um
+        # lembrete de reteste de manutenção na data configurada".
+        objective.maintenance_check_date = datetime.date.today() + datetime.timedelta(days=MAINTENANCE_INTERVAL_DAYS)
 
     audit_service.record(
         db,
@@ -369,6 +456,145 @@ def get_history(db: Session, user: User, objective_id: uuid.UUID) -> list[AuditL
         .order_by(AuditLog.timestamp.desc())
         .all()
     )
+
+
+def record_generalization_context(
+    db: Session, user: User, objective_id: uuid.UUID, payload: GeneralizationContextCreateRequest
+) -> Objective:
+    """Addendum v3.0, RF-24 — "campos simples para marcar onde já foi testado
+    (clínica, casa, escola) e o resultado em cada um"."""
+    patient, objective = _get_objective_or_404(db, user, objective_id)
+    if not can_edit_area(db, user, patient, objective.area):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized to edit this area")
+
+    entry = {
+        "context": payload.context.value,
+        "tested_at": payload.tested_at.isoformat(),
+        "result": payload.result,
+        "notes": payload.notes,
+    }
+    contexts = list(objective.generalization_contexts or [])
+    contexts.append(entry)
+    objective.generalization_contexts = contexts
+
+    audit_service.record(
+        db,
+        actor_user_id=user.id,
+        action="objective_generalization_recorded",
+        entity_type="objective",
+        entity_id=objective.id,
+        after=entry,
+    )
+    db.commit()
+    db.refresh(objective)
+    return objective
+
+
+def record_maintenance_check(
+    db: Session, user: User, objective_id: uuid.UUID, payload: MaintenanceCheckRequest
+) -> Objective:
+    """Addendum v3.0, RF-24 — registra o resultado do reteste periódico e
+    reagenda o próximo lembrete de manutenção."""
+    patient, objective = _get_objective_or_404(db, user, objective_id)
+    if not can_edit_area(db, user, patient, objective.area):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized to edit this area")
+    if objective.status != ObjectiveStatus.MASTERED:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Only mastered objectives have maintenance checks"
+        )
+
+    objective.maintenance_check_date = datetime.date.today() + datetime.timedelta(days=MAINTENANCE_INTERVAL_DAYS)
+    audit_service.record(
+        db,
+        actor_user_id=user.id,
+        action="objective_maintenance_checked",
+        entity_type="objective",
+        entity_id=objective.id,
+        after={"result": payload.result, "notes": payload.notes},
+    )
+    db.commit()
+    db.refresh(objective)
+    return objective
+
+
+def _to_applier_response_row(db: Session, applier: ObjectiveApplier) -> dict:
+    applier_user = db.get(User, applier.applier_user_id)
+    return {
+        "id": applier.id,
+        "objective_id": applier.objective_id,
+        "applier_type": applier.applier_type,
+        "applier_user_id": applier.applier_user_id,
+        "applier_name": applier_user.name if applier_user else "Usuário removido",
+        "created_at": applier.created_at,
+    }
+
+
+def add_applier(
+    db: Session, user: User, objective_id: uuid.UUID, payload: ObjectiveApplierCreateRequest
+) -> dict:
+    """Addendum v3.0, RF-25 — marca um pai/cuidador (ou profissional) como
+    aplicador de um objetivo específico. Um pai só pode ser marcado se já
+    tiver acesso ativo ao Family Portal para este paciente (Seção 29.6) —
+    reaproveita o mesmo grant de consentimento explícito, em vez de criar uma
+    segunda porta de entrada para dados do paciente."""
+    patient, objective = _get_objective_or_404(db, user, objective_id)
+    if not can_edit_area(db, user, patient, objective.area):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized to edit this area")
+
+    applier_user = db.get(User, payload.applier_user_id)
+    if applier_user is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Applier user not found")
+
+    if payload.applier_type == ApplierType.PARENT:
+        if applier_user.user_type != UserType.FAMILY:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Applier user is not a family account")
+        access = (
+            db.query(FamilyAccess)
+            .filter(
+                FamilyAccess.patient_id == patient.id,
+                FamilyAccess.family_user_id == applier_user.id,
+                FamilyAccess.revoked_at.is_(None),
+            )
+            .first()
+        )
+        if access is None:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="This family account does not have active Family Portal access to this patient",
+            )
+
+    existing = (
+        db.query(ObjectiveApplier)
+        .filter(ObjectiveApplier.objective_id == objective.id, ObjectiveApplier.applier_user_id == applier_user.id)
+        .first()
+    )
+    if existing is not None:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="This user is already an applier for this objective")
+
+    applier = ObjectiveApplier(
+        objective_id=objective.id,
+        applier_type=payload.applier_type,
+        applier_user_id=applier_user.id,
+        added_by_user_id=user.id,
+    )
+    db.add(applier)
+    audit_service.record(
+        db,
+        actor_user_id=user.id,
+        action="objective_applier_added",
+        entity_type="objective",
+        entity_id=objective.id,
+        after={"applier_type": payload.applier_type.value, "applier_user_id": str(applier_user.id)},
+    )
+    db.commit()
+    db.refresh(applier)
+    return _to_applier_response_row(db, applier)
+
+
+def list_appliers(db: Session, user: User, objective_id: uuid.UUID) -> list[dict]:
+    _patient, objective = _get_objective_or_404(db, user, objective_id)
+    appliers = db.query(ObjectiveApplier).filter(ObjectiveApplier.objective_id == objective.id).all()
+    return [_to_applier_response_row(db, a) for a in appliers]
 
 
 def get_objective_training_ids(db: Session, objective_id: uuid.UUID) -> list[uuid.UUID]:

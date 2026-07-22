@@ -76,8 +76,49 @@ export interface ClinicalSession {
   occurred_at: string;
   notes: string | null;
   photo_url: string | null;
+  media_type: "photo" | "video" | null;
+  media_duration_seconds: number | null;
   deleted_at: string | null;
   trainings: SessionTraining[];
+}
+
+export interface SessionMediaUrl {
+  media_type: "photo" | "video";
+  url: string;
+  duration_seconds: number | null;
+}
+
+export type BehaviorIntensity = "baixa" | "media" | "alta";
+
+export interface BehaviorEvent {
+  id: string;
+  patient_id: string;
+  session_id: string;
+  recorded_by_user_id: string;
+  antecedent: string;
+  behavior: string;
+  consequence: string;
+  frequency_count: number | null;
+  duration_seconds: number | null;
+  intensity: BehaviorIntensity | null;
+  occurred_at: string;
+}
+
+export interface Reinforcer {
+  id: string;
+  patient_id: string;
+  name: string;
+  effectiveness_notes: string | null;
+  usage_count: number;
+}
+
+export interface SessionReinforcer {
+  id: string;
+  session_id: string;
+  reinforcer_id: string;
+  reinforcer_name: string;
+  effectiveness_note: string | null;
+  used_at: string;
 }
 
 export interface Trial {
@@ -117,6 +158,15 @@ export type TreatmentArea =
 
 export type ObjectiveStatus = "not_started" | "in_progress" | "mastered" | "paused" | "discontinued";
 export type ObjectivePriority = "low" | "medium" | "high";
+export type GeneralizationContext = "clinica" | "casa" | "escola" | "outro";
+export type ApplierType = "professional" | "parent";
+
+export interface GeneralizationContextEntry {
+  context: GeneralizationContext;
+  tested_at: string;
+  result: string;
+  notes: string | null;
+}
 
 export interface Objective {
   id: string;
@@ -137,6 +187,19 @@ export interface Objective {
   ai_generated: boolean;
   ai_source_document_id: string | null;
   ai_reviewed_at: string | null;
+  maintenance_check_date: string | null;
+  maintenance_due: boolean;
+  generalization_contexts: GeneralizationContextEntry[];
+  display_order: number;
+}
+
+export interface ObjectiveApplier {
+  id: string;
+  objective_id: string;
+  applier_type: ApplierType;
+  applier_user_id: string;
+  applier_name: string;
+  created_at: string;
 }
 
 export interface ObjectiveAIFillResponse {
@@ -240,6 +303,24 @@ export interface HeatmapAreaPoint {
   intensity_label: HeatmapIntensity;
 }
 
+export interface BehaviorFrequencyPoint {
+  date: string;
+  frequency_count: number;
+  duration_seconds: number;
+}
+
+export interface BehaviorFrequencySeries {
+  behavior: string;
+  total_events: number;
+  points: BehaviorFrequencyPoint[];
+}
+
+export interface ReinforcerUsagePoint {
+  reinforcer_id: string;
+  reinforcer_name: string;
+  usage_count: number;
+}
+
 export interface ReportData {
   patient_id: string;
   period_start: string | null;
@@ -252,6 +333,8 @@ export interface ReportData {
   radar: RadarPoint[];
   cumulative: CumulativePoint[];
   heatmap: HeatmapAreaPoint[];
+  behavior_frequency: BehaviorFrequencySeries[];
+  reinforcer_usage: ReinforcerUsagePoint[];
   comparison: {
     available: boolean;
     message?: string | null;
@@ -290,10 +373,23 @@ export interface ResourceItem {
   uploaded_by_user_id: string;
   created_at: string;
   deleted_at: string | null;
+  ai_generated: boolean;
+  ai_reviewed_at: string | null;
 }
 
 export interface ResourceWithUrl extends ResourceItem {
   view_url: string;
+}
+
+export type AIResourceKind = "historia_social" | "rotina_visual" | "cartao_comunicacao";
+
+export interface ResourceAIDraft {
+  kind: AIResourceKind;
+  theme: string;
+  age_range: string;
+  title: string;
+  description: string;
+  content_text: string;
 }
 
 export interface DeletedItem {
@@ -405,7 +501,15 @@ export interface Appointment {
   status_notes: string | null;
   notes: string | null;
   session_id: string | null;
+  room_id: string | null;
+  room_name: string | null;
   deleted_at: string | null;
+  created_at: string;
+}
+
+export interface Room {
+  id: string;
+  name: string;
   created_at: string;
 }
 
@@ -482,6 +586,36 @@ export interface ManagerDashboardData {
   occupancy_rate_pct: number | null;
 }
 
+export interface ProfessionalPerformance {
+  professional_id: string;
+  professional_name: string;
+  professional_role: string;
+  sessions_count: number;
+  registration_consistency_pct: number | null;
+  average_accuracy_pct: number | null;
+  procedure_variability_pp: number | null;
+  applier_efficiency_label: "alta" | "media" | "baixa" | null;
+}
+
+export interface ProgramPerformanceRow {
+  training_id: string;
+  training_title: string;
+  patients_count: number;
+  objectives_count: number;
+  mastery_rate_pct: number;
+  average_days_to_mastery: number | null;
+}
+
+export type ChurnRiskLabel = "baixo" | "alto" | "assinatura_encerrada" | "nao_aplicavel";
+
+export interface FinancialOutlook {
+  subscription_plan: PlanId;
+  subscription_status: string;
+  current_period_end: string | null;
+  days_until_renewal: number | null;
+  churn_risk_label: ChurnRiskLabel;
+}
+
 export type AssessmentProtocol = "vb_mapp" | "ablls_r";
 
 export interface ProtocolDomainDefinition {
@@ -505,6 +639,17 @@ export interface DomainScore {
   normalized_pct: number;
 }
 
+export interface PlanDraftItem {
+  area: TreatmentArea;
+  domain_code: string;
+  domain_label: string;
+  normalized_pct: number;
+  title: string;
+  description: string;
+  criteria: string;
+  strategies: string;
+}
+
 export interface Assessment {
   id: string;
   patient_id: string;
@@ -514,13 +659,14 @@ export interface Assessment {
   raw_scores: DomainScore[];
   summary: string | null;
   created_at: string;
+  ai_generated_plan_draft: PlanDraftItem[];
+  plan_draft_activated_at: string | null;
 }
 
 export interface DomainComparisonPoint {
   domain_code: string;
   domain_label: string;
-  earliest_pct: number;
-  latest_pct: number;
+  values_by_date: Record<string, number>;
   gain_absolute_pp: number;
   gain_relative_pct: number | null;
 }
@@ -531,6 +677,19 @@ export interface AssessmentComparison {
   applied_dates: string[];
   domains: DomainComparisonPoint[];
   interpretive_summary: string;
+}
+
+export interface SuggestedTrainingRef {
+  training_id: string;
+  title: string;
+  objective: string;
+}
+
+export interface SuggestedTrainingFolderEntry {
+  domain_code: string;
+  domain_label: string;
+  normalized_pct: number;
+  trainings: SuggestedTrainingRef[];
 }
 
 export interface ResourceLink {
@@ -559,6 +718,7 @@ export interface FamilyAccess {
   can_view_team_guidance: boolean;
   can_view_home_materials: boolean;
   can_use_messaging: boolean;
+  can_submit_routine_logs: boolean;
   revoked_at: string | null;
   created_at: string;
 }
@@ -571,6 +731,7 @@ export interface FamilyMyAccess {
   can_view_team_guidance: boolean;
   can_view_home_materials: boolean;
   can_use_messaging: boolean;
+  can_submit_routine_logs: boolean;
 }
 
 export interface FamilyEvolution {
@@ -602,6 +763,31 @@ export interface FamilyMessage {
   sender_name: string;
   body: string;
   created_at: string;
+}
+
+export interface FamilyRoutineLog {
+  id: string;
+  patient_id: string;
+  submitted_by_user_id: string;
+  submitted_by_name: string;
+  content: string;
+  created_at: string;
+}
+
+export interface FamilyAudioMessage {
+  id: string;
+  patient_id: string;
+  submitted_by_user_id: string;
+  submitted_by_name: string;
+  transcription_text: string;
+  created_at: string;
+}
+
+export interface FamilyApplierObjective {
+  objective_id: string;
+  title: string;
+  area: TreatmentArea;
+  applied_today: boolean;
 }
 
 export interface BillingStatus {
@@ -666,4 +852,49 @@ export interface ABATrialReviewEntry {
   result: "correct" | "incorrect" | "partial" | "no_response";
   prompt_level: "independent" | "gestural" | "verbal" | "modeling" | "partial_physical" | "full_physical";
   recorded_at: string;
+}
+
+export interface Anamnesis {
+  id: string;
+  patient_id: string;
+  created_by_user_id: string;
+  chief_complaint: string | null;
+  birth_history: string | null;
+  developmental_history: string | null;
+  developmental_milestones: string | null;
+  family_history: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export type ChecklistAnswerType = "yes_no" | "scale" | "short_text";
+
+export interface ChecklistQuestion {
+  id: string;
+  text: string;
+  answer_type: ChecklistAnswerType;
+}
+
+export interface ChecklistTemplate {
+  id: string;
+  title: string;
+  questions: ChecklistQuestion[];
+  created_at: string;
+}
+
+export interface ChecklistAnswerItem {
+  question_id: string;
+  question_text: string;
+  answer_type: ChecklistAnswerType;
+  value: boolean | number | string;
+}
+
+export interface ChecklistResponseDetail {
+  id: string;
+  template_id: string;
+  template_title: string;
+  patient_id: string;
+  applied_by_user_id: string;
+  applied_at: string;
+  items: ChecklistAnswerItem[];
 }

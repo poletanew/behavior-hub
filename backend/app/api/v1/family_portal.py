@@ -7,12 +7,19 @@ from app.core.deps import get_current_user
 from app.db.session import get_db
 from app.models.user import User
 from app.schemas.family import (
+    FamilyApplierObjectiveResponse,
+    FamilyApplyObjectiveRequest,
+    FamilyApplyObjectiveResponse,
     FamilyAppointmentResponse,
+    FamilyAudioMessageCreateRequest,
+    FamilyAudioMessageResponse,
     FamilyEvolutionResponse,
     FamilyGuidanceResponse,
     FamilyMessageCreateRequest,
     FamilyMessageResponse,
     FamilyMyAccessResponse,
+    FamilyRoutineLogCreateRequest,
+    FamilyRoutineLogResponse,
 )
 from app.schemas.resource_link import ResourceLinkResponse
 from app.schemas.white_label import PublicBrandingResponse
@@ -66,3 +73,59 @@ def create_patient_message(
     user: User = Depends(get_current_user),
 ):
     return family_portal_service.post_message(db, user, patient_id, payload.body)
+
+
+@router.get("/patients/{patient_id}/applier-objectives", response_model=list[FamilyApplierObjectiveResponse])
+def list_applier_objectives(patient_id: uuid.UUID, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+    """Addendum v3.0, RF-25 — objetivos em que este responsável foi marcado como aplicador."""
+    return family_portal_service.list_applier_objectives(db, user, patient_id)
+
+
+@router.post(
+    "/patients/{patient_id}/applier-objectives/{objective_id}/apply", response_model=FamilyApplyObjectiveResponse
+)
+def apply_objective_today(
+    patient_id: uuid.UUID,
+    objective_id: uuid.UUID,
+    payload: FamilyApplyObjectiveRequest,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """Addendum v3.0, RF-25 — critério de aceite: registrar "apliquei hoje"."""
+    return family_portal_service.record_objective_application(db, user, patient_id, objective_id, payload.notes)
+
+
+@router.get("/patients/{patient_id}/routine-logs", response_model=list[FamilyRoutineLogResponse])
+def list_routine_logs(patient_id: uuid.UUID, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+    """Addendum v3.0, RF-29 — registros de rotina enviados pela família."""
+    return family_portal_service.list_routine_logs(db, user, patient_id)
+
+
+@router.post(
+    "/patients/{patient_id}/routine-logs", response_model=FamilyRoutineLogResponse, status_code=201
+)
+def create_routine_log(
+    patient_id: uuid.UUID,
+    payload: FamilyRoutineLogCreateRequest,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    return family_portal_service.create_routine_log(db, user, patient_id, payload.content)
+
+
+@router.get("/patients/{patient_id}/audio-messages", response_model=list[FamilyAudioMessageResponse])
+def list_audio_messages(patient_id: uuid.UUID, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+    """Addendum v3.0, RF-30 — notas de voz da família, já transcritas no navegador."""
+    return family_portal_service.list_audio_messages(db, user, patient_id)
+
+
+@router.post(
+    "/patients/{patient_id}/audio-messages", response_model=FamilyAudioMessageResponse, status_code=201
+)
+def create_audio_message(
+    patient_id: uuid.UUID,
+    payload: FamilyAudioMessageCreateRequest,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    return family_portal_service.create_audio_message(db, user, patient_id, payload.transcription_text)

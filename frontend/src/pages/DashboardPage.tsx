@@ -48,7 +48,10 @@ export default function DashboardPage() {
         </div>
 
         {data.recent_sessions.length === 0 ? (
-          <div className="text-center py-10">
+          <div className="text-center py-10 animate-fade-in">
+            <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-full bg-brand-turquoise/10 text-2xl">
+              ✨
+            </div>
             <p className="text-neutralState mb-4">
               Nenhuma sessão registrada. Adicione um paciente para iniciar.
             </p>
