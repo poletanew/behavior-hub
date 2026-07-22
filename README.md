@@ -259,6 +259,16 @@ Este repositório está sendo construído **por fases**, seguindo o roadmap da S
   status da assinatura no Stripe — deliberadamente restrito à assinatura da própria clínica (sem
   nenhum papel novo de operador da plataforma nem valores de receita inventados), conforme escolha
   explícita do responsável pelo produto diante da ambiguidade do texto original do addendum.
+- **Fase 7 (Módulo 3.7) — Addendum v3.0, RF-33 a RF-35 — Gráficos**: a comparação de avaliações em
+  Avaliações Padronizadas passa de 2 para até 4 aplicações do mesmo protocolo selecionadas de uma vez,
+  num único gráfico de linhas (uma linha por data de aplicação, eixo X pelos domínios em comum entre
+  todas as aplicações selecionadas) — reaproveita o mesmo `normalized_pct` de sempre, nenhum cálculo de
+  normalização novo. Em Reports, o gráfico de linha "Evolução do percentual de acerto" agora é
+  apresentado como "Curva de Aprendizagem" (mesmo cálculo, só o rótulo mudou), e dois gráficos novos
+  aparecem sempre que houver pelo menos um evento registrado: "Comportamentos interferentes" (frequência
+  e duração ao longo do tempo de cada comportamento-alvo do modelo ABC, agrupado pelo texto exato do
+  comportamento) e "Reforçadores mais usados" (quantas vezes cada reforçador cadastrado foi usado no
+  período).
 
 ## Stack (Seção 4 do PRD)
 

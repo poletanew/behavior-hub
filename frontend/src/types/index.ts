@@ -303,6 +303,24 @@ export interface HeatmapAreaPoint {
   intensity_label: HeatmapIntensity;
 }
 
+export interface BehaviorFrequencyPoint {
+  date: string;
+  frequency_count: number;
+  duration_seconds: number;
+}
+
+export interface BehaviorFrequencySeries {
+  behavior: string;
+  total_events: number;
+  points: BehaviorFrequencyPoint[];
+}
+
+export interface ReinforcerUsagePoint {
+  reinforcer_id: string;
+  reinforcer_name: string;
+  usage_count: number;
+}
+
 export interface ReportData {
   patient_id: string;
   period_start: string | null;
@@ -315,6 +333,8 @@ export interface ReportData {
   radar: RadarPoint[];
   cumulative: CumulativePoint[];
   heatmap: HeatmapAreaPoint[];
+  behavior_frequency: BehaviorFrequencySeries[];
+  reinforcer_usage: ReinforcerUsagePoint[];
   comparison: {
     available: boolean;
     message?: string | null;
@@ -646,8 +666,7 @@ export interface Assessment {
 export interface DomainComparisonPoint {
   domain_code: string;
   domain_label: string;
-  earliest_pct: number;
-  latest_pct: number;
+  values_by_date: Record<string, number>;
   gain_absolute_pp: number;
   gain_relative_pct: number | null;
 }

@@ -81,8 +81,7 @@ class ProtocolDefinitionResponse(BaseModel):
 class DomainComparisonPoint(BaseModel):
     domain_code: str
     domain_label: str
-    earliest_pct: float
-    latest_pct: float
+    values_by_date: dict[str, float]
     gain_absolute_pp: float
     gain_relative_pct: float | None
 

@@ -51,6 +51,89 @@ def test_report_data_matches_prd_example(client, db_session):
     assert data["cumulative"][-1]["cumulative_total"] == 3
 
 
+def test_behavior_frequency_chart_groups_by_behavior_text(client, db_session):
+    """Addendum v3.0, RF-34 — frequência/duração de comportamentos-alvo ao longo
+    do tempo, agrupadas pelo texto do comportamento registrado (RF-18)."""
+    ctx = register_clinic(client)
+    patient = create_patient(client, ctx["headers"])
+    category = create_training_category(db_session)
+    training = create_training(db_session, category)
+    session = client.post(
+        "/v1/sessions",
+        json={
+            "patient_id": patient["id"],
+            "professional_id": ctx["user"]["id"],
+            "occurred_at": "2026-07-10T10:00:00Z",
+            "training_ids": [str(training.id)],
+        },
+        headers=ctx["headers"],
+    ).json()
+
+    for frequency_count, duration_seconds in [(2, 30), (3, 45)]:
+        client.post(
+            f"/v1/patients/{patient['id']}/behavior-events",
+            json={
+                "session_id": session["id"],
+                "antecedent": "Pediram para guardar o brinquedo",
+                "behavior": "Gritou e jogou o brinquedo no chão",
+                "consequence": "Terapeuta ofereceu escolha entre dois brinquedos",
+                "frequency_count": frequency_count,
+                "duration_seconds": duration_seconds,
+            },
+            headers=ctx["headers"],
+        )
+
+    response = client.get(f"/v1/reports/patients/{patient['id']}", headers=ctx["headers"])
+    assert response.status_code == 200
+    data = response.json()
+
+    assert len(data["behavior_frequency"]) == 1
+    series = data["behavior_frequency"][0]
+    assert series["behavior"] == "Gritou e jogou o brinquedo no chão"
+    assert series["total_events"] == 2
+    assert len(series["points"]) == 1
+    assert series["points"][0]["frequency_count"] == 5
+    assert series["points"][0]["duration_seconds"] == 75
+
+
+def test_reinforcer_usage_chart_counts_usages_in_period(client, db_session):
+    """Addendum v3.0, RF-34 — frequência de uso de cada reforçador cadastrado (RF-19)."""
+    ctx = register_clinic(client)
+    patient = create_patient(client, ctx["headers"])
+    category = create_training_category(db_session)
+    training = create_training(db_session, category)
+    session = client.post(
+        "/v1/sessions",
+        json={
+            "patient_id": patient["id"],
+            "professional_id": ctx["user"]["id"],
+            "occurred_at": "2026-07-10T10:00:00Z",
+            "training_ids": [str(training.id)],
+        },
+        headers=ctx["headers"],
+    ).json()
+
+    reinforcer = client.post(
+        f"/v1/patients/{patient['id']}/reinforcers",
+        json={"name": "Elogio verbal"},
+        headers=ctx["headers"],
+    ).json()
+    for _ in range(3):
+        client.post(
+            f"/v1/sessions/{session['id']}/reinforcers",
+            json={"reinforcer_id": reinforcer["id"]},
+            headers=ctx["headers"],
+        )
+
+    response = client.get(f"/v1/reports/patients/{patient['id']}", headers=ctx["headers"])
+    assert response.status_code == 200
+    data = response.json()
+
+    assert len(data["reinforcer_usage"]) == 1
+    assert data["reinforcer_usage"][0]["reinforcer_name"] == "Elogio verbal"
+    assert data["reinforcer_usage"][0]["usage_count"] == 3
+
+
 def test_radar_flags_insufficient_data_below_threshold(client, db_session):
     """Seção 14.3 — radar deve alertar sobre limitações estatísticas com poucas tentativas."""
     ctx = register_clinic(client)

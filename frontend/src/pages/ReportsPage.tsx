@@ -269,7 +269,8 @@ export default function ReportsPage() {
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <div className="bg-white rounded-card shadow-sm p-6">
-            <h3 className="font-semibold text-brand-navy mb-2">Evolução do percentual de acerto</h3>
+            <h3 className="font-semibold text-brand-navy">Curva de Aprendizagem</h3>
+            <p className="text-xs text-neutralState mb-2">Evolução do percentual de acerto</p>
             {data.line.map((series) => (
               <div key={series.training_id} className="mb-4">
                 <div className="text-xs text-neutralState mb-1">{series.training_title}</div>
@@ -362,6 +363,57 @@ export default function ReportsPage() {
               </LineChart>
             </ResponsiveContainer>
           </div>
+        </div>
+      )}
+
+      {(data.behavior_frequency.length > 0 || data.reinforcer_usage.length > 0) && (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
+          {data.behavior_frequency.length > 0 && (
+            <div className="bg-white rounded-card shadow-sm p-6">
+              <h3 className="font-semibold text-brand-navy mb-2">Comportamentos interferentes</h3>
+              <p className="text-xs text-neutralState mb-2">
+                Frequência e duração ao longo do tempo (Addendum v3.0, RF-34) — idealmente mostrando
+                redução, que é o objetivo terapêutico.
+              </p>
+              {data.behavior_frequency.map((series) => (
+                <div key={series.behavior} className="mb-4">
+                  <div className="text-xs text-neutralState mb-1">
+                    {series.behavior} ({series.total_events} evento(s))
+                  </div>
+                  <ResponsiveContainer width="100%" height={180}>
+                    <LineChart data={series.points}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" />
+                      <XAxis dataKey="date" fontSize={9} />
+                      <YAxis yAxisId="freq" fontSize={9} allowDecimals={false} />
+                      <YAxis yAxisId="dur" orientation="right" fontSize={9} allowDecimals={false} />
+                      <Tooltip contentStyle={{ background: "#334155", color: "#fff", border: "none" }} />
+                      <Legend wrapperStyle={{ fontSize: 10 }} />
+                      <Line yAxisId="freq" type="monotone" dataKey="frequency_count" name="Frequência" stroke={CHART_COLORS[0]} strokeWidth={2} />
+                      <Line yAxisId="dur" type="monotone" dataKey="duration_seconds" name="Duração (s)" stroke={CHART_COLORS[3]} strokeWidth={2} />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {data.reinforcer_usage.length > 0 && (
+            <div className="bg-white rounded-card shadow-sm p-6">
+              <h3 className="font-semibold text-brand-navy mb-2">Reforçadores mais usados</h3>
+              <p className="text-xs text-neutralState mb-2">
+                Frequência de uso de cada reforçador cadastrado no período (Addendum v3.0, RF-34).
+              </p>
+              <ResponsiveContainer width="100%" height={220}>
+                <BarChart data={data.reinforcer_usage}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" />
+                  <XAxis dataKey="reinforcer_name" fontSize={9} />
+                  <YAxis fontSize={9} allowDecimals={false} />
+                  <Tooltip contentStyle={{ background: "#334155", color: "#fff", border: "none" }} />
+                  <Bar dataKey="usage_count" name="Vezes usado" fill={CHART_COLORS[2]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          )}
         </div>
       )}
     </div>

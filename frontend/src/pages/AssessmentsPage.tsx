@@ -1,6 +1,6 @@
 import { FormEvent, useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import { Bar, BarChart, CartesianGrid, Legend, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { apiRequest } from "../api/client";
 import EmptyState from "../components/EmptyState";
 import {
@@ -16,6 +16,9 @@ const PROTOCOL_LABELS: Record<AssessmentProtocol, string> = {
   vb_mapp: "VB-MAPP",
   ablls_r: "ABLLS-R",
 };
+
+const MAX_ASSESSMENTS_TO_COMPARE = 4;
+const COMPARE_CHART_COLORS = ["#3B82F6", "#14B8A6", "#F59E0B", "#8B5CF6"];
 
 function DomainChart({ assessment }: { assessment: Assessment }) {
   return (
@@ -85,7 +88,11 @@ export default function AssessmentsPage() {
   }
 
   function toggleSelected(id: string) {
-    setSelectedIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+    setSelectedIds((prev) => {
+      if (prev.includes(id)) return prev.filter((x) => x !== id);
+      if (prev.length >= MAX_ASSESSMENTS_TO_COMPARE) return prev;
+      return [...prev, id];
+    });
     setComparison(null);
   }
 
@@ -289,6 +296,7 @@ export default function AssessmentsPage() {
               <input
                 type="checkbox"
                 checked={selectedIds.includes(a.id)}
+                disabled={!selectedIds.includes(a.id) && selectedIds.length >= MAX_ASSESSMENTS_TO_COMPARE}
                 onChange={() => toggleSelected(a.id)}
               />
               <span className="flex-1">{new Date(a.applied_date).toLocaleDateString("pt-BR")}</span>
@@ -391,32 +399,62 @@ export default function AssessmentsPage() {
       )}
 
       {assessmentsOfProtocol.length >= 2 && (
-        <button
-          onClick={handleCompare}
-          disabled={selectedIds.length < 2}
-          className="rounded-btn bg-brand-blueLight text-white px-4 py-2 text-sm font-medium disabled:opacity-40 mb-6"
-        >
-          Comparar selecionadas ({selectedIds.length})
-        </button>
+        <div className="mb-6">
+          <button
+            onClick={handleCompare}
+            disabled={selectedIds.length < 2}
+            className="rounded-btn bg-brand-blueLight text-white px-4 py-2 text-sm font-medium disabled:opacity-40"
+          >
+            Comparar selecionadas ({selectedIds.length})
+          </button>
+          <p className="text-xs text-neutralState mt-1">
+            Selecione de 2 a {MAX_ASSESSMENTS_TO_COMPARE} avaliações do mesmo protocolo (Addendum v3.0, RF-33).
+          </p>
+        </div>
       )}
 
       {comparison && (
         <div className="bg-white rounded-card shadow-sm p-6">
           <div className="flex items-center justify-between mb-3">
             <h2 className="font-semibold text-brand-navy">
-              Comparação: {new Date(comparison.applied_dates[0]).toLocaleDateString("pt-BR")} →{" "}
+              Comparação de {comparison.applied_dates.length} avaliações:{" "}
+              {new Date(comparison.applied_dates[0]).toLocaleDateString("pt-BR")} →{" "}
               {new Date(comparison.applied_dates[comparison.applied_dates.length - 1]).toLocaleDateString("pt-BR")}
             </h2>
             <span className="text-[10px] uppercase font-semibold px-2 py-1 rounded-full bg-warning/10 text-warning">
               Rascunho automático por regras — revise antes de aprovar
             </span>
           </div>
-          <table className="w-full text-sm mb-4">
+
+          <ResponsiveContainer width="100%" height={260}>
+            <LineChart data={comparison.domains.map((d) => ({ domain_label: d.domain_label, ...d.values_by_date }))}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" />
+              <XAxis dataKey="domain_label" fontSize={9} />
+              <YAxis domain={[0, 100]} tickFormatter={(v) => `${v}%`} fontSize={9} />
+              <Tooltip formatter={(value: number) => `${value}%`} contentStyle={{ background: "#334155", color: "#fff", border: "none" }} />
+              <Legend wrapperStyle={{ fontSize: 10 }} />
+              {comparison.applied_dates.map((date, idx) => (
+                <Line
+                  key={date}
+                  type="monotone"
+                  dataKey={date}
+                  name={new Date(date).toLocaleDateString("pt-BR")}
+                  stroke={COMPARE_CHART_COLORS[idx % COMPARE_CHART_COLORS.length]}
+                  strokeWidth={2}
+                />
+              ))}
+            </LineChart>
+          </ResponsiveContainer>
+
+          <table className="w-full text-sm my-4">
             <thead>
               <tr className="text-left text-xs text-neutralState uppercase border-b border-slate-100">
                 <th className="py-2">Domínio</th>
-                <th className="py-2">Inicial</th>
-                <th className="py-2">Final</th>
+                {comparison.applied_dates.map((date) => (
+                  <th key={date} className="py-2">
+                    {new Date(date).toLocaleDateString("pt-BR")}
+                  </th>
+                ))}
                 <th className="py-2">Ganho absoluto</th>
                 <th className="py-2">Ganho relativo</th>
               </tr>
@@ -425,8 +463,11 @@ export default function AssessmentsPage() {
               {comparison.domains.map((d) => (
                 <tr key={d.domain_code} className="border-b border-slate-50 last:border-0">
                   <td className="py-2">{d.domain_label}</td>
-                  <td className="py-2">{d.earliest_pct}%</td>
-                  <td className="py-2">{d.latest_pct}%</td>
+                  {comparison.applied_dates.map((date) => (
+                    <td key={date} className="py-2">
+                      {d.values_by_date[date]}%
+                    </td>
+                  ))}
                   <td className={`py-2 ${d.gain_absolute_pp > 0 ? "text-success" : d.gain_absolute_pp < 0 ? "text-danger" : ""}`}>
                     {d.gain_absolute_pp > 0 ? "+" : ""}
                     {d.gain_absolute_pp} p.p.

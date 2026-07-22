@@ -1000,6 +1000,34 @@ tentativa futura de `upgrade` após um `downgrade` falha com "type already exist
   derivado unicamente de `Clinic.subscription_status` (`CHURN_RISK_BY_STATUS`) — nunca um valor de
   receita em R$, já que nenhum dado desse tipo existe localmente (só os price IDs do Stripe).
 
+## Nota sobre Gráficos — Comparação de Avaliações, Comportamentos/Reforçadores e Curva de Aprendizagem (Fase 7 Módulo 3.7 — Addendum v3.0, RF-33 a RF-35)
+
+- **RF-33 — `assessment_service.compare_assessments`**: reescrito para retornar um ponto por domínio
+  *por data selecionada* (`values_by_date: dict[str, float]`, chave = `applied_date.isoformat()`), em
+  vez da estrutura anterior que só guardava `earliest_pct`/`latest_pct` (a mais antiga contra a mais
+  recente do conjunto, ignorando qualquer aplicação intermediária). Isso é o que torna "comparar até 4"
+  um recurso real: com 3-4 aplicações selecionadas, cada uma aparece como sua própria linha no gráfico,
+  não apenas as duas extremidades. `MAX_ASSESSMENTS_TO_COMPARE = 4` é validado no service (400 se
+  ultrapassado); a normalização em si continua sendo só `normalized_pct` (Seção 30.1.1), como o
+  addendum pede explicitamente para reaproveitar. Só entram no gráfico os domínios em comum entre
+  *todas* as aplicações selecionadas (interseção, não só entre a primeira e a última) — garante que
+  cada linha do gráfico tenha um ponto em cada data, sem buracos.
+- **RF-34 — `report_service.build_behavior_frequency_data`/`build_reinforcer_usage_data`**: dois
+  datasets novos no mesmo endpoint de Reports (`GET /reports/patients/{id}`), escopados pelos mesmos
+  `date_from`/`date_to` do restante do relatório. `BehaviorEvent` (RF-18) não tem nenhum campo de
+  categoria/nome — o texto exato de `behavior` é o único identificador estável de "qual comportamento"
+  ao longo de várias sessões, então o agrupamento é por esse texto literal. `Reinforcer`/
+  `SessionReinforcer` (RF-19) já existiam com esse uso futuro documentado no próprio docstring do
+  modelo ("reaproveitado... pelo gráfico de reforçadores (RF-34)") — a contagem por reforçador aqui só
+  precisou ganhar o filtro de data que o restante do relatório já tinha. Os dois gráficos aparecem no
+  frontend independentemente de `total_trials` (diferente dos 6 gráficos originais, que dependem de
+  tentativas de treino) — um paciente pode ter eventos ABC/reforçadores registrados sem nenhuma
+  tentativa ainda.
+- **RF-35 — nenhuma mudança de cálculo**: o rótulo do gráfico de linha existente em Reports passou de
+  "Evolução do percentual de acerto" para "Curva de Aprendizagem" (título) mantendo o texto técnico
+  como subtítulo — exatamente como o critério de aceite pede ("apenas o rótulo... passa a incluir
+  Curva de Aprendizagem"). `build_line_series` não foi tocado.
+
 ## Estrutura
 
 - `app/models/` — entidades SQLAlchemy (Seção 18/27 do PRD).

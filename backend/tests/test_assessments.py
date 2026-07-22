@@ -163,11 +163,65 @@ def test_compare_assessments_computes_gain_per_domain(client):
     assert response.status_code == 200, response.text
     body = response.json()
     mando = next(d for d in body["domains"] if d["domain_code"] == "mando")
-    assert mando["earliest_pct"] == 20.0
-    assert mando["latest_pct"] == 60.0
+    assert mando["values_by_date"]["2026-01-01"] == 20.0
+    assert mando["values_by_date"]["2026-07-01"] == 60.0
     assert mando["gain_absolute_pp"] == 40.0
     assert mando["gain_relative_pct"] == 200.0
     assert "diagn" not in body["interpretive_summary"].lower() or "não constitui diagnóstico" in body["interpretive_summary"]
+
+
+def test_compare_up_to_four_assessments_returns_one_value_per_date(client):
+    """Addendum v3.0, RF-33 — o ABA+ compara até 4 aplicações do mesmo protocolo
+    num único gráfico (uma série por data), e não apenas a mais antiga contra
+    a mais recente."""
+    ctx = register_clinic(client)
+    patient = create_patient(client, ctx["headers"])
+
+    ids = []
+    for applied_date, raw_value in [("2026-01-01", 3), ("2026-03-01", 6), ("2026-05-01", 9), ("2026-07-01", 12)]:
+        created = client.post(
+            f"/v1/patients/{patient['id']}/assessments",
+            json={"protocol": "vb_mapp", "applied_date": applied_date, "domain_scores": [{"domain_code": "mando", "raw_value": raw_value}]},
+            headers=ctx["headers"],
+        ).json()
+        ids.append(created["id"])
+
+    response = client.get(
+        f"/v1/patients/{patient['id']}/assessments/compare",
+        params={"protocol": "vb_mapp", "assessment_ids": ids},
+        headers=ctx["headers"],
+    )
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert len(body["applied_dates"]) == 4
+    mando = next(d for d in body["domains"] if d["domain_code"] == "mando")
+    assert len(mando["values_by_date"]) == 4
+    # "mando" domain has max_value=15 (Seção 30.1.1) — raw_value/15*100.
+    assert mando["values_by_date"]["2026-01-01"] == 20.0
+    assert mando["values_by_date"]["2026-03-01"] == 40.0
+    assert mando["values_by_date"]["2026-05-01"] == 60.0
+    assert mando["values_by_date"]["2026-07-01"] == 80.0
+
+
+def test_compare_rejects_more_than_four_assessments(client):
+    ctx = register_clinic(client)
+    patient = create_patient(client, ctx["headers"])
+
+    ids = []
+    for applied_date in ["2026-01-01", "2026-02-01", "2026-03-01", "2026-04-01", "2026-05-01"]:
+        created = client.post(
+            f"/v1/patients/{patient['id']}/assessments",
+            json={"protocol": "vb_mapp", "applied_date": applied_date, "domain_scores": [{"domain_code": "mando", "raw_value": 3}]},
+            headers=ctx["headers"],
+        ).json()
+        ids.append(created["id"])
+
+    response = client.get(
+        f"/v1/patients/{patient['id']}/assessments/compare",
+        params={"protocol": "vb_mapp", "assessment_ids": ids},
+        headers=ctx["headers"],
+    )
+    assert response.status_code == 400
 
 
 def test_compare_requires_at_least_two_assessments(client):

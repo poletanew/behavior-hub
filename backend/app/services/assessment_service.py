@@ -258,14 +258,25 @@ def _interpretive_summary(domains: list[dict], earliest_date: datetime.date, lat
     return " ".join(parts)
 
 
+MAX_ASSESSMENTS_TO_COMPARE = 4
+
+
 def compare_assessments(db: Session, user: User, patient_id: uuid.UUID, protocol: AssessmentProtocol, assessment_ids: list[uuid.UUID]) -> dict:
-    """Seção 30.2/AC-19 — ganho absoluto e percentual por domínio entre a
-    aplicação mais antiga e a mais recente do conjunto selecionado, usando
-    normalized_pct (não raw_value, já que max_value pode variar entre
-    aplicações — Seção 30.1.1)."""
+    """Addendum v3.0, RF-33 — amplia a comparação de 2 para até 4 aplicações do
+    mesmo protocolo, reaproveitando normalized_pct (não raw_value, já que
+    max_value pode variar entre aplicações — Seção 30.1.1 do PRD; nenhum
+    cálculo de normalização novo foi criado). Só entram no gráfico os
+    domínios em comum entre TODAS as aplicações selecionadas (não só a mais
+    antiga e a mais recente), para que cada linha do gráfico tenha um ponto
+    em cada data."""
     patient_service.get_patient_or_404(db, user, patient_id)
     if len(assessment_ids) < 2:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="At least two assessments are required to compare")
+    if len(assessment_ids) > MAX_ASSESSMENTS_TO_COMPARE:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"At most {MAX_ASSESSMENTS_TO_COMPARE} assessments can be compared at once",
+        )
 
     assessments = (
         db.query(Assessment)
@@ -281,23 +292,28 @@ def compare_assessments(db: Session, user: User, patient_id: uuid.UUID, protocol
     if len(assessments) != len(set(assessment_ids)):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="One or more assessments not found for this patient/protocol")
 
+    scores_by_assessment = [{row["domain_code"]: row for row in a.raw_scores} for a in assessments]
+    common_codes = set(scores_by_assessment[0])
+    for scores in scores_by_assessment[1:]:
+        common_codes &= set(scores)
     earliest, latest = assessments[0], assessments[-1]
-    earliest_by_domain = {row["domain_code"]: row for row in earliest.raw_scores}
-    latest_by_domain = {row["domain_code"]: row for row in latest.raw_scores}
-    common_codes = [code for code in earliest_by_domain if code in latest_by_domain]
+    ordered_codes = [code for code in scores_by_assessment[0] if code in common_codes]
 
     domains = []
-    for code in common_codes:
-        earliest_pct = earliest_by_domain[code]["normalized_pct"]
-        latest_pct = latest_by_domain[code]["normalized_pct"]
+    for code in ordered_codes:
+        values_by_date = {
+            a.applied_date.isoformat(): scores[code]["normalized_pct"]
+            for a, scores in zip(assessments, scores_by_assessment)
+        }
+        earliest_pct = scores_by_assessment[0][code]["normalized_pct"]
+        latest_pct = scores_by_assessment[-1][code]["normalized_pct"]
         gain_absolute = round(latest_pct - earliest_pct, 1)
         gain_relative = round(gain_absolute / earliest_pct * 100, 1) if earliest_pct else None
         domains.append(
             {
                 "domain_code": code,
-                "domain_label": latest_by_domain[code]["domain_label"],
-                "earliest_pct": earliest_pct,
-                "latest_pct": latest_pct,
+                "domain_label": scores_by_assessment[-1][code]["domain_label"],
+                "values_by_date": values_by_date,
                 "gain_absolute_pp": gain_absolute,
                 "gain_relative_pct": gain_relative,
             }
