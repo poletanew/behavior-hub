@@ -10,6 +10,7 @@ import {
   Patient,
   PlanDraftItem,
   ProtocolDefinition,
+  SuggestedTrainingFolderEntry,
 } from "../types";
 
 const PROTOCOL_LABELS: Record<AssessmentProtocol, string> = {
@@ -60,6 +61,10 @@ export default function AssessmentsPage() {
   const [activating, setActivating] = useState(false);
   const [activateError, setActivateError] = useState<string | null>(null);
   const [activateSuccess, setActivateSuccess] = useState(false);
+
+  const [folderAssessment, setFolderAssessment] = useState<Assessment | null>(null);
+  const [suggestedFolder, setSuggestedFolder] = useState<SuggestedTrainingFolderEntry[] | null>(null);
+  const [linkedTrainingIds, setLinkedTrainingIds] = useState<Set<string>>(new Set());
 
   function load() {
     if (!patientId) return;
@@ -147,6 +152,19 @@ export default function AssessmentsPage() {
 
   function updateDraftItem(index: number, field: keyof PlanDraftItem, value: string) {
     setDraftItems((prev) => prev.map((item, i) => (i === index ? { ...item, [field]: value } : item)));
+  }
+
+  async function openFolder(a: Assessment) {
+    setFolderAssessment(a);
+    setSuggestedFolder(null);
+    const data = await apiRequest<SuggestedTrainingFolderEntry[]>(`/assessments/${a.id}/suggested-training-folder`);
+    setSuggestedFolder(data);
+  }
+
+  async function linkSuggestedTraining(trainingId: string) {
+    if (!patientId) return;
+    await apiRequest(`/trainings/${trainingId}/link`, { method: "POST", body: { patient_id: patientId } });
+    setLinkedTrainingIds((prev) => new Set(prev).add(trainingId));
   }
 
   async function handleActivateDraft() {
@@ -307,6 +325,9 @@ export default function AssessmentsPage() {
               >
                 {chartAssessment?.id === a.id ? "Ocultar gráfico" : "Ver gráfico"}
               </button>
+              <button onClick={() => openFolder(a)} className="text-brand-blue underline text-xs">
+                Pasta de treinos sugerida
+              </button>
               {a.ai_generated_plan_draft.length > 0 &&
                 (a.plan_draft_activated_at ? (
                   <span className="text-[10px] uppercase font-semibold px-2 py-1 rounded-full bg-success/10 text-success">
@@ -395,6 +416,68 @@ export default function AssessmentsPage() {
               </button>
             </div>
           )}
+        </div>
+      )}
+
+      {folderAssessment && (
+        <div className="bg-white rounded-card shadow-sm p-6 mb-6">
+          <div className="flex items-center justify-between mb-1">
+            <h2 className="font-semibold text-brand-navy">
+              Pasta de treinos sugerida — {new Date(folderAssessment.applied_date).toLocaleDateString("pt-BR")}
+            </h2>
+            <span className="text-[10px] uppercase font-semibold px-2 py-1 rounded-full bg-brand-turquoise/10 text-brand-turquoise">
+              Sugestão automática — revise antes de vincular
+            </span>
+          </div>
+          <p className="text-xs text-neutralState mb-4">
+            Treinos da Biblioteca de Treino relevantes às áreas de menor pontuação desta avaliação
+            (Addendum v3.0, RF-36). Nenhum vínculo é criado automaticamente — revise e clique em
+            "Vincular" para cada treino desejado.
+          </p>
+          {!suggestedFolder ? (
+            <p className="text-neutralState text-sm">Carregando...</p>
+          ) : suggestedFolder.length === 0 ? (
+            <p className="text-sm text-neutralState">Nenhuma área de baixa pontuação identificada nesta avaliação.</p>
+          ) : (
+            <div className="space-y-4 mb-4">
+              {suggestedFolder.map((entry) => (
+                <div key={entry.domain_code} className="border border-slate-200 rounded-btn p-4">
+                  <div className="text-sm font-medium mb-2">
+                    {entry.domain_label} ({entry.normalized_pct}%)
+                  </div>
+                  {entry.trainings.length === 0 ? (
+                    <p className="text-xs text-neutralState">
+                      Nenhum treino da Biblioteca encontrado para este domínio ainda.
+                    </p>
+                  ) : (
+                    <ul className="space-y-2">
+                      {entry.trainings.map((t) => (
+                        <li key={t.training_id} className="flex items-center justify-between gap-3 text-sm">
+                          <span>{t.title}</span>
+                          {linkedTrainingIds.has(t.training_id) ? (
+                            <span className="text-xs text-success font-medium shrink-0">Vinculado</span>
+                          ) : (
+                            <button
+                              onClick={() => linkSuggestedTraining(t.training_id)}
+                              className="rounded-btn bg-white border border-slate-300 px-3 py-1 text-xs font-medium shrink-0"
+                            >
+                              Vincular
+                            </button>
+                          )}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+          <button
+            onClick={() => setFolderAssessment(null)}
+            className="rounded-btn bg-white border border-slate-300 px-4 py-2 text-sm font-medium"
+          >
+            Fechar
+          </button>
         </div>
       )}
 

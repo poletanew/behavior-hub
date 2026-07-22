@@ -92,3 +92,20 @@ class AssessmentComparisonResponse(BaseModel):
     applied_dates: list[datetime.date]
     domains: list[DomainComparisonPoint]
     interpretive_summary: str
+
+
+class SuggestedTrainingRef(BaseModel):
+    training_id: uuid.UUID
+    title: str
+    objective: str
+
+
+class SuggestedTrainingFolderEntry(BaseModel):
+    """Addendum v3.0, RF-36 — um domínio de menor desempenho desta avaliação e os
+    treinos da Training Library que já existem no sistema e parecem relevantes
+    a ele; nenhum vínculo é criado aqui, é só a sugestão para revisão."""
+
+    domain_code: str
+    domain_label: str
+    normalized_pct: float
+    trainings: list[SuggestedTrainingRef]

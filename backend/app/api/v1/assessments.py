@@ -15,6 +15,7 @@ from app.schemas.assessment import (
     AssessmentResponse,
     AssessmentUpdateRequest,
     ProtocolDefinitionResponse,
+    SuggestedTrainingFolderEntry,
 )
 from app.schemas.treatment_plan import ObjectiveResponse
 from app.services import assessment_protocols, assessment_service
@@ -79,6 +80,16 @@ def update_assessment(
 @router.delete("/assessments/{assessment_id}", status_code=204)
 def delete_assessment(assessment_id: uuid.UUID, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
     assessment_service.soft_delete_assessment(db, user, assessment_id)
+
+
+@router.get("/assessments/{assessment_id}/suggested-training-folder", response_model=list[SuggestedTrainingFolderEntry])
+def get_suggested_training_folder(
+    assessment_id: uuid.UUID, db: Session = Depends(get_db), user: User = Depends(get_current_user)
+):
+    """Addendum v3.0, RF-36 — pasta de treinos da Biblioteca sugeridos para as
+    áreas de menor pontuação desta avaliação, aguardando confirmação do
+    profissional (vínculo real via POST /trainings/{id}/link, RF-10)."""
+    return assessment_service.get_suggested_training_folder(db, user, assessment_id)
 
 
 @router.post("/assessments/{assessment_id}/activate-plan-draft", response_model=list[ObjectiveResponse])

@@ -1028,6 +1028,39 @@ tentativa futura de `upgrade` após um `downgrade` falha com "type already exist
   como subtítulo — exatamente como o critério de aceite pede ("apenas o rótulo... passa a incluir
   Curva de Aprendizagem"). `build_line_series` não foi tocado.
 
+## Nota sobre Automatização — Pasta de Treinos Sugerida e IA Multidisciplinar Ampliada (Fase 7 Módulo 3.8 — Addendum v3.0, RF-36 e RF-37)
+
+- **RF-36 — `assessment_service.get_suggested_training_folder`**: compartilha `_weak_domains` com o
+  rascunho de plano do RF-06 (mesma definição de "área de baixa pontuação" nos dois lugares), e reusa
+  a listagem de treinos já visível ao usuário (`training_service.list_trainings`, RF-10 do Addendum
+  v2.1) — nenhuma associação nova domínio→treino é inventada, é busca textual sobre dados já
+  existentes. Calculado sob demanda a cada chamada (diferente de `ai_generated_plan_draft`, que é
+  congelado na criação da avaliação) para sempre refletir o estado atual da Training Library.
+  **Bug descoberto e corrigido durante o desenvolvimento**: a primeira versão comparava o rótulo do
+  domínio como substring crua contra título/objetivo (via `ILIKE`), e isso produzia falsos positivos
+  ridículos — buscar o domínio "Mando" "casava" com o treino "Empilhar blocos" só porque seu texto
+  contém a palavra "for**mando**"; buscar "Tato" "casava" com "Contato visual" (con**tato**). Corrigido
+  trocando para casamento por **palavra inteira** (`\b<rótulo>\b`, case-insensitive, calculado em
+  Python sobre a lista de treinos já carregada — evitar depender de regex do lado do banco e sua
+  sintaxe de escape separada). Coberto por teste de regressão dedicado
+  (`test_suggested_training_folder_ignores_substring_false_positives`). Vincular um treino sugerido ao
+  paciente usa o endpoint `POST /trainings/{id}/link` já existente — nada de vínculo automático.
+- **RF-37 — `SPECIALTY_TO_AREA` (app/models/enums.py)**: a Seção 7.2 do PRD lista 12 especialidades,
+  mas o dicionário só mapeava 7 para uma `TreatmentArea` nomeada; as 5 restantes (Neuropediatra,
+  Psiquiatra Infantil, Musicoterapeuta, Arteterapeuta, Psicomotricista) retornavam `None` em
+  `SPECIALTY_TO_AREA.get(user.specialty)`, e como `can_edit_area` (usado tanto para criar objetivo
+  quanto para `generate_objective_draft_from_attachment`/"Preencher com IA") compara esse valor contra
+  a área do anexo, essas 5 especialidades nunca conseguiam editar nenhuma área com permissão
+  `EDIT_AREA_PLAN` — incluindo o próprio mecanismo de IA que o RF-37 pede para ampliar. Corrigido
+  mapeando as 5 para `TreatmentArea.OUTRA` (a área "catch-all" que já existe na grade), em vez de
+  inventar uma associação clínica 1:1 que o PRD não especifica (ex.: Psicomotricista não é Terapia
+  Ocupacional). **Gap adjacente também corrigido**: a página de convite de profissional (`/invitations`)
+  nunca expunha um campo de especialidade — o backend já aceitava `specialty` na criação do convite
+  (usado em registro individual e nos testes), mas nenhuma tela de convite de clínica preenchia esse
+  campo, o que tornava o próprio mapeamento inatingível na prática para profissionais convidados por
+  uma clínica. Adicionado um seletor de especialidade opcional ao formulário de convite (visível para
+  papéis `professional`/`supervisor`, omitido para `at`, que não usa `SPECIALTY_TO_AREA`).
+
 ## Estrutura
 
 - `app/models/` — entidades SQLAlchemy (Seção 18/27 do PRD).

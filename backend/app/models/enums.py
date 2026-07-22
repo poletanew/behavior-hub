@@ -111,6 +111,17 @@ class TreatmentArea(str, enum.Enum):
 
 # Seção 13.3 — mapeamento entre especialidade do profissional e a área do plano
 # de tratamento que ele pode editar quando o vínculo é EDIT_AREA_PLAN.
+#
+# Addendum v3.0, RF-37 — a Seção 7.2 do PRD lista 12 especialidades, mas só 7
+# têm uma área nomeada correspondente na grade multidisciplinar (Seção 13.1,
+# TreatmentArea). As 5 restantes (Neuropediatra, Psiquiatra Infantil,
+# Musicoterapeuta, Arteterapeuta, Psicomotricista) não têm área dedicada — sem
+# este mapeamento, um profissional com uma dessas especialidades e permissão
+# EDIT_AREA_PLAN nunca conseguia editar objetivo ou usar "Preencher com IA"
+# (RF-05) em nenhuma área, já que `SPECIALTY_TO_AREA.get(user.specialty)`
+# retornava None para elas. Mapear para OUTRA (área "catch-all" que já existe
+# na grade) resolve isso sem inventar uma associação clínica 1:1 que o PRD não
+# especifica (ex.: Psicomotricista não é o mesmo que Terapia Ocupacional).
 SPECIALTY_TO_AREA: dict[Specialty, TreatmentArea] = {
     Specialty.PSICOLOGO_INFANTIL: TreatmentArea.PSICOLOGIA,
     Specialty.ANALISTA_COMPORTAMENTO_ABA: TreatmentArea.ABA,
@@ -119,6 +130,11 @@ SPECIALTY_TO_AREA: dict[Specialty, TreatmentArea] = {
     Specialty.PSICOPEDAGOGO: TreatmentArea.PSICOPEDAGOGIA,
     Specialty.FISIOTERAPEUTA_PEDIATRICO: TreatmentArea.FISIOTERAPIA,
     Specialty.NUTRICIONISTA_INFANTIL: TreatmentArea.NUTRICAO,
+    Specialty.NEUROPEDIATRA: TreatmentArea.OUTRA,
+    Specialty.PSIQUIATRA_INFANTIL: TreatmentArea.OUTRA,
+    Specialty.MUSICOTERAPEUTA: TreatmentArea.OUTRA,
+    Specialty.ARTETERAPEUTA: TreatmentArea.OUTRA,
+    Specialty.PSICOMOTRICISTA: TreatmentArea.OUTRA,
 }
 
 

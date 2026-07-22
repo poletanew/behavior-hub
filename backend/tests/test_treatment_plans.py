@@ -379,6 +379,49 @@ def test_ai_fill_requires_area_edit_permission(client, mock_s3):
     assert response.status_code == 403
 
 
+def test_ai_fill_works_for_specialties_without_a_dedicated_area(client, mock_s3):
+    """Addendum v3.0, RF-37 — a Seção 7.2 do PRD lista 12 especialidades, mas só 7
+    tinham entrada em SPECIALTY_TO_AREA; as outras 5 (sem área dedicada na grade)
+    nunca conseguiam usar "Preencher com IA" em nenhuma área. Testa 3 delas
+    (Musicoterapeuta, Arteterapeuta, Neuropediatra), todas mapeadas para a área
+    'outra' — mesmo mecanismo de IA (RF-05), mesma revisão humana obrigatória."""
+    for specialty in ["musicoterapeuta", "arteterapeuta", "neuropediatra"]:
+        ctx = register_clinic(client)
+        patient = create_patient(client, ctx["headers"])
+        pdf_bytes = _pdf_with_text("Registro multidisciplinar", "Criterio de dominio: 70%")
+        attachment = _upload_pdf_bytes(client, ctx["headers"], patient["id"], pdf_bytes, area="outra").json()
+
+        professional = invite_and_accept_professional(client, ctx["headers"], specialty=specialty)
+        assign_professional(client, ctx["headers"], patient["id"], professional["user"]["id"], permission="edit_area_plan")
+
+        response = client.post(
+            f"/v1/patients/{patient['id']}/treatment-plan/objectives/ai-fill",
+            json={"attachment_id": attachment["id"]},
+            headers=professional["headers"],
+        )
+        assert response.status_code == 200, f"{specialty}: {response.text}"
+        draft = response.json()
+        assert draft["title"] == "Registro multidisciplinar"
+
+        created = client.post(
+            f"/v1/patients/{patient['id']}/treatment-plan/objectives",
+            json={
+                "area": "outra",
+                "title": draft["title"],
+                "description": draft["description"],
+                "criteria": draft["criteria"],
+                "strategies": draft["strategies"],
+                "priority": "medium",
+                "ai_generated": True,
+                "ai_source_document_id": attachment["id"],
+            },
+            headers=professional["headers"],
+        )
+        assert created.status_code == 201, f"{specialty}: {created.text}"
+        # Seção 12.1 — salvar É a confirmação de revisão humana obrigatória.
+        assert created.json()["ai_reviewed_at"] is not None
+
+
 def test_marking_objective_mastered_auto_schedules_maintenance_check(client):
     """Addendum v3.0, RF-24 — objetivo dominado gera automaticamente um
     lembrete de reteste de manutenção 30 dias à frente."""

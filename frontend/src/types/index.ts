@@ -679,6 +679,19 @@ export interface AssessmentComparison {
   interpretive_summary: string;
 }
 
+export interface SuggestedTrainingRef {
+  training_id: string;
+  title: string;
+  objective: string;
+}
+
+export interface SuggestedTrainingFolderEntry {
+  domain_code: string;
+  domain_label: string;
+  normalized_pct: number;
+  trainings: SuggestedTrainingRef[];
+}
+
 export interface ResourceLink {
   id: string;
   resource_id: string;

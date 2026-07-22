@@ -269,6 +269,17 @@ Este repositório está sendo construído **por fases**, seguindo o roadmap da S
   e duração ao longo do tempo de cada comportamento-alvo do modelo ABC, agrupado pelo texto exato do
   comportamento) e "Reforçadores mais usados" (quantas vezes cada reforçador cadastrado foi usado no
   período).
+- **Fase 7 (Módulo 3.8) — Addendum v3.0, RF-36 e RF-37 — Automatização**: ao registrar uma avaliação
+  padronizada, o botão "Pasta de treinos sugerida" mostra, para cada área de baixa pontuação já
+  identificada pelo rascunho de plano (RF-06), os treinos da Biblioteca de Treino cujo título ou
+  objetivo mencionam aquele domínio — pronto para revisar e clicar em "Vincular" (mesmo mecanismo já
+  usado na Biblioteca de Treino); nenhum vínculo é criado sozinho, e domínios sem nenhum treino
+  relacionado simplesmente aparecem com a pasta vazia, nunca com uma sugestão inventada. O convite de
+  profissional (página "Profissionais") ganhou um campo de especialidade opcional, e a IA de
+  "Preencher com IA" do Plano de Tratamento agora funciona para as 12 especialidades da Seção 7.2 do
+  PRD (antes, 5 delas — Neuropediatra, Psiquiatra Infantil, Musicoterapeuta, Arteterapeuta,
+  Psicomotricista — não tinham nenhuma área da grade multidisciplinar associada e por isso nunca
+  conseguiam usar o recurso).
 
 ## Stack (Seção 4 do PRD)
 

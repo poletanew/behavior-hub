@@ -1,4 +1,5 @@
 import datetime
+import re
 import uuid
 
 from fastapi import HTTPException, status
@@ -11,7 +12,7 @@ from app.models.treatment_plan import Objective
 from app.models.user import User
 from app.schemas.assessment import ActivatePlanDraftRequest, AssessmentCreateRequest, AssessmentUpdateRequest
 from app.schemas.treatment_plan import ObjectiveCreateRequest
-from app.services import assessment_protocols, audit_service, patient_service, treatment_plan_service
+from app.services import assessment_protocols, audit_service, patient_service, training_service, treatment_plan_service
 from app.services.rbac_service import can_restore_deleted_data
 
 
@@ -52,14 +53,28 @@ def _build_raw_scores(protocol: AssessmentProtocol, domain_scores: list) -> list
     return rows
 
 
+def _weak_domains(raw_scores: list[dict]) -> list[dict]:
+    """RF-06/RF-36 — domínios abaixo da média normalized_pct desta própria
+    avaliação são tratados como "de menor desempenho"; se todos empatarem, os
+    de valor mínimo garantem ao menos um domínio identificado. Compartilhado
+    entre o rascunho de plano (RF-06) e a pasta de treinos sugerida (RF-36) —
+    mesma definição de "área de baixa pontuação" nos dois lugares."""
+    if not raw_scores:
+        return []
+
+    mean_pct = sum(row["normalized_pct"] for row in raw_scores) / len(raw_scores)
+    weak = [row for row in raw_scores if row["normalized_pct"] < mean_pct]
+    if not weak:
+        min_pct = min(row["normalized_pct"] for row in raw_scores)
+        weak = [row for row in raw_scores if row["normalized_pct"] == min_pct]
+    return weak
+
+
 def _generate_plan_draft(protocol: AssessmentProtocol, raw_scores: list[dict]) -> list[dict]:
     """RF-06 — "propõe um rascunho de Plano de Tratamento com objetivos básicos
     por área, com base nos domínios de menor pontuação". Regra determinística,
     sem chamada a nenhuma API de IA externa (mesmo princípio de
-    treatment_plan_service._draft_objective_fields_from_text): domínios abaixo
-    da média normalized_pct desta própria avaliação são tratados como "de menor
-    desempenho"; se todos empatarem, os de valor mínimo garantem ao menos um
-    item no rascunho.
+    treatment_plan_service._draft_objective_fields_from_text).
 
     Decisão de escopo: VB-MAPP e ABLLS-R são instrumentos de Análise do
     Comportamento Aplicada (Seção 30) — o PRD não define um mapeamento
@@ -67,15 +82,7 @@ def _generate_plan_draft(protocol: AssessmentProtocol, raw_scores: list[dict]) -
     domínio para uma especialidade diferente seria inventar um julgamento
     clínico que o documento não especifica. Todos os objetivos sugeridos vão
     para a área ABA, área nativa desses protocolos."""
-    if not raw_scores:
-        return []
-
-    mean_pct = sum(row["normalized_pct"] for row in raw_scores) / len(raw_scores)
-    weak_domains = [row for row in raw_scores if row["normalized_pct"] < mean_pct]
-    if not weak_domains:
-        min_pct = min(row["normalized_pct"] for row in raw_scores)
-        weak_domains = [row for row in raw_scores if row["normalized_pct"] == min_pct]
-
+    weak_domains = _weak_domains(raw_scores)
     draft = []
     for row in weak_domains:
         draft.append(
@@ -167,6 +174,62 @@ def _get_assessment_or_404(db: Session, user: User, assessment_id: uuid.UUID, *,
 def get_assessment(db: Session, user: User, assessment_id: uuid.UUID) -> Assessment:
     _patient, assessment = _get_assessment_or_404(db, user, assessment_id)
     return assessment
+
+
+MAX_SUGGESTED_TRAININGS_PER_DOMAIN = 5
+
+
+def _mentions_domain_label(text: str, domain_label: str) -> bool:
+    """Addendum v3.0, RF-36 — casamento por palavra inteira (não substring
+    cru), para não sugerir treinos irrelevantes só porque o rótulo do
+    domínio aparece "escondido" dentro de outra palavra (ex.: buscar "Mando"
+    com substring simples também "casaria" com "for-MANDO"; buscar "Tato"
+    também "casaria" com "Con-TATO"). `\\b` exige que a fronteira da palavra
+    seja um caractere não alfanumérico (ou início/fim de string) dos dois
+    lados do termo buscado."""
+    pattern = r"\b" + re.escape(domain_label) + r"\b"
+    return re.search(pattern, text, re.IGNORECASE) is not None
+
+
+def get_suggested_training_folder(db: Session, user: User, assessment_id: uuid.UUID) -> list[dict]:
+    """Addendum v3.0, RF-36 — "montar automaticamente uma pasta... dos treinos da
+    Training Library que já existem no sistema e são relevantes às áreas de
+    menor pontuação identificadas, prontos para revisão e vinculação ao
+    paciente". Reaproveita a mesma listagem de treinos já visíveis ao usuário
+    (RF-10 do Addendum v2.1, training_service.list_trainings) e casa o rótulo
+    do domínio contra título/objetivo por palavra inteira — nenhuma
+    associação nova domínio→treino é inventada aqui. Domínios cujo rótulo não
+    tem nenhum treino com título/objetivo semelhante simplesmente retornam
+    uma lista vazia (nunca um treino inventado ou não relacionado só para
+    preencher a pasta).
+
+    Calculado sob demanda (não congelado na criação da avaliação, diferente de
+    `ai_generated_plan_draft`) para sempre refletir o estado atual da Training
+    Library — um treino pode ser criado, editado ou removido depois."""
+    _patient, assessment = _get_assessment_or_404(db, user, assessment_id)
+    weak_domains = _weak_domains(assessment.raw_scores)
+    if not weak_domains:
+        return []
+
+    all_trainings = training_service.list_trainings(db, user)
+
+    folder = []
+    for row in weak_domains:
+        matches = [
+            t for t in all_trainings if _mentions_domain_label(t.title, row["domain_label"]) or _mentions_domain_label(t.objective, row["domain_label"])
+        ]
+        folder.append(
+            {
+                "domain_code": row["domain_code"],
+                "domain_label": row["domain_label"],
+                "normalized_pct": row["normalized_pct"],
+                "trainings": [
+                    {"training_id": t.id, "title": t.title, "objective": t.objective}
+                    for t in matches[:MAX_SUGGESTED_TRAININGS_PER_DOMAIN]
+                ],
+            }
+        )
+    return folder
 
 
 def update_assessment(db: Session, user: User, assessment_id: uuid.UUID, payload: AssessmentUpdateRequest) -> Assessment:
