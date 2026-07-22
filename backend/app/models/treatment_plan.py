@@ -61,6 +61,11 @@ class Objective(Base, UUIDPrimaryKeyMixin, TimestampMixin, SoftDeleteMixin):
     maintenance_check_date: Mapped[datetime.date | None] = mapped_column(Date, nullable=True)
     generalization_contexts: Mapped[list | None] = mapped_column(JSON, nullable=True)
 
+    # Addendum v3.0, RF-28 — posição manual dentro da área (arrastar e soltar
+    # para reordenar prioridade dos programas do paciente); novos objetivos
+    # entram no fim da lista da própria área.
+    display_order: Mapped[int] = mapped_column(default=0, nullable=False)
+
     plan: Mapped["TreatmentPlan"] = relationship(back_populates="objectives")
     comments: Mapped[list["ObjectiveComment"]] = relationship(
         back_populates="objective", cascade="all, delete-orphan", order_by="ObjectiveComment.created_at"

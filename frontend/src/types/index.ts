@@ -190,6 +190,7 @@ export interface Objective {
   maintenance_check_date: string | null;
   maintenance_due: boolean;
   generalization_contexts: GeneralizationContextEntry[];
+  display_order: number;
 }
 
 export interface ObjectiveApplier {
@@ -480,7 +481,15 @@ export interface Appointment {
   status_notes: string | null;
   notes: string | null;
   session_id: string | null;
+  room_id: string | null;
+  room_name: string | null;
   deleted_at: string | null;
+  created_at: string;
+}
+
+export interface Room {
+  id: string;
+  name: string;
   created_at: string;
 }
 

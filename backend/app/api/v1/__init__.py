@@ -27,6 +27,7 @@ from app.api.v1 import (
     reports,
     resource_links,
     resources,
+    rooms,
     session_templates,
     sessions,
     supervisor_dashboard,
@@ -41,6 +42,7 @@ api_router = APIRouter(prefix="/v1")
 api_router.include_router(auth.router)
 api_router.include_router(billing.router)
 api_router.include_router(appointments.router)
+api_router.include_router(rooms.router)
 api_router.include_router(assessments.router)
 api_router.include_router(clinical_alerts.router)
 api_router.include_router(clinical_suggestions.router)

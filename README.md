@@ -223,6 +223,16 @@ Este repositório está sendo construído **por fases**, seguindo o roadmap da S
   responsável foi marcado como aplicador e permite registrar "Apliquei hoje" (com nota opcional);
   essa ação reaproveita o Audit Log já existente, então aparece automaticamente no histórico do
   objetivo do lado da equipe clínica, sem nenhuma tabela ou tela nova.
+- **Fase 7 (Módulo 3.4) — Addendum v3.0, RF-26 e RF-28 — Agendamento**: em Configurações da Clínica,
+  uma nova seção "Salas de Atendimento" cadastra as salas físicas disponíveis; ao agendar um
+  atendimento na Agenda, a sala é opcional, e a mesma sala não pode ter dois atendimentos
+  sobrepostos (mesma checagem de conflito que já existia para o profissional). Cada card de
+  atendimento na Agenda agora pode ser arrastado para outro dia da semana para reagendar, mantendo
+  o mesmo horário e duração; e cada objetivo do Plano de Tratamento ganha uma pequena alça de
+  arrastar (⠿⠿⠿) para reordenar manualmente a prioridade dos programas dentro da própria área, com a
+  nova ordem persistindo entre sessões. RF-27 (confirmação via WhatsApp) foi propositalmente
+  deixado de fora desta fase: depende de um provedor de API do WhatsApp Business, e nenhuma
+  credencial desse tipo está configurada neste projeto.
 
 ## Stack (Seção 4 do PRD)
 

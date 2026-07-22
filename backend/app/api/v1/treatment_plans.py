@@ -20,6 +20,7 @@ from app.schemas.treatment_plan import (
     ObjectiveCommentResponse,
     ObjectiveCreateRequest,
     ObjectiveHistoryEntry,
+    ObjectiveReorderRequest,
     ObjectiveResponse,
     ObjectiveUpdateRequest,
     TreatmentPlanAttachmentResponse,
@@ -72,6 +73,7 @@ def _to_objective_response(db: Session, objective: Objective) -> ObjectiveRespon
         maintenance_check_date=objective.maintenance_check_date,
         maintenance_due=maintenance_due,
         generalization_contexts=objective.generalization_contexts or [],
+        display_order=objective.display_order,
     )
 
 
@@ -167,6 +169,18 @@ def create_objective(
     a menos que `force=true` seja enviado."""
     objective = treatment_plan_service.create_objective(db, user, patient_id, payload)
     return _to_objective_response(db, objective)
+
+
+@router.post("/patients/{patient_id}/treatment-plan/objectives/reorder", response_model=list[ObjectiveResponse])
+def reorder_objectives(
+    patient_id: uuid.UUID,
+    payload: ObjectiveReorderRequest,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """Addendum v3.0, RF-28 — arrastar e soltar para reordenar prioridade dos objetivos de uma área."""
+    objectives = treatment_plan_service.reorder_objectives(db, user, patient_id, payload)
+    return [_to_objective_response(db, o) for o in objectives]
 
 
 @router.get("/objectives/{objective_id}", response_model=ObjectiveResponse)

@@ -610,6 +610,7 @@ export default function TreatmentPlanPage() {
   const [professionals, setProfessionals] = useState<User[]>([]);
   const [resources, setResources] = useState<ResourceItem[]>([]);
   const [familyAccesses, setFamilyAccesses] = useState<FamilyAccess[]>([]);
+  const [draggedObjectiveId, setDraggedObjectiveId] = useState<string | null>(null);
   const [aiAttachmentId, setAiAttachmentId] = useState("");
   const [aiFilling, setAiFilling] = useState(false);
   const [aiError, setAiError] = useState<string | null>(null);
@@ -710,6 +711,25 @@ export default function TreatmentPlanPage() {
     e.preventDefault();
     setError(null);
     await submitObjective(false);
+  }
+
+  async function handleReorderDrop(area: TreatmentArea, targetObjectiveId: string) {
+    if (!draggedObjectiveId || draggedObjectiveId === targetObjectiveId) return;
+    const current = objectivesByArea[area] || [];
+    const ids = current.map((o) => o.id);
+    const fromIndex = ids.indexOf(draggedObjectiveId);
+    const toIndex = ids.indexOf(targetObjectiveId);
+    setDraggedObjectiveId(null);
+    if (fromIndex === -1 || toIndex === -1) return;
+
+    const reordered = [...ids];
+    reordered.splice(fromIndex, 1);
+    reordered.splice(toIndex, 0, draggedObjectiveId);
+    await apiRequest(`/patients/${patientId}/treatment-plan/objectives/reorder`, {
+      method: "POST",
+      body: { area, ordered_ids: reordered },
+    });
+    load();
   }
 
   const objectivesByArea: Record<string, Objective[]> = {};
@@ -896,14 +916,25 @@ export default function TreatmentPlanPage() {
             <div key={areaKey} className="bg-white rounded-card shadow-sm p-4">
               <h2 className="font-semibold text-brand-navy mb-2">{AREA_LABELS[areaKey]}</h2>
               {(objectivesByArea[areaKey] || []).map((objective) => (
-                <ObjectiveCard
-                  key={objective.id}
-                  objective={objective}
-                  onChanged={load}
-                  professionals={professionals}
-                  resources={resources}
-                  familyAccesses={familyAccesses}
-                />
+                <div key={objective.id}>
+                  <div
+                    draggable
+                    onDragStart={() => setDraggedObjectiveId(objective.id)}
+                    onDragOver={(e) => e.preventDefault()}
+                    onDrop={() => handleReorderDrop(areaKey, objective.id)}
+                    className="flex items-center justify-center h-4 text-slate-300 hover:text-slate-500 cursor-move select-none text-xs"
+                    title="Arraste para reordenar a prioridade nesta área"
+                  >
+                    ⠿⠿⠿
+                  </div>
+                  <ObjectiveCard
+                    objective={objective}
+                    onChanged={load}
+                    professionals={professionals}
+                    resources={resources}
+                    familyAccesses={familyAccesses}
+                  />
+                </div>
               ))}
               {(objectivesByArea[areaKey] || []).length === 0 && (
                 <p className="text-xs text-neutralState mb-2">Nenhum objetivo nesta área ainda.</p>

@@ -72,9 +72,19 @@ class ObjectiveResponse(BaseModel):
     maintenance_check_date: datetime.date | None
     maintenance_due: bool = False
     generalization_contexts: list[GeneralizationContextEntry] = Field(default_factory=list)
+    display_order: int = 0
 
     class Config:
         from_attributes = True
+
+
+class ObjectiveReorderRequest(BaseModel):
+    """Addendum v3.0, RF-28 — arrastar e soltar para reordenar prioridade dos
+    objetivos de uma área; a lista deve conter exatamente os objetivos ativos
+    dessa área, na nova ordem desejada."""
+
+    area: TreatmentArea
+    ordered_ids: list[uuid.UUID] = Field(min_length=1)
 
 
 class GeneralizationContextCreateRequest(BaseModel):

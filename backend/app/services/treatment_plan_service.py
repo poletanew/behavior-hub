@@ -35,6 +35,7 @@ from app.schemas.treatment_plan import (
     ObjectiveAIFillResponse,
     ObjectiveApplierCreateRequest,
     ObjectiveCreateRequest,
+    ObjectiveReorderRequest,
     ObjectiveUpdateRequest,
 )
 from app.services import audit_service, file_service, notification_service, patient_service, rbac_service
@@ -119,8 +120,46 @@ def get_treatment_plan(
     if date_to is not None:
         query = query.filter(Objective.created_at <= date_to)
 
-    objectives = query.order_by(Objective.area, Objective.created_at).all()
+    objectives = query.order_by(Objective.area, Objective.display_order, Objective.created_at).all()
     return plan, objectives
+
+
+def reorder_objectives(
+    db: Session, user: User, patient_id: uuid.UUID, payload: ObjectiveReorderRequest
+) -> list[Objective]:
+    """Addendum v3.0, RF-28 — arrastar e soltar para reordenar prioridade dos
+    objetivos de uma área do Plano de Tratamento."""
+    patient = patient_service.get_patient_or_404(db, user, patient_id)
+    plan = get_or_create_plan(db, patient)
+
+    if not can_edit_area(db, user, patient, payload.area):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized to edit this area")
+
+    objectives = (
+        db.query(Objective)
+        .filter(Objective.plan_id == plan.id, Objective.area == payload.area, Objective.deleted_at.is_(None))
+        .all()
+    )
+    objectives_by_id = {o.id: o for o in objectives}
+    if set(payload.ordered_ids) != set(objectives_by_id.keys()):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="ordered_ids must contain exactly the active objectives of this area",
+        )
+
+    for index, objective_id in enumerate(payload.ordered_ids):
+        objectives_by_id[objective_id].display_order = index
+
+    audit_service.record(
+        db,
+        actor_user_id=user.id,
+        action="objectives_reordered",
+        entity_type="treatment_plan",
+        entity_id=plan.id,
+        after={"area": payload.area.value, "ordered_ids": [str(i) for i in payload.ordered_ids]},
+    )
+    db.commit()
+    return sorted(objectives_by_id.values(), key=lambda o: o.display_order)
 
 
 def find_duplicate_candidates(db: Session, plan: TreatmentPlan, title: str) -> list[dict]:
@@ -187,6 +226,13 @@ def create_objective(
         if source_assessment is None or source_assessment.patient_id != patient.id:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Source assessment not found")
 
+    # Addendum v3.0, RF-28 — novo objetivo entra no fim da ordem manual da área.
+    next_order = (
+        db.query(Objective)
+        .filter(Objective.plan_id == plan.id, Objective.area == payload.area, Objective.deleted_at.is_(None))
+        .count()
+    )
+
     objective = Objective(
         plan_id=plan.id,
         area=payload.area,
@@ -196,6 +242,7 @@ def create_objective(
         strategies=payload.strategies,
         priority=payload.priority,
         author_id=user.id,
+        display_order=next_order,
         ai_generated=payload.ai_generated,
         ai_source_document_id=payload.ai_source_document_id if payload.ai_generated else None,
         ai_source_assessment_id=payload.ai_source_assessment_id if payload.ai_generated else None,

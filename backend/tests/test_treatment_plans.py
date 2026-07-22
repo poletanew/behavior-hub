@@ -490,3 +490,56 @@ def test_add_professional_applier(client):
         headers=ctx["headers"],
     )
     assert duplicate.status_code == 409
+
+
+def test_reorder_objectives_within_area(client):
+    """Addendum v3.0, RF-28 — arrastar e soltar para reordenar prioridade dos
+    objetivos de uma área do Plano de Tratamento."""
+    ctx = register_clinic(client)
+    patient = create_patient(client, ctx["headers"])
+    first = _create_objective(client, ctx["headers"], patient["id"], title="Primeiro").json()
+    second = _create_objective(client, ctx["headers"], patient["id"], title="Segundo").json()
+    third = _create_objective(client, ctx["headers"], patient["id"], title="Terceiro").json()
+
+    plan = client.get(f"/v1/patients/{patient['id']}/treatment-plan", headers=ctx["headers"]).json()
+    assert [o["title"] for o in plan["objectives"]] == ["Primeiro", "Segundo", "Terceiro"]
+
+    reordered = client.post(
+        f"/v1/patients/{patient['id']}/treatment-plan/objectives/reorder",
+        json={"area": "aba", "ordered_ids": [third["id"], first["id"], second["id"]]},
+        headers=ctx["headers"],
+    )
+    assert reordered.status_code == 200, reordered.text
+    assert [o["title"] for o in reordered.json()] == ["Terceiro", "Primeiro", "Segundo"]
+
+    plan_after = client.get(f"/v1/patients/{patient['id']}/treatment-plan", headers=ctx["headers"]).json()
+    assert [o["title"] for o in plan_after["objectives"]] == ["Terceiro", "Primeiro", "Segundo"]
+
+
+def test_reorder_objectives_requires_area_permission(client):
+    ctx = register_clinic(client)
+    patient = create_patient(client, ctx["headers"])
+    objective = _create_objective(client, ctx["headers"], patient["id"]).json()
+    professional = invite_and_accept_professional(client, ctx["headers"], specialty="fonoaudiologo")
+    assign_professional(client, ctx["headers"], patient["id"], professional["user"]["id"])
+
+    response = client.post(
+        f"/v1/patients/{patient['id']}/treatment-plan/objectives/reorder",
+        json={"area": "aba", "ordered_ids": [objective["id"]]},
+        headers=professional["headers"],
+    )
+    assert response.status_code == 403
+
+
+def test_reorder_objectives_rejects_incomplete_list(client):
+    ctx = register_clinic(client)
+    patient = create_patient(client, ctx["headers"])
+    first = _create_objective(client, ctx["headers"], patient["id"], title="Primeiro").json()
+    _create_objective(client, ctx["headers"], patient["id"], title="Segundo")
+
+    response = client.post(
+        f"/v1/patients/{patient['id']}/treatment-plan/objectives/reorder",
+        json={"area": "aba", "ordered_ids": [first["id"]]},
+        headers=ctx["headers"],
+    )
+    assert response.status_code == 400

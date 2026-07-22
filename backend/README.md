@@ -897,6 +897,40 @@ tentativa futura de `upgrade` após um `downgrade` falha com "type already exist
   independente da whitelist de categorias (Seção 17.2) — ser marcado como aplicador de um objetivo
   específico já é, em si, a autorização para aquele objetivo puntual.
 
+## Nota sobre Agendamento — Salas e Arrastar-e-soltar (Fase 7 Módulo 3.4 — Addendum v3.0, RF-26 e RF-28)
+
+- **`Room`** (RF-26) — segue o mesmo padrão de tenant dos demais modelos (`clinic_id` OU
+  `individual_owner_id`, nunca os dois), consistente com `Appointment` e todos os modelos
+  adicionados desde a Fase 4. `Appointment.room_id` é opcional (nem todo atendimento usa uma sala
+  física — ex.: telessaúde). `_has_room_conflict` em `appointment_service.py` é uma cópia direta do
+  padrão já usado para `_has_conflict` (profissional): mesma janela de tempo, mesmos status ativos
+  (`SCHEDULED`/`CONFIRMED`/`COMPLETED`), aplicado tanto em `create_appointment` quanto em
+  `update_appointment`. `room_service.delete_room` recusa (409) remover uma sala com atendimentos
+  futuros ativos, em vez de silenciosamente deixá-los sem sala. A UI de gestão de salas fica em
+  Configurações da Clínica, restrita a quem já vê essa página (admin/supervisor) — contas
+  individuais podem criar salas pela API (mesma consistência de tenant), mas RF-26 fala
+  explicitamente de "salas" no plural, um cenário de clínica multi-sala, não de profissional
+  autônomo, então não foi criada uma tela dedicada para elas.
+- **Arrastar e soltar na Agenda (RF-28)** — implementado como reagendamento por dia: arrastar o
+  card de um atendimento para outra coluna de dia da semana mantém o mesmo horário e duração,
+  mudando só a data (`PATCH /appointments/{id}` com os novos `scheduled_start`/`scheduled_end`,
+  reaproveitando toda a validação de conflito que já existia para edição manual). Não foi
+  implementado arrastar para mudar o horário dentro do mesmo dia, já que a grade da Agenda é uma
+  visão por coluna-de-dia (Seção 32.2), sem uma grade horária granular para soltar em cima.
+- **`Objective.display_order` e reordenar por área (RF-28)** — campo inteiro novo em `Objective`,
+  populado com a posição na criação (append ao fim da área) e usado como critério de ordenação
+  primário (`area, display_order, created_at`) em `get_treatment_plan`. `POST
+  /patients/{id}/treatment-plan/objectives/reorder` recebe a lista completa de IDs da área na nova
+  ordem e reescreve `display_order` de todos eles; recusa (400) se a lista não bater exatamente com
+  os objetivos ativos da área, para não silenciosamente perder algum objetivo de uma reordenação
+  parcial. O frontend expõe uma pequena alça de arrastar (⠿⠿⠿) acima de cada card em vez de tornar o
+  card inteiro arrastável, para não conflitar com a seleção de texto nos campos de comentário e
+  formulários internos do próprio card.
+- **RF-27 (confirmação via WhatsApp) — não implementado nesta fase**, por decisão já confirmada
+  anteriormente com o usuário: depende de um provedor de API do WhatsApp Business (BSP) contratado,
+  e nenhuma credencial desse tipo está disponível neste projeto. Nenhum schema, campo ou tela foi
+  criado para isso — a retomada fica condicionada a uma decisão/credencial futura do usuário.
+
 ## Estrutura
 
 - `app/models/` — entidades SQLAlchemy (Seção 18/27 do PRD).

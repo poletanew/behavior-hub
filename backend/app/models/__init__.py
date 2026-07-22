@@ -16,6 +16,7 @@ from app.models.reinforcer import Reinforcer, SessionReinforcer
 from app.models.report_summary import ReportSummary
 from app.models.resource import Resource
 from app.models.resource_link import ResourceLink
+from app.models.room import Room
 from app.models.session import ClinicalSession, SessionTraining, Trial
 from app.models.session_template import SessionTemplate, SessionTemplateTraining
 from app.models.stripe_webhook_event import StripeWebhookEvent
@@ -48,6 +49,7 @@ __all__ = [
     "ReportSummary",
     "Resource",
     "ResourceLink",
+    "Room",
     "ClinicalSession",
     "SessionTraining",
     "SessionTemplate",

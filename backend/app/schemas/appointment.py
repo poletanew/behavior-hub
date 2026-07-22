@@ -12,6 +12,7 @@ class AppointmentCreateRequest(BaseModel):
     scheduled_start: datetime.datetime
     scheduled_end: datetime.datetime
     notes: str | None = None
+    room_id: uuid.UUID | None = None
 
     @model_validator(mode="after")
     def _check_range(self) -> "AppointmentCreateRequest":
@@ -25,6 +26,8 @@ class AppointmentUpdateRequest(BaseModel):
     scheduled_start: datetime.datetime | None = None
     scheduled_end: datetime.datetime | None = None
     notes: str | None = None
+    room_id: uuid.UUID | None = None
+    clear_room: bool = False
 
 
 class AppointmentStatusChangeRequest(BaseModel):
@@ -45,6 +48,8 @@ class AppointmentResponse(BaseModel):
     status_notes: str | None
     notes: str | None
     session_id: uuid.UUID | None
+    room_id: uuid.UUID | None
+    room_name: str | None
     deleted_at: datetime.datetime | None
     created_at: datetime.datetime
 
