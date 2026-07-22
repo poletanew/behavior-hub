@@ -13,6 +13,8 @@ const ENTITY_TYPE_OPTIONS = [
   { value: "trial", label: "Tentativa" },
   { value: "behavior_event", label: "Comportamento-alvo (ABC)" },
   { value: "reinforcer", label: "Reforçador" },
+  { value: "anamnesis", label: "Anamnese" },
+  { value: "checklist_response", label: "Checklist aplicado" },
   { value: "report_summary", label: "Resumo de relatório" },
   { value: "clinic", label: "Clínica" },
   { value: "invitation", label: "Convite" },
@@ -57,6 +59,9 @@ const ACTION_LABELS: Record<string, string> = {
   behavior_event_created: "Comportamento-alvo registrado (ABC)",
   reinforcer_created: "Reforçador cadastrado",
   session_media_uploaded: "Foto/vídeo anexado ao atendimento",
+  anamnesis_created: "Anamnese registrada",
+  anamnesis_updated: "Anamnese atualizada",
+  checklist_applied: "Checklist aplicado",
 };
 
 export default function AuditLogPage() {

@@ -32,6 +32,8 @@ import SecurityPage from "./pages/SecurityPage";
 import SupervisorDashboardPage from "./pages/SupervisorDashboardPage";
 import ManagerDashboardPage from "./pages/ManagerDashboardPage";
 import AssessmentsPage from "./pages/AssessmentsPage";
+import AnamnesisPage from "./pages/AnamnesisPage";
+import ChecklistsPage from "./pages/ChecklistsPage";
 import PlansPage from "./pages/PlansPage";
 import FamilyAccessAdminPage from "./pages/FamilyAccessAdminPage";
 import WhiteLabelSettingsPage from "./pages/WhiteLabelSettingsPage";
@@ -79,6 +81,8 @@ export default function App() {
         <Route path="/patients/:patientId/reports" element={<ReportsPage />} />
         <Route path="/patients/:patientId/timeline" element={<TimelinePage />} />
         <Route path="/patients/:patientId/assessments" element={<AssessmentsPage />} />
+        <Route path="/patients/:patientId/anamnesis" element={<AnamnesisPage />} />
+        <Route path="/patients/:patientId/checklists" element={<ChecklistsPage />} />
         <Route path="/patients/:patientId/family-portal-admin" element={<FamilyAccessAdminPage />} />
         <Route path="/agenda" element={<AgendaPage />} />
         <Route path="/sessions" element={<SessionsPage />} />

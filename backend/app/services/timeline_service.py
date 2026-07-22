@@ -3,6 +3,7 @@ import uuid
 
 from sqlalchemy.orm import Session
 
+from app.models.anamnesis import Anamnesis
 from app.models.assessment import Assessment
 from app.models.audit_log import AuditLog
 from app.models.behavior_event import BehaviorEvent
@@ -201,6 +202,25 @@ def _behavior_event_entries(db: Session, patient: Patient) -> list[dict]:
     ]
 
 
+def _anamnesis_entries(db: Session, patient: Patient) -> list[dict]:
+    """Addendum v3.0, RF-21 — "citada na timeline clínica como um evento
+    fundacional do caso": uma entrada, na data de criação (não de cada edição
+    posterior — a anamnese é um formulário vivo, não uma série de eventos)."""
+    anamnesis = db.query(Anamnesis).filter(Anamnesis.patient_id == patient.id).first()
+    if anamnesis is None:
+        return []
+    return [
+        {
+            "id": anamnesis.id,
+            "event_type": "anamnesis_registered",
+            "occurred_at": anamnesis.created_at,
+            "label": "Anamnese registrada",
+            "source_type": "anamnesis",
+            "source_id": anamnesis.id,
+        }
+    ]
+
+
 def _assessment_entries(db: Session, patient: Patient) -> list[dict]:
     """Seção 29.2 — "avaliações aplicadas"."""
     assessments = (
@@ -235,6 +255,7 @@ def get_patient_timeline(db: Session, patient: Patient) -> list[dict]:
         + _report_entries(db, patient)
         + _assessment_entries(db, patient)
         + _behavior_event_entries(db, patient)
+        + _anamnesis_entries(db, patient)
     )
     entries.sort(key=lambda e: (e["occurred_at"], str(e["id"])))
     return entries

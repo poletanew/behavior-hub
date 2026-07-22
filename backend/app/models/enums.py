@@ -254,3 +254,12 @@ class SessionMediaType(str, enum.Enum):
 
     PHOTO = "photo"
     VIDEO = "video"
+
+
+class ChecklistAnswerType(str, enum.Enum):
+    """Addendum v3.0, RF-22 — tipo de resposta de uma pergunta de checklist
+    personalizado: sim/não, escala (1-5) ou texto curto."""
+
+    YES_NO = "yes_no"
+    SCALE = "scale"
+    SHORT_TEXT = "short_text"

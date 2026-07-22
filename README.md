@@ -198,6 +198,17 @@ Este repositório está sendo construído **por fases**, seguindo o roadmap da S
   efetividade, já mostrando quantas vezes cada um foi usado. "Foto/Vídeo" ganha upload de verdade
   (antes era só um campo de URL) com limite de duração e tamanho conforme o plano da clínica, mesmo
   bloqueio do plano Free que já valia para foto.
+- **Fase 7 (Módulo 3.2) — Addendum v3.0, RF-21 a RF-23 — Avaliação**: a ficha do paciente ganha dois
+  links novos. "Anamnese" abre um formulário de admissão (queixa principal, informações de
+  nascimento, histórico de desenvolvimento, marcos de desenvolvimento, histórico familiar) que pode
+  ser preenchido aos poucos e editado depois; a primeira vez que é salvo aparece na Timeline Clínica
+  como evento fundacional do caso. "Checklists" permite montar um checklist reutilizável (pergunta +
+  tipo de resposta: sim/não, escala 1-5 ou texto curto) e reaplicá-lo em vários pacientes; cada
+  aplicação mostra o resultado tabulado e, para as perguntas de escala, um gráfico de barras simples.
+  Na tela de Avaliações Padronizadas, iniciar uma nova aplicação de um protocolo já usado antes no
+  mesmo paciente mostra "Duplicar avaliação anterior como ponto de partida", que pré-preenche os
+  campos com a última aplicação — o profissional só ajusta o que mudou, e a avaliação duplicada
+  sempre fica com sua própria data, sem sobrescrever a original.
 
 ## Stack (Seção 4 do PRD)
 

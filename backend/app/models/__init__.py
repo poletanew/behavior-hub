@@ -1,7 +1,9 @@
+from app.models.anamnesis import Anamnesis
 from app.models.appointment import Appointment
 from app.models.assessment import Assessment
 from app.models.audit_log import AuditLog
 from app.models.behavior_event import BehaviorEvent
+from app.models.checklist import ChecklistResponse, CustomChecklistTemplate
 from app.models.clinic import Clinic
 from app.models.clinic_permission_settings import ClinicPermissionSettings
 from app.models.clinical_alert import ClinicalAlert
@@ -24,10 +26,13 @@ from app.models.user import User
 from app.models.waitlist_entry import WaitlistEntry
 
 __all__ = [
+    "Anamnesis",
     "Appointment",
     "Assessment",
     "AuditLog",
     "BehaviorEvent",
+    "ChecklistResponse",
+    "CustomChecklistTemplate",
     "Clinic",
     "ClinicPermissionSettings",
     "ClinicalAlert",

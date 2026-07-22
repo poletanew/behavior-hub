@@ -832,6 +832,39 @@ automaticamente o enum que uma `create_table` anterior criou implicitamente (aqu
 `behaviorintensity`) — o `downgrade()` precisa dropar esse tipo explicitamente também, ou uma
 tentativa futura de `upgrade` após um `downgrade` falha com "type already exists".
 
+## Nota sobre Avaliação — Anamnese, Checklists Personalizados e Duplicar Avaliação (Fase 7 Módulo 3.2 — Addendum v3.0, RF-21 a RF-23)
+
+- **`Anamnesis`** (RF-21) — um por paciente (`UniqueConstraint("patient_id")`), campos fixos em vez de
+  JSON livre: diferente de `Assessment.raw_scores` (cujos domínios variam por protocolo), as seções
+  da anamnese são sempre as mesmas (queixa principal, informações de nascimento, histórico/marcos de
+  desenvolvimento, histórico familiar), então um schema fixo é mais simples de validar e exibir do
+  que o `form_data (JSON)` sugerido pela tabela de impacto no modelo de dados do addendum.
+  `PUT /patients/{id}/anamnesis` cria na primeira chamada e edita nas seguintes (é um formulário de
+  admissão vivo, preenchido aos poucos — não um evento imutável); só a criação gera a entrada
+  "evento fundacional" na Timeline Clínica (`timeline_service._anamnesis_entries`), edições
+  posteriores não duplicam a entrada. Gate: `patient_service.assert_full_clinical_access` (mesmo
+  usado por prontuário completo/plano de tratamento/reports) — bloqueia o AT, conforme o texto do
+  RF-21 ("acessível a quem tem permissão de leitura de dados clínicos completos").
+- **`CustomChecklistTemplate` / `ChecklistResponse`** (RF-22) — o profissional monta um template uma
+  vez (`POST /checklist-templates`, título + lista de perguntas com `answer_type` sim/não, escala
+  1-5 ou texto curto — cada pergunta recebe um `id` gerado no momento da criação) e reaplica em
+  quantos pacientes quiser (`POST /patients/{id}/checklist-responses`). O serviço valida que toda
+  pergunta do template foi respondida e que o tipo do valor bate com `answer_type` (bool para
+  sim/não, 1-5 para escala, string não vazia para texto curto). `GET /patients/{id}/checklist-responses`
+  já devolve os itens "achatados" (pergunta + resposta juntas, não dois arrays para cruzar no
+  frontend), o que o critério de aceite chama de "resultado tabulado"; o frontend soma um gráfico de
+  barras simples só para as perguntas do tipo escala (as de sim/não e texto curto não têm eixo
+  numérico para plotar, então ficam só na tabela).
+- **RF-23 (duplicar avaliação anterior)** — implementado inteiramente no frontend, sem rota nova:
+  `AssessmentsPage.tsx` já carrega todas as aplicações do protocolo selecionado; um botão "Duplicar
+  avaliação anterior como ponto de partida" (visível só quando já existe pelo menos uma aplicação
+  anterior do mesmo protocolo para o paciente) pré-preenche o estado local do formulário com os
+  `raw_scores` da aplicação mais recente. Como o formulário de criação já exige uma nova
+  `applied_date` antes de habilitar o envio, e o POST de `/patients/{id}/assessments` sempre cria um
+  registro novo (nunca atualiza um existente — `Assessment` não tem endpoint de update de scores),
+  "sem sobrescrever a original" é garantido pela própria arquitetura já existente, sem precisar de
+  um endpoint de duplicação dedicado no backend.
+
 ## Estrutura
 
 - `app/models/` — entidades SQLAlchemy (Seção 18/27 do PRD).

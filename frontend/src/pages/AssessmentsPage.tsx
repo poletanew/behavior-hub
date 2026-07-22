@@ -70,6 +70,19 @@ export default function AssessmentsPage() {
   }, []);
 
   const activeProtocolDef = protocols.find((p) => p.protocol === protocol);
+  const priorAssessmentsOfProtocol = assessments
+    .filter((a) => a.protocol === protocol)
+    .sort((a, b) => (a.applied_date < b.applied_date ? 1 : -1));
+
+  function duplicatePriorAssessment() {
+    const latest = priorAssessmentsOfProtocol[0];
+    if (!latest) return;
+    const prefilled: Record<string, { raw_value: string; max_value: string }> = {};
+    for (const domain of latest.raw_scores) {
+      prefilled[domain.domain_code] = { raw_value: String(domain.raw_value), max_value: String(domain.max_value) };
+    }
+    setScores(prefilled);
+  }
 
   function toggleSelected(id: string) {
     setSelectedIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
@@ -192,6 +205,21 @@ export default function AssessmentsPage() {
 
       {showForm && activeProtocolDef && (
         <form onSubmit={handleCreate} className="bg-white rounded-card shadow-sm p-6 mb-6 space-y-4">
+          {priorAssessmentsOfProtocol.length > 0 && (
+            <div className="bg-brand-grayLight rounded-btn p-3 flex items-center justify-between">
+              <p className="text-xs text-neutralState">
+                Já existe uma aplicação anterior de {PROTOCOL_LABELS[protocol]} para este paciente
+                ({new Date(priorAssessmentsOfProtocol[0].applied_date).toLocaleDateString("pt-BR")}).
+              </p>
+              <button
+                type="button"
+                onClick={duplicatePriorAssessment}
+                className="rounded-btn bg-white border border-slate-300 px-3 py-1.5 text-xs font-medium shrink-0 ml-3"
+              >
+                Duplicar avaliação anterior como ponto de partida
+              </button>
+            </div>
+          )}
           <div>
             <label className="block text-sm font-medium mb-1">Data de aplicação</label>
             <input

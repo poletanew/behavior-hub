@@ -5,9 +5,11 @@ from fastapi import HTTPException, status
 from sqlalchemy import or_
 from sqlalchemy.orm import Session, aliased
 
+from app.models.anamnesis import Anamnesis
 from app.models.assessment import Assessment
 from app.models.audit_log import AuditLog
 from app.models.behavior_event import BehaviorEvent
+from app.models.checklist import ChecklistResponse
 from app.models.enums import UserType
 from app.models.patient import Patient
 from app.models.reinforcer import Reinforcer
@@ -34,6 +36,8 @@ _PATIENT_ENTITY_TYPES = (
     "report_summary",
     "behavior_event",
     "reinforcer",
+    "anamnesis",
+    "checklist_response",
 )
 
 
@@ -121,6 +125,10 @@ def _patient_scoped_entity_ids(db: Session, patient: Patient) -> dict[str, list[
         row[0] for row in db.query(BehaviorEvent.id).filter(BehaviorEvent.patient_id == patient.id).all()
     ]
     reinforcers = [row[0] for row in db.query(Reinforcer.id).filter(Reinforcer.patient_id == patient.id).all()]
+    anamneses = [row[0] for row in db.query(Anamnesis.id).filter(Anamnesis.patient_id == patient.id).all()]
+    checklist_responses = [
+        row[0] for row in db.query(ChecklistResponse.id).filter(ChecklistResponse.patient_id == patient.id).all()
+    ]
 
     return {
         "patient": [patient.id],
@@ -132,6 +140,8 @@ def _patient_scoped_entity_ids(db: Session, patient: Patient) -> dict[str, list[
         "report_summary": reports,
         "behavior_event": behavior_events,
         "reinforcer": reinforcers,
+        "anamnesis": anamneses,
+        "checklist_response": checklist_responses,
     }
 
 

@@ -734,3 +734,48 @@ export interface ABATrialReviewEntry {
   prompt_level: "independent" | "gestural" | "verbal" | "modeling" | "partial_physical" | "full_physical";
   recorded_at: string;
 }
+
+export interface Anamnesis {
+  id: string;
+  patient_id: string;
+  created_by_user_id: string;
+  chief_complaint: string | null;
+  birth_history: string | null;
+  developmental_history: string | null;
+  developmental_milestones: string | null;
+  family_history: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export type ChecklistAnswerType = "yes_no" | "scale" | "short_text";
+
+export interface ChecklistQuestion {
+  id: string;
+  text: string;
+  answer_type: ChecklistAnswerType;
+}
+
+export interface ChecklistTemplate {
+  id: string;
+  title: string;
+  questions: ChecklistQuestion[];
+  created_at: string;
+}
+
+export interface ChecklistAnswerItem {
+  question_id: string;
+  question_text: string;
+  answer_type: ChecklistAnswerType;
+  value: boolean | number | string;
+}
+
+export interface ChecklistResponseDetail {
+  id: string;
+  template_id: string;
+  template_title: string;
+  patient_id: string;
+  applied_by_user_id: string;
+  applied_at: string;
+  items: ChecklistAnswerItem[];
+}
