@@ -1,6 +1,7 @@
 from app.models.appointment import Appointment
 from app.models.assessment import Assessment
 from app.models.audit_log import AuditLog
+from app.models.behavior_event import BehaviorEvent
 from app.models.clinic import Clinic
 from app.models.clinic_permission_settings import ClinicPermissionSettings
 from app.models.clinical_alert import ClinicalAlert
@@ -9,6 +10,7 @@ from app.models.family_access import FamilyAccess, FamilyMessage
 from app.models.invitation import Invitation
 from app.models.notification import Notification
 from app.models.patient import Patient, PatientAssignment
+from app.models.reinforcer import Reinforcer, SessionReinforcer
 from app.models.report_summary import ReportSummary
 from app.models.resource import Resource
 from app.models.resource_link import ResourceLink
@@ -25,6 +27,7 @@ __all__ = [
     "Appointment",
     "Assessment",
     "AuditLog",
+    "BehaviorEvent",
     "Clinic",
     "ClinicPermissionSettings",
     "ClinicalAlert",
@@ -35,6 +38,8 @@ __all__ = [
     "Notification",
     "Patient",
     "PatientAssignment",
+    "Reinforcer",
+    "SessionReinforcer",
     "ReportSummary",
     "Resource",
     "ResourceLink",

@@ -3,7 +3,7 @@ import uuid
 
 from pydantic import BaseModel, Field
 
-from app.models.enums import PromptLevel, TrialResult
+from app.models.enums import PromptLevel, SessionMediaType, TrialResult
 
 
 class SessionCreateRequest(BaseModel):
@@ -32,11 +32,22 @@ class SessionResponse(BaseModel):
     occurred_at: datetime.datetime
     notes: str | None
     photo_url: str | None
+    media_type: SessionMediaType | None
+    media_duration_seconds: int | None
     deleted_at: datetime.datetime | None
     trainings: list[SessionTrainingResponse] = Field(default_factory=list)
 
     class Config:
         from_attributes = True
+
+
+class SessionMediaUrlResponse(BaseModel):
+    """Addendum v3.0, RF-20 — URL assinada e temporária (Seção 17.2) para
+    visualizar a foto/vídeo anexado à sessão."""
+
+    media_type: SessionMediaType
+    url: str
+    duration_seconds: int | None
 
 
 class AddTrainingsRequest(BaseModel):

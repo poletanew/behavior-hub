@@ -76,8 +76,49 @@ export interface ClinicalSession {
   occurred_at: string;
   notes: string | null;
   photo_url: string | null;
+  media_type: "photo" | "video" | null;
+  media_duration_seconds: number | null;
   deleted_at: string | null;
   trainings: SessionTraining[];
+}
+
+export interface SessionMediaUrl {
+  media_type: "photo" | "video";
+  url: string;
+  duration_seconds: number | null;
+}
+
+export type BehaviorIntensity = "baixa" | "media" | "alta";
+
+export interface BehaviorEvent {
+  id: string;
+  patient_id: string;
+  session_id: string;
+  recorded_by_user_id: string;
+  antecedent: string;
+  behavior: string;
+  consequence: string;
+  frequency_count: number | null;
+  duration_seconds: number | null;
+  intensity: BehaviorIntensity | null;
+  occurred_at: string;
+}
+
+export interface Reinforcer {
+  id: string;
+  patient_id: string;
+  name: string;
+  effectiveness_notes: string | null;
+  usage_count: number;
+}
+
+export interface SessionReinforcer {
+  id: string;
+  session_id: string;
+  reinforcer_id: string;
+  reinforcer_name: string;
+  effectiveness_note: string | null;
+  used_at: string;
 }
 
 export interface Trial {

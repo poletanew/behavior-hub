@@ -190,6 +190,14 @@ Este repositório está sendo construído **por fases**, seguindo o roadmap da S
   Área de Trabalho) passa a usar um componente `EmptyState` reutilizável, com ícone amigável em vez
   de só texto cinza; e confirmações de "salvo com sucesso" na aba Segurança ganham uma
   microanimação curta. As animações respeitam `prefers-reduced-motion`.
+- **Fase 7 (Módulo 3.1) — Addendum v3.0, RF-18 a RF-20 — Coleta de Dados**: o detalhe do atendimento
+  ganha três seções novas. "Comportamento-alvo (modelo ABC)" registra Antecedente → Comportamento →
+  Consequência (com frequência, duração e intensidade), independente das tentativas de treino, e
+  aparece na Timeline Clínica do paciente. "Reforçadores usados nesta sessão" permite cadastrar
+  reforçadores por paciente (o que funciona para motivá-lo) e vinculá-los a uma sessão com nota de
+  efetividade, já mostrando quantas vezes cada um foi usado. "Foto/Vídeo" ganha upload de verdade
+  (antes era só um campo de URL) com limite de duração e tamanho conforme o plano da clínica, mesmo
+  bloqueio do plano Free que já valia para foto.
 
 ## Stack (Seção 4 do PRD)
 

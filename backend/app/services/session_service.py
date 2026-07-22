@@ -4,7 +4,7 @@ import uuid
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session as DbSession
 
-from app.models.enums import UserType
+from app.models.enums import SessionMediaType, UserType
 from app.models.session import ClinicalSession, SessionTraining, Trial
 from app.models.training import Training
 from app.models.user import User
@@ -14,12 +14,21 @@ from app.services import (
     audit_service,
     clinical_alert_service,
     clinical_suggestion_service,
+    file_service,
     patient_service,
     rbac_service,
     training_service,
 )
 from app.services.calculations import accuracy_pct, independence_pct
 from app.services.plan_service import current_plan
+
+# Addendum v3.0, RF-20 — "Foto" (Seção 11.2) vira "Foto/Vídeo"; limite de
+# duração/tamanho configurável por plano (Seção 8.1), mesmo bloqueio Free que
+# já valia para foto.
+ALLOWED_PHOTO_CONTENT_TYPES = {"image/jpeg", "image/png", "image/webp"}
+ALLOWED_VIDEO_CONTENT_TYPES = {"video/mp4", "video/webm", "video/quicktime"}
+MEDIA_MAX_DURATION_SECONDS = {"basic": 30, "premium": 60, "enterprise": 120}
+MEDIA_MAX_SIZE_BYTES = {"basic": 20 * 1024 * 1024, "premium": 50 * 1024 * 1024, "enterprise": 100 * 1024 * 1024}
 
 
 def _tenant_scope_filter(user: User):
@@ -238,4 +247,79 @@ def get_training_progress(db: DbSession, user: User, session_training_id: uuid.U
         "trials": trials,
         "accuracy_pct": accuracy_pct(trials),
         "independence_pct": independence_pct(trials),
+    }
+
+
+async def upload_session_media(
+    db: DbSession,
+    user: User,
+    session_id: uuid.UUID,
+    *,
+    file,
+    duration_seconds: int | None,
+) -> ClinicalSession:
+    """Addendum v3.0, RF-20 — upload real (S3/MinIO) de foto ou vídeo curto
+    anexado ao atendimento, com o mesmo bloqueio de plano Free já usado para
+    photo_url (Seção 8.1/AC-03), e limite de duração/tamanho por plano."""
+    session = get_session_or_404(db, user, session_id)
+
+    plan = current_plan(user)
+    if plan == "free":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Photo/video attachments are not available on the Free plan",
+        )
+
+    content_type = file.content_type or ""
+    if content_type in ALLOWED_PHOTO_CONTENT_TYPES:
+        media_type = SessionMediaType.PHOTO
+    elif content_type in ALLOWED_VIDEO_CONTENT_TYPES:
+        media_type = SessionMediaType.VIDEO
+        max_duration = MEDIA_MAX_DURATION_SECONDS.get(plan)
+        if not duration_seconds or duration_seconds <= 0:
+            raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="duration_seconds is required for video")
+        if max_duration is not None and duration_seconds > max_duration:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=f"Video duration exceeds the {max_duration}s limit for the {plan} plan",
+            )
+    else:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Unsupported media type: {content_type}")
+
+    body = await file.read()
+    max_size = MEDIA_MAX_SIZE_BYTES.get(plan)
+    if max_size is not None and len(body) > max_size:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"File exceeds the {max_size // (1024 * 1024)}MB limit for the {plan} plan",
+        )
+
+    key = f"session-media/{session.id}/{uuid.uuid4().hex}"
+    file_service.upload_object(key, body, content_type)
+
+    session.media_key = key
+    session.media_type = media_type
+    session.media_duration_seconds = duration_seconds if media_type == SessionMediaType.VIDEO else None
+    session.media_uploaded_by_user_id = user.id
+    audit_service.record(
+        db,
+        actor_user_id=user.id,
+        action="session_media_uploaded",
+        entity_type="session",
+        entity_id=session.id,
+        after={"media_type": media_type.value},
+    )
+    db.commit()
+    db.refresh(session)
+    return session
+
+
+def get_session_media_url(db: DbSession, user: User, session_id: uuid.UUID) -> dict:
+    session = get_session_or_404(db, user, session_id)
+    if session.media_key is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="This session has no photo/video attached")
+    return {
+        "media_type": session.media_type,
+        "url": file_service.generate_presigned_url(session.media_key),
+        "duration_seconds": session.media_duration_seconds,
     }

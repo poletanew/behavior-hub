@@ -785,6 +785,53 @@ Cantos arredondados (`rounded-card`, 12px) e espaçamento generoso nos cards já
 consistente desde fases anteriores (Seção 24.8 do PRD já estava implementada) — não foram alterados
 para não introduzir uma mudança de densidade em massa sem necessidade.
 
+## Nota sobre Coleta de Dados — Modelo ABC, Reforçadores e Foto/Vídeo (Fase 7 Módulo 3.1 — Addendum v3.0, RF-18 a RF-20)
+
+Primeiro bloco do Addendum v3.0 (RF-18 a RF-38, numeração contínua a partir do v2.1). Três entidades
+novas, todas escopadas por paciente (`clinic_id`/`individual_owner_id` denormalizados, mesmo padrão
+de `Assessment`):
+
+- **`BehaviorEvent`** (RF-18) — modelo ABC (Antecedente/Comportamento/Consequência) completo, com
+  `frequency_count`, `duration_seconds` e `intensity` (enum `baixa/media/alta`), sempre ligado a uma
+  `session_id` mas registrável independentemente das tentativas de treino
+  (`POST /patients/{id}/behavior-events`). Entra na Timeline Clínica
+  (`timeline_service._behavior_event_entries`, Seção 29.2) e na Auditoria por Paciente
+  (`audit_log_service._PATIENT_ENTITY_TYPES`, RF-14/Fase 6 bloco 11) pelo mesmo mecanismo já usado
+  para as demais entidades clínicas — nenhuma tabela ou view nova precisou ser criada para isso.
+- **`Reinforcer`** / **`SessionReinforcer`** (RF-19) — cadastro de reforçador por paciente
+  (`POST /patients/{id}/reinforcers`) e vínculo a uma sessão específica com nota rápida de
+  efetividade (`POST /sessions/{id}/reinforcers`). `GET /patients/{id}/reinforcers` já devolve
+  `usage_count` agregado por reforçador (contagem de `SessionReinforcer`), satisfazendo o critério
+  de aceite "ver quais reforçadores foram mais usados no período" nesta própria rota — o gráfico
+  dedicado (RF-34, Módulo 3.7) reaproveitará os mesmos dados.
+- **`ClinicalSession.media_key`/`media_type`/`media_duration_seconds`** (RF-20) — o campo `photo_url`
+  original (Fase 1) era só uma string de URL sem upload real de fato; permanece intocado por
+  compatibilidade, mas o addendum pede upload de verdade com limite de duração/tamanho por plano, o
+  que exigia a mesma infraestrutura já usada por Resources/TreatmentPlanAttachment
+  (`file_service.upload_object`/`generate_presigned_url`). Novo par de rotas
+  `POST /sessions/{id}/media` (multipart, aceita foto ou vídeo, detecta o tipo pelo `content_type`) e
+  `GET /sessions/{id}/media-url` (URL assinada, mesmo padrão de privacidade da Seção 17.2). Limites
+  por plano (`basic`/`premium`/`enterprise`): duração de vídeo 30s/60s/120s, tamanho de arquivo
+  20MB/50MB/100MB — Free continua bloqueado por completo, igual já valia para `photo_url`.
+
+**Decisões de escopo**: (1) tanto `BehaviorEvent` quanto o vínculo de `Reinforcer` a uma sessão usam
+a mesma permissão "Registrar sessão" (`rbac_service.can_register_session`, Seção 17.1) já usada por
+Trial — nenhum RBAC novo. (2) Foto/vídeo ficou no nível de sessão (não por tentativa individual),
+espelhando onde `photo_url` já vivia; o texto do RF-20 fala em "tentativa/sessão" de forma ambígua,
+e criar um campo de mídia por `Trial` exigiria uma tabela nova sem um critério de aceite que
+realmente precisasse desse nível de granularidade. (3) Nem `BehaviorEvent` nem `Reinforcer` têm
+rotas de edição/exclusão — os critérios de aceite do RF-18/RF-19 só pedem registrar, vincular e
+visualizar; adicionar CRUD completo sem um requisito correspondente seria escopo não pedido.
+
+**Gotcha de migration (mesma classe do Fase 6 bloco 7, documentada por completude)**: `op.add_column`
+numa tabela já existente (`sessions`) não cria automaticamente o tipo Postgres de um enum novo — só
+`create_table` faz isso implicitamente. A migration cria `sessionmediatype` explicitamente via
+`postgresql.ENUM(...).create(bind, checkfirst=True)` antes do `add_column` (com `create_type=False`
+no próprio `add_column`). Efeito colateral menos óbvio: `op.drop_table` também **não** derruba
+automaticamente o enum que uma `create_table` anterior criou implicitamente (aqui,
+`behaviorintensity`) — o `downgrade()` precisa dropar esse tipo explicitamente também, ou uma
+tentativa futura de `upgrade` após um `downgrade` falha com "type already exists".
+
 ## Estrutura
 
 - `app/models/` — entidades SQLAlchemy (Seção 18/27 do PRD).

@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session
 
 from app.models.assessment import Assessment
 from app.models.audit_log import AuditLog
+from app.models.behavior_event import BehaviorEvent
 from app.models.patient import Patient
 from app.models.report_summary import ReportSummary
 from app.models.session import ClinicalSession
@@ -184,6 +185,22 @@ def _report_entries(db: Session, patient: Patient) -> list[dict]:
     ]
 
 
+def _behavior_event_entries(db: Session, patient: Patient) -> list[dict]:
+    """Addendum v3.0, RF-18 — "ele aparece na timeline clínica do paciente"."""
+    events = db.query(BehaviorEvent).filter(BehaviorEvent.patient_id == patient.id).all()
+    return [
+        {
+            "id": event.id,
+            "event_type": "behavior_event_recorded",
+            "occurred_at": event.occurred_at,
+            "label": f"Comportamento-alvo registrado ({event.intensity.value if event.intensity else 'intensidade não informada'})",
+            "source_type": "behavior_event",
+            "source_id": event.id,
+        }
+        for event in events
+    ]
+
+
 def _assessment_entries(db: Session, patient: Patient) -> list[dict]:
     """Seção 29.2 — "avaliações aplicadas"."""
     assessments = (
@@ -217,6 +234,7 @@ def get_patient_timeline(db: Session, patient: Patient) -> list[dict]:
         + _assignment_entries(db, patient)
         + _report_entries(db, patient)
         + _assessment_entries(db, patient)
+        + _behavior_event_entries(db, patient)
     )
     entries.sort(key=lambda e: (e["occurred_at"], str(e["id"])))
     return entries

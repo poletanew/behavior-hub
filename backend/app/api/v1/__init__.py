@@ -7,6 +7,7 @@ from app.api.v1 import (
     at_portal,
     audit_logs,
     auth,
+    behavior_events,
     billing,
     clinical_alerts,
     clinical_suggestions,
@@ -20,6 +21,7 @@ from app.api.v1 import (
     patients,
     professionals,
     rbac,
+    reinforcers,
     reports,
     resource_links,
     resources,
@@ -47,6 +49,8 @@ api_router.include_router(patients.router)
 api_router.include_router(professionals.router)
 api_router.include_router(sessions.router)
 api_router.include_router(session_templates.router)
+api_router.include_router(behavior_events.router)
+api_router.include_router(reinforcers.router)
 api_router.include_router(trainings.router)
 api_router.include_router(dashboard.router)
 api_router.include_router(treatment_plans.router)

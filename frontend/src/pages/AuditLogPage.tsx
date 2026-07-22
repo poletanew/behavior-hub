@@ -11,6 +11,8 @@ const ENTITY_TYPE_OPTIONS = [
   { value: "resource", label: "Recurso" },
   { value: "session", label: "Atendimento" },
   { value: "trial", label: "Tentativa" },
+  { value: "behavior_event", label: "Comportamento-alvo (ABC)" },
+  { value: "reinforcer", label: "Reforçador" },
   { value: "report_summary", label: "Resumo de relatório" },
   { value: "clinic", label: "Clínica" },
   { value: "invitation", label: "Convite" },
@@ -52,6 +54,9 @@ const ACTION_LABELS: Record<string, string> = {
   report_summary_updated: "Resumo de relatório editado",
   password_changed: "Senha alterada",
   user_name_updated: "Nome de usuário atualizado",
+  behavior_event_created: "Comportamento-alvo registrado (ABC)",
+  reinforcer_created: "Reforçador cadastrado",
+  session_media_uploaded: "Foto/vídeo anexado ao atendimento",
 };
 
 export default function AuditLogPage() {

@@ -5,7 +5,7 @@ from sqlalchemy import DateTime, ForeignKey, Integer, String, Text, UniqueConstr
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base, SoftDeleteMixin, TimestampMixin, UUIDPrimaryKeyMixin
-from app.models.enums import PromptLevel, TrialResult
+from app.models.enums import PromptLevel, SessionMediaType, TrialResult
 
 
 class ClinicalSession(Base, UUIDPrimaryKeyMixin, TimestampMixin, SoftDeleteMixin):
@@ -29,6 +29,14 @@ class ClinicalSession(Base, UUIDPrimaryKeyMixin, TimestampMixin, SoftDeleteMixin
     occurred_at: Mapped[datetime.datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
     photo_url: Mapped[str | None] = mapped_column(String(1024), nullable=True)
+
+    # Addendum v3.0, RF-20 — "Foto" (acima, campo legado de URL simples desde a
+    # Fase 1) vira "Foto/Vídeo": upload real via file_service (S3/MinIO),
+    # com limite de duração/tamanho por plano (Seção 8.1).
+    media_key: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    media_type: Mapped[SessionMediaType | None] = mapped_column(nullable=True)
+    media_duration_seconds: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    media_uploaded_by_user_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id"), nullable=True)
 
     __table_args__ = (
         # Seção 18.2 — índice composto patient_id + date em Sessions.

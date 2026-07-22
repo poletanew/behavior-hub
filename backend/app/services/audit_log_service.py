@@ -7,8 +7,10 @@ from sqlalchemy.orm import Session, aliased
 
 from app.models.assessment import Assessment
 from app.models.audit_log import AuditLog
+from app.models.behavior_event import BehaviorEvent
 from app.models.enums import UserType
 from app.models.patient import Patient
+from app.models.reinforcer import Reinforcer
 from app.models.report_summary import ReportSummary
 from app.models.session import ClinicalSession
 from app.models.treatment_plan import Objective, TreatmentPlan, TreatmentPlanAttachment
@@ -30,6 +32,8 @@ _PATIENT_ENTITY_TYPES = (
     "patient_assignment",
     "assessment",
     "report_summary",
+    "behavior_event",
+    "reinforcer",
 )
 
 
@@ -113,6 +117,10 @@ def _patient_scoped_entity_ids(db: Session, patient: Patient) -> dict[str, list[
 
     assessments = [row[0] for row in db.query(Assessment.id).filter(Assessment.patient_id == patient.id).all()]
     reports = [row[0] for row in db.query(ReportSummary.id).filter(ReportSummary.patient_id == patient.id).all()]
+    behavior_events = [
+        row[0] for row in db.query(BehaviorEvent.id).filter(BehaviorEvent.patient_id == patient.id).all()
+    ]
+    reinforcers = [row[0] for row in db.query(Reinforcer.id).filter(Reinforcer.patient_id == patient.id).all()]
 
     return {
         "patient": [patient.id],
@@ -122,6 +130,8 @@ def _patient_scoped_entity_ids(db: Session, patient: Patient) -> dict[str, list[
         "patient_assignment": [patient.id],
         "assessment": assessments,
         "report_summary": reports,
+        "behavior_event": behavior_events,
+        "reinforcer": reinforcers,
     }
 
 

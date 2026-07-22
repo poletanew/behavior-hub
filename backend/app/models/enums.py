@@ -237,3 +237,20 @@ class TrainingLinkStatus(str, enum.Enum):
 
     PRESCRIBED = "prescribed"
     APPLIED = "applied"
+
+
+class BehaviorIntensity(str, enum.Enum):
+    """Addendum v3.0, RF-18 — intensidade do comportamento-alvo registrado no
+    modelo ABC, mesmo vocabulário já usado em outras escalas do sistema."""
+
+    BAIXA = "baixa"
+    MEDIA = "media"
+    ALTA = "alta"
+
+
+class SessionMediaType(str, enum.Enum):
+    """Addendum v3.0, RF-20 — o antigo campo único "Foto" da Seção 11.2 vira
+    "Foto/Vídeo"; este enum identifica qual dos dois foi anexado."""
+
+    PHOTO = "photo"
+    VIDEO = "video"
