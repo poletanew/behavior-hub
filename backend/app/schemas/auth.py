@@ -53,6 +53,15 @@ class RefreshRequest(BaseModel):
     refresh_token: str
 
 
+class ChangePasswordRequest(BaseModel):
+    current_password: str
+    new_password: str = Field(min_length=8, max_length=128)
+
+
+class ChangeNameRequest(BaseModel):
+    name: str = Field(min_length=2, max_length=255)
+
+
 class UserResponse(BaseModel):
     id: uuid.UUID
     email: EmailStr

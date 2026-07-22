@@ -175,6 +175,13 @@ Este repositório está sendo construído **por fases**, seguindo o roadmap da S
   cadastro, sessões, alterações de plano de tratamento, anexos importados, atribuições, avaliações
   — em ordem cronológica, com autor e data/hora visíveis, reaproveitando a mesma cobertura de
   entidades já usada pela Timeline Clínica (Fase 4a).
+- **Fase 6 (bloco 12) — Addendum de Melhorias v2.1, RF-15**: a aba Segurança ganha autoatendimento
+  para trocar o nome de exibição e a senha, sem depender de suporte. Trocar a senha exige a senha
+  atual, encerra imediatamente as demais sessões ativas da conta (reaproveitando o mecanismo de
+  `token_version` já usado pela Seção 17.2/Family Portal) e devolve um par de tokens novo para que a
+  própria sessão que fez a troca continue funcionando sem precisar logar de novo. Como o login é
+  feito por email (não existe um campo de "username" separado), "nome de usuário" foi interpretado
+  como o nome de exibição (`User.name`).
 
 ## Stack (Seção 4 do PRD)
 

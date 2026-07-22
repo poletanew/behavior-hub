@@ -5,6 +5,8 @@ from app.core.deps import get_current_user
 from app.db.session import get_db
 from app.models.user import User
 from app.schemas.auth import (
+    ChangeNameRequest,
+    ChangePasswordRequest,
     ClinicRegisterRequest,
     IndividualRegisterRequest,
     LoginRequest,
@@ -95,3 +97,22 @@ def refresh(payload: RefreshRequest, db: Session = Depends(get_db)) -> TokenResp
 @router.get("/me", response_model=UserResponse)
 def me(current_user: User = Depends(get_current_user)) -> User:
     return current_user
+
+
+@router.post("/change-password", response_model=TokenResponse)
+def change_password(
+    payload: ChangePasswordRequest,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+) -> TokenResponse:
+    access, refresh_token = auth_service.change_password(db, user, payload)
+    return TokenResponse(access_token=access, refresh_token=refresh_token)
+
+
+@router.patch("/change-name", response_model=UserResponse)
+def change_name(
+    payload: ChangeNameRequest,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+) -> User:
+    return auth_service.change_name(db, user, payload)

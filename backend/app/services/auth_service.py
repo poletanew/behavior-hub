@@ -18,6 +18,8 @@ from app.models.enums import InvitationStatus, UserStatus, UserType
 from app.models.invitation import Invitation
 from app.models.user import User
 from app.schemas.auth import (
+    ChangeNameRequest,
+    ChangePasswordRequest,
     ClinicRegisterRequest,
     IndividualRegisterRequest,
     LoginRequest,
@@ -164,6 +166,49 @@ def refresh_access_token(db: Session, refresh_token: str) -> tuple[str, str]:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid refresh token")
 
     return issue_tokens(user)
+
+
+def change_password(db: Session, user: User, payload: ChangePasswordRequest) -> tuple[str, str]:
+    """Addendum v2.1, RF-15 — autoatendimento de troca de senha: "trocar a senha
+    deve encerrar as demais sessões ativas do usuário". Reaproveita o mecanismo
+    de token_version (Seção 17.2) para invalidar todos os tokens já emitidos, e
+    devolve um par de tokens novo já válido para que a sessão que fez a troca
+    continue funcionando sem precisar logar de novo."""
+    if not verify_password(payload.current_password, user.password_hash):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid current password")
+
+    user.password_hash = hash_password(payload.new_password)
+    user.token_version += 1
+    audit_service.record(
+        db,
+        actor_user_id=user.id,
+        action="password_changed",
+        entity_type="user",
+        entity_id=user.id,
+    )
+    db.commit()
+    db.refresh(user)
+    return issue_tokens(user)
+
+
+def change_name(db: Session, user: User, payload: ChangeNameRequest) -> User:
+    """Addendum v2.1, RF-15 — autoatendimento de troca do nome de usuário. Não há
+    um campo de "username" de login separado (o login é feito por email), então
+    "nome de usuário" aqui é o nome de exibição (User.name)."""
+    before_name = user.name
+    user.name = payload.name
+    audit_service.record(
+        db,
+        actor_user_id=user.id,
+        action="user_name_updated",
+        entity_type="user",
+        entity_id=user.id,
+        before={"name": before_name},
+        after={"name": user.name},
+    )
+    db.commit()
+    db.refresh(user)
+    return user
 
 
 def create_invitation(db: Session, inviter: User, payload: InvitationCreateRequest) -> tuple[Invitation, str]:

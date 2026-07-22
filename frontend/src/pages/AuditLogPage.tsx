@@ -49,6 +49,8 @@ const ACTION_LABELS: Record<string, string> = {
   resource_restored: "Recurso restaurado",
   report_summary_generated: "Resumo de relatório gerado",
   report_summary_updated: "Resumo de relatório editado",
+  password_changed: "Senha alterada",
+  user_name_updated: "Nome de usuário atualizado",
 };
 
 export default function AuditLogPage() {

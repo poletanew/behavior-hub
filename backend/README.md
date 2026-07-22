@@ -724,6 +724,31 @@ entram na auditoria por paciente — o critério de aceite do addendum fala em "
 tentativa isolada, e resolver `Trial` → `SessionTraining` → `ClinicalSession` → paciente
 adicionaria uma junção a mais sem um pedido explícito correspondente.
 
+## Nota sobre Segurança — Autoatendimento (Fase 6 bloco 12 — Addendum v2.1, RF-15)
+
+Duas rotas novas em `app/api/v1/auth.py`, ambas exigindo `get_current_user` (o próprio usuário só
+altera os próprios dados, nunca os de terceiros):
+
+- `POST /auth/change-password` (`ChangePasswordRequest{current_password, new_password}`) — valida a
+  senha atual com `verify_password`, grava o novo hash e **incrementa `user.token_version`**. Esse
+  campo já existia (Seção 17.2, usado para revogar acesso do Family Portal) e embute um claim `ver`
+  em todo JWT emitido; o middleware de autenticação (`app/core/deps.py::get_current_user`) já
+  rejeita qualquer token cujo `ver` não bata mais com o valor salvo no banco. Isso satisfaz
+  literalmente "trocar a senha deve encerrar as demais sessões ativas do usuário" sem precisar de
+  nenhuma tabela de sessões nova. Como o bump de `token_version` também invalidaria o próprio
+  access token que fez a requisição, a rota devolve um par de tokens novo (`TokenResponse`) já
+  válido — o frontend troca os tokens salvos (`setTokens`) e a sessão que trocou a senha continua
+  ativa, exatamente como o texto pede ("as **demais** sessões", não a atual).
+- `PATCH /auth/change-name` (`ChangeNameRequest{name}`) — atualiza `User.name`. **Decisão de
+  escopo**: o addendum fala em "nome de usuário", mas o cadastro (Seção 6.2) nunca teve um campo de
+  username separado — o login é sempre por email. Interpretamos "nome de usuário" como o nome de
+  exibição já existente (`User.name`, mostrado em toda a UI e nos registros de auditoria), em vez de
+  inventar um novo campo de identificador de login que o restante do sistema não usa em lugar
+  nenhum.
+
+Ambas as ações geram entradas em `AuditLog` (`password_changed`, `user_name_updated`), visíveis na
+Auditoria por ação (`entity_type=user`) e na Auditoria por paciente onde aplicável.
+
 ## Estrutura
 
 - `app/models/` — entidades SQLAlchemy (Seção 18/27 do PRD).
