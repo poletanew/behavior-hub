@@ -2,6 +2,7 @@ import { FormEvent, useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { apiRequest } from "../api/client";
+import EmptyState from "../components/EmptyState";
 import {
   Assessment,
   AssessmentComparison,
@@ -252,9 +253,7 @@ export default function AssessmentsPage() {
       )}
 
       {assessmentsOfProtocol.length === 0 ? (
-        <div className="bg-white rounded-card shadow-sm p-10 text-center text-neutralState">
-          Nenhuma avaliação {PROTOCOL_LABELS[protocol]} registrada ainda.
-        </div>
+        <EmptyState icon="🧩" message={`Nenhuma avaliação ${PROTOCOL_LABELS[protocol]} registrada ainda.`} />
       ) : (
         <div className="bg-white rounded-card shadow-sm divide-y divide-slate-100 mb-6">
           {assessmentsOfProtocol.map((a) => (

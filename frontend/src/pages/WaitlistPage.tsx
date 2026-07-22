@@ -1,6 +1,7 @@
 import { FormEvent, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { apiRequest, ApiError } from "../api/client";
+import EmptyState from "../components/EmptyState";
 import { WaitlistEntry } from "../types";
 
 const STATUS_LABELS: Record<string, string> = {
@@ -179,9 +180,7 @@ export default function WaitlistPage() {
       )}
 
       {waiting.length === 0 && others.length === 0 ? (
-        <div className="bg-white rounded-card shadow-sm p-10 text-center text-neutralState">
-          Nenhum paciente na lista de espera.
-        </div>
+        <EmptyState icon="🗓️" message="Nenhum paciente na lista de espera." />
       ) : (
         <div className="space-y-3">
           {[...waiting, ...others].map((entry) => (

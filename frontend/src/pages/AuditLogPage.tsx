@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { apiRequest, ApiError } from "../api/client";
+import EmptyState from "../components/EmptyState";
 import { AuditLogEntry, Patient } from "../types";
 
 const ENTITY_TYPE_OPTIONS = [
@@ -173,9 +174,7 @@ export default function AuditLogPage() {
           {loading ? (
             <p className="text-neutralState">Carregando...</p>
           ) : entries.length === 0 && !error ? (
-            <div className="bg-white rounded-card shadow-sm p-10 text-center text-neutralState">
-              Nenhum registro de auditoria encontrado.
-            </div>
+            <EmptyState icon="🔍" message="Nenhum registro de auditoria encontrado." />
           ) : !error ? (
             <div className="bg-white rounded-card shadow-sm overflow-hidden">
               <table className="w-full text-sm">

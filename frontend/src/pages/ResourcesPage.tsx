@@ -1,5 +1,6 @@
 import { FormEvent, useEffect, useState } from "react";
 import { apiRequest, apiUpload, ApiError } from "../api/client";
+import EmptyState from "../components/EmptyState";
 import { AIResourceKind, ResourceAIDraft, ResourceItem, ResourceVisibility, ResourceWithUrl } from "../types";
 
 const TYPE_ICONS: Record<string, string> = { pdf: "📄", image: "🖼️", text: "📝" };
@@ -329,9 +330,7 @@ export default function ResourcesPage() {
       </div>
 
       {resources.length === 0 ? (
-        <div className="bg-white rounded-card shadow-sm p-10 text-center text-neutralState">
-          Nenhum recurso adicionado ainda.
-        </div>
+        <EmptyState icon="📚" message="Nenhum recurso adicionado ainda. Que tal criar o primeiro com IA?" />
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {resources.map((resource) => (

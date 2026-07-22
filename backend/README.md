@@ -749,6 +749,42 @@ altera os próprios dados, nunca os de terceiros):
 Ambas as ações geram entradas em `AuditLog` (`password_changed`, `user_name_updated`), visíveis na
 Auditoria por ação (`entity_type=user`) e na Auditoria por paciente onde aplicável.
 
+## Nota sobre Design System — Leveza Visual Transversal (Fase 6 bloco 13 — Addendum v2.1, RF-17)
+
+Este bloco é 100% frontend — nenhum endpoint, schema ou tabela novos. O addendum pede algo
+propositalmente amplo ("aplicar em cada tela principal do sistema"), então em vez de retocar
+manualmente todas as ~25 telas uma a uma, priorizamos duas mudanças centrais e de baixo risco que
+cobrem o requisito de forma sistemática:
+
+1. **Transição de tela automática para o sistema inteiro**: `Layout.tsx`, `ATWorkspaceLayout.tsx` e
+   `FamilyPortalLayout.tsx` (os três roteadores de topo — clínica, AT e Família) agora envolvem o
+   `<Outlet />` num `<div key={location.pathname} className="animate-fade-in">`. Trocar de rota
+   remonta esse wrapper (a `key` muda), disparando um fade-in curto (`index.css`) em **toda** tela
+   do sistema sem precisar tocar em cada página individualmente — satisfaz literalmente "transição
+   suave ao trocar de aba" do critério de aceite para qualquer tela, presente ou futura.
+2. **Componente `EmptyState` reutilizável** (`frontend/src/components/EmptyState.tsx`): ícone
+   amigável num círculo com a cor de apoio turquesa, título opcional e mensagem, substituindo o
+   antigo bloco `<div className="p-10 text-center text-neutralState">texto cinza</div>` repetido
+   (encontrado idêntico em 13 arquivos). Aplicado às telas principais que podem ficar vazias:
+   Pacientes, Atendimentos, Recursos, Lista de Espera, Dados Excluídos, Relatórios, Avaliações,
+   Timeline, Auditoria, Painel de Supervisão, Espaço do AT (lista de pacientes e treinos
+   prescritos) e o card de "Sessões recentes" da Área de Trabalho.
+
+**Decisão de escopo deliberada**: estados vazios *aninhados* dentro de painéis já preenchidos (ex.:
+"Nenhum comentário ainda" dentro do card de um objetivo, "Nenhum convite gerado ainda" numa célula
+de tabela) foram deixados como texto simples — o critério de aceite fala em "o primeiro contato de
+uma clínica nova com o sistema", isto é, a tela cheia vazia, não cada sub-lista aninhada dentro de
+uma tela já com conteúdo; usar o `EmptyState` (ícone grande em círculo) nesses contextos pequenos
+ficaria desproporcional ao espaço disponível. Uma confirmação animada ao salvar
+(`animate-pop-in`) foi adicionada às mensagens de sucesso da aba Segurança (bloco 12, testado nesta
+mesma sessão) como exemplo do padrão "microanimação curta"; não foi replicada em todos os ~60
+pontos de mensagem de sucesso do sistema pelo mesmo motivo de escopo. Ambas as animações respeitam
+`prefers-reduced-motion: reduce` (acessibilidade, também citada no critério de aceite do RF-17).
+
+Cantos arredondados (`rounded-card`, 12px) e espaçamento generoso nos cards já eram usados de forma
+consistente desde fases anteriores (Seção 24.8 do PRD já estava implementada) — não foram alterados
+para não introduzir uma mudança de densidade em massa sem necessidade.
+
 ## Estrutura
 
 - `app/models/` — entidades SQLAlchemy (Seção 18/27 do PRD).

@@ -1,4 +1,4 @@
-import { Outlet } from "react-router-dom";
+import { Outlet, useLocation } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 
 // Addendum v2.1, RF-11 — espaço de trabalho restrito do AT (Auxiliar
@@ -6,6 +6,7 @@ import { useAuth } from "../context/AuthContext";
 // nenhum outro item de menu do sistema (mesmo padrão do Family Portal).
 export default function ATWorkspaceLayout() {
   const { user, logout } = useAuth();
+  const location = useLocation();
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -21,7 +22,7 @@ export default function ATWorkspaceLayout() {
           </button>
         </div>
       </header>
-      <div className="p-8">
+      <div key={location.pathname} className="p-8 animate-fade-in">
         <Outlet />
       </div>
     </div>

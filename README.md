@@ -182,6 +182,14 @@ Este repositório está sendo construído **por fases**, seguindo o roadmap da S
   própria sessão que fez a troca continue funcionando sem precisar logar de novo. Como o login é
   feito por email (não existe um campo de "username" separado), "nome de usuário" foi interpretado
   como o nome de exibição (`User.name`).
+- **Fase 6 (bloco 13) — Addendum de Melhorias v2.1, RF-17**: injeção transversal de leveza visual no
+  Design System (Seção 24) sem perder o tom profissional. Toda navegação entre telas (Layout
+  principal, espaço do AT e Portal da Família) ganha uma transição suave (fade-in) automática; todo
+  estado vazio de tela principal (Pacientes, Atendimentos, Recursos, Lista de Espera, Dados
+  Excluídos, Relatórios, Avaliações, Timeline, Auditoria, Painel de Supervisão, espaço do AT e a
+  Área de Trabalho) passa a usar um componente `EmptyState` reutilizável, com ícone amigável em vez
+  de só texto cinza; e confirmações de "salvo com sucesso" na aba Segurança ganham uma
+  microanimação curta. As animações respeitam `prefers-reduced-motion`.
 
 ## Stack (Seção 4 do PRD)
 

@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { apiRequest } from "../../api/client";
+import EmptyState from "../../components/EmptyState";
 import { ATPatient } from "../../types";
 import { calculateAge } from "../../utils/patient";
 
@@ -22,9 +23,10 @@ export default function ATPatientsPage() {
       {patients === null ? (
         <p className="text-neutralState">Carregando...</p>
       ) : patients.length === 0 ? (
-        <div className="bg-white rounded-card shadow-sm p-10 text-center text-neutralState">
-          Nenhum paciente atribuído a você ainda. Peça ao supervisor para atribuir na aba ABA.
-        </div>
+        <EmptyState
+          icon="🧑‍🤝‍🧑"
+          message="Nenhum paciente atribuído a você ainda. Peça ao supervisor para atribuir na aba ABA."
+        />
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {patients.map((patient) => (

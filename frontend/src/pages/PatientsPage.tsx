@@ -1,6 +1,7 @@
 import { FormEvent, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { apiRequest, ApiError } from "../api/client";
+import EmptyState from "../components/EmptyState";
 import { Patient, SchoolShift } from "../types";
 import { calculateAge, formatPhoneInput, initials, schoolShiftLabel } from "../utils/patient";
 
@@ -266,9 +267,11 @@ export default function PatientsPage() {
       {loading ? (
         <p className="text-neutralState">Carregando...</p>
       ) : filtered.length === 0 ? (
-        <div className="bg-white rounded-card shadow-sm p-10 text-center text-neutralState">
-          Nenhum paciente adicionado. Clique em Adicionar paciente para começar.
-        </div>
+        <EmptyState
+          icon="👋"
+          title="Vamos começar?"
+          message="Nenhum paciente adicionado. Clique em Adicionar paciente para começar."
+        />
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {filtered.map((patient) => (

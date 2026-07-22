@@ -42,7 +42,7 @@ function ChangeNameForm() {
   return (
     <div className="bg-white rounded-card shadow-sm p-6 max-w-xl space-y-3">
       <h2 className="font-semibold text-brand-navy">Nome de usuário</h2>
-      {message && <p className="text-success text-sm">{message}</p>}
+      {message && <p className="text-success text-sm animate-pop-in">{message}</p>}
       {error && <p className="text-danger text-sm">{error}</p>}
       <form onSubmit={handleSubmit} className="flex gap-3 items-end max-w-md">
         <div className="flex-1">
@@ -108,7 +108,7 @@ function ChangePasswordForm() {
       <p className="text-xs text-neutralState">
         Trocar a senha encerra imediatamente as demais sessões ativas desta conta.
       </p>
-      {message && <p className="text-success text-sm">{message}</p>}
+      {message && <p className="text-success text-sm animate-pop-in">{message}</p>}
       {error && <p className="text-danger text-sm">{error}</p>}
       <form onSubmit={handleSubmit} className="space-y-3 max-w-xs">
         <div>
@@ -220,7 +220,7 @@ export default function SecurityPage() {
           Ative abaixo para continuar em conformidade.
         </div>
       )}
-      {message && <p className="text-success text-sm mb-4">{message}</p>}
+      {message && <p className="text-success text-sm mb-4 animate-pop-in">{message}</p>}
       {error && <p className="text-danger text-sm mb-4">{error}</p>}
 
       <div className="bg-white rounded-card shadow-sm p-6 max-w-xl space-y-4">

@@ -1,6 +1,7 @@
 import { FormEvent, useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { apiRequest } from "../api/client";
+import EmptyState from "../components/EmptyState";
 import {
   ClinicalAlert,
   ClinicalSession,
@@ -350,9 +351,7 @@ export default function PatientDetailPage() {
       )}
 
       {sessions.length === 0 ? (
-        <div className="bg-white rounded-card shadow-sm p-10 text-center text-neutralState">
-          Nenhuma sessão registrada ainda.
-        </div>
+        <EmptyState icon="🗒️" message="Nenhuma sessão registrada ainda." />
       ) : (
         <div className="bg-white rounded-card shadow-sm divide-y divide-slate-100">
           {sessions.map((session) => (

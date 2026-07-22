@@ -20,6 +20,7 @@ import {
   YAxis,
 } from "recharts";
 import { apiDownload, apiRequest } from "../api/client";
+import EmptyState from "../components/EmptyState";
 import { Patient, ReportData, ReportSummary, Training, TrainingCategory } from "../types";
 
 const CHART_COLORS = ["#3B82F6", "#14B8A6", "#22C55E", "#84CC16", "#8B5CF6", "#334155"];
@@ -264,9 +265,7 @@ export default function ReportsPage() {
       </div>
 
       {data.total_trials === 0 ? (
-        <div className="bg-white rounded-card shadow-sm p-10 text-center text-neutralState">
-          Nenhuma tentativa registrada para os filtros selecionados.
-        </div>
+        <EmptyState icon="📊" message="Nenhuma tentativa registrada para os filtros selecionados." />
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <div className="bg-white rounded-card shadow-sm p-6">
