@@ -169,6 +169,12 @@ Este repositório está sendo construído **por fases**, seguindo o roadmap da S
   aviso "Gerado por IA — revise antes de publicar". O profissional edita livremente e só então clica
   em "Publicar", que gera um PDF de fato e o adiciona à biblioteca — nada é publicado sozinho. O
   recurso publicado mantém um badge "Gerado por IA" visível no card da biblioteca.
+- **Fase 6 (bloco 11) — Addendum de Melhorias v2.1, RF-14**: a aba Auditoria ganha uma segunda visão,
+  "Por paciente", ao lado da já existente "Por ação". Buscar e clicar em um paciente abre uma linha
+  do tempo consolidada com todas as ações registradas por qualquer profissional sobre ele —
+  cadastro, sessões, alterações de plano de tratamento, anexos importados, atribuições, avaliações
+  — em ordem cronológica, com autor e data/hora visíveis, reaproveitando a mesma cobertura de
+  entidades já usada pela Timeline Clínica (Fase 4a).
 
 ## Stack (Seção 4 do PRD)
 

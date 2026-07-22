@@ -103,7 +103,7 @@ def generate_summary(
         actor_user_id=user.id,
         action="report_summary_generated",
         entity_type="report_summary",
-        entity_id=None,
+        entity_id=summary.id,
         after={"patient_id": str(patient_id), "version": next_version},
     )
     db.commit()

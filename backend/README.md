@@ -696,6 +696,34 @@ vincular via FK — o rascunho é gerado a partir de texto livre (tema + faixa e
 próprio formulário, então basta os dois campos booleano/timestamp em `Resource`, sem nenhuma FK
 adicional.
 
+## Nota sobre Auditoria Agrupada por Paciente (Fase 6 bloco 11 — Addendum v2.1, RF-14)
+
+O addendum descreve o modelo de dados como "`AuditLog` já suporta `patient_id` como entidade
+referenciada; adicionar índice `patient_id` + `timestamp`" — mas o `AuditLog` real (Seção 18) nunca
+teve uma coluna `patient_id`; cada linha só referencia `entity_type`/`entity_id` (ex.:
+`entity_type="objective"`, `entity_id=<uuid do objetivo>`). Adicionar essa coluna de verdade
+exigiria retrofitar os ~60 pontos de chamada de `audit_service.record` espalhados por 18 serviços
+— a maioria (auth, billing, RBAC, white-label) nem é sobre um paciente. Em vez disso,
+`audit_log_service.get_patient_audit_trail` resolve os IDs relevantes por `entity_type` **em tempo
+de consulta**, reaproveitando exatamente a mesma cobertura de entidades já usada por
+`timeline_service.get_patient_timeline` (Fase 4a/Seção 29.2): `patient`, `session`, `objective`
+(via `plan_id`), `treatment_plan_attachment` (via `plan_id` — os "uploads" citados no critério de
+aceite), `patient_assignment` e `assessment`. Diferente da Timeline (que foca em eventos clínicos e
+por isso ignora registros já excluídos), a auditoria inclui explicitamente entidades com soft
+delete já aplicado — "exclusões" e "restaurações" são, ela própria, o dado que a Seção 17 pede para
+mostrar.
+
+Um efeito colateral corrigido en passant: `report_summary_service.generate_summary` gravava
+`entity_id=None` no seu registro de auditoria (o resumo criado nunca era referenciado de volta).
+Passou a gravar `entity_id=summary.id`, permitindo resolver `ReportSummary.patient_id` como as
+demais entidades — pequeno bug de rastreabilidade preexistente, não introduzido por este bloco, mas
+que impedia esse tipo de ação de aparecer na nova visão agrupada.
+
+**Decisão de escopo deliberada**: tentativas individuais (`trial_created`/`updated`/`deleted`) não
+entram na auditoria por paciente — o critério de aceite do addendum fala em "sessões", não em cada
+tentativa isolada, e resolver `Trial` → `SessionTraining` → `ClinicalSession` → paciente
+adicionaria uma junção a mais sem um pedido explícito correspondente.
+
 ## Estrutura
 
 - `app/models/` — entidades SQLAlchemy (Seção 18/27 do PRD).
