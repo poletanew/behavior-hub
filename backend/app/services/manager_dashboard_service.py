@@ -4,7 +4,8 @@ from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.models.appointment import Appointment
-from app.models.enums import AppointmentStatus, PatientStatus, UserStatus, UserType
+from app.models.clinic import Clinic
+from app.models.enums import AppointmentStatus, PatientStatus, SubscriptionStatus, UserStatus, UserType
 from app.models.patient import Patient
 from app.models.session import ClinicalSession
 from app.models.user import User
@@ -14,6 +15,21 @@ CONCLUDED_APPOINTMENT_STATUSES = (
     AppointmentStatus.NO_SHOW,
     AppointmentStatus.CANCELLED,
 )
+
+# Addendum v3.0, RF-32 — "estimativa de churn" traduzida em uma faixa
+# qualitativa a partir do subscription_status já existente (Seção 8.3, Fase
+# 3), sem inventar nenhum dado financeiro novo. Escopo por clínica (decisão
+# confirmada com o usuário) — ver backend/README.md.
+CHURN_RISK_BY_STATUS = {
+    SubscriptionStatus.ACTIVE: "baixo",
+    SubscriptionStatus.TRIALING: "baixo",
+    SubscriptionStatus.PAST_DUE: "alto",
+    SubscriptionStatus.INCOMPLETE: "alto",
+    SubscriptionStatus.UNPAID: "alto",
+    SubscriptionStatus.CANCELED: "assinatura_encerrada",
+    SubscriptionStatus.INCOMPLETE_EXPIRED: "assinatura_encerrada",
+    SubscriptionStatus.NONE: "nao_aplicavel",
+}
 
 
 def _require_manager_view(user: User) -> None:
@@ -109,4 +125,28 @@ def get_manager_dashboard(
         "sessions_count": sessions_count,
         "clinical_hours": clinical_hours,
         "occupancy_rate_pct": occupancy_rate_pct,
+    }
+
+
+def get_financial_outlook(db: Session, user: User) -> dict:
+    """Addendum v3.0, RF-32 — previsibilidade financeira usando exclusivamente
+    os dados de assinatura Stripe já existentes (Seção 8.3, Fase 3): plano
+    atual, data de renovação e um indicador qualitativo de risco de churn.
+    Não há hoje um papel de "operador da plataforma" que agregaria a receita
+    recorrente de todas as clínicas — por isso este relatório é por clínica,
+    da própria assinatura (decisão confirmada com o usuário)."""
+    _require_manager_view(user)
+    clinic = db.get(Clinic, user.clinic_id)
+
+    days_until_renewal = None
+    if clinic.subscription_current_period_end is not None:
+        now = datetime.datetime.now(datetime.timezone.utc)
+        days_until_renewal = (clinic.subscription_current_period_end - now).days
+
+    return {
+        "subscription_plan": clinic.subscription_plan,
+        "subscription_status": clinic.subscription_status,
+        "current_period_end": clinic.subscription_current_period_end,
+        "days_until_renewal": days_until_renewal,
+        "churn_risk_label": CHURN_RISK_BY_STATUS.get(clinic.subscription_status, "nao_aplicavel"),
     }

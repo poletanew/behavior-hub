@@ -15,6 +15,7 @@ import {
   Patient,
   ResourceItem,
   ResourceLink,
+  Training,
   TreatmentArea,
   TreatmentPlan,
   TreatmentPlanAttachment,
@@ -68,12 +69,14 @@ function ObjectiveCard({
   professionals,
   resources,
   familyAccesses,
+  trainings,
 }: {
   objective: Objective;
   onChanged: () => void;
   professionals: User[];
   resources: ResourceItem[];
   familyAccesses: FamilyAccess[];
+  trainings: Training[];
 }) {
   const [expanded, setExpanded] = useState(false);
   const [comments, setComments] = useState<ObjectiveComment[]>([]);
@@ -244,6 +247,15 @@ function ObjectiveCard({
           {objective.strategies && (
             <p>
               <span className="font-medium">Estratégias:</span> {objective.strategies}
+            </p>
+          )}
+          {objective.training_ids.length > 0 && (
+            <p>
+              <span className="font-medium">Treinos vinculados:</span>{" "}
+              {objective.training_ids
+                .map((id) => trainings.find((t) => t.id === id)?.title)
+                .filter(Boolean)
+                .join(", ") || "—"}
             </p>
           )}
           <div className="flex flex-wrap gap-2 pt-2">
@@ -610,6 +622,8 @@ export default function TreatmentPlanPage() {
   const [professionals, setProfessionals] = useState<User[]>([]);
   const [resources, setResources] = useState<ResourceItem[]>([]);
   const [familyAccesses, setFamilyAccesses] = useState<FamilyAccess[]>([]);
+  const [trainings, setTrainings] = useState<Training[]>([]);
+  const [selectedTrainingIds, setSelectedTrainingIds] = useState<string[]>([]);
   const [draggedObjectiveId, setDraggedObjectiveId] = useState<string | null>(null);
   const [aiAttachmentId, setAiAttachmentId] = useState("");
   const [aiFilling, setAiFilling] = useState(false);
@@ -620,6 +634,7 @@ export default function TreatmentPlanPage() {
   useEffect(() => {
     apiRequest<User[]>("/professionals").then(setProfessionals);
     apiRequest<ResourceItem[]>("/resources").then(setResources);
+    apiRequest<Training[]>("/trainings").then(setTrainings);
   }, []);
 
   function load() {
@@ -642,6 +657,7 @@ export default function TreatmentPlanPage() {
     setCriteria("");
     setStrategies("");
     setPriority("medium");
+    setSelectedTrainingIds([]);
     setDuplicateCandidates(null);
     setError(null);
     setAiAttachmentId("");
@@ -688,6 +704,7 @@ export default function TreatmentPlanPage() {
           strategies: strategies || null,
           priority,
           force,
+          training_ids: selectedTrainingIds,
           ai_generated: aiGenerated,
           ai_source_document_id: aiGenerated ? aiAttachmentId : null,
         },
@@ -898,6 +915,25 @@ export default function TreatmentPlanPage() {
               ))}
             </select>
           </div>
+          <div>
+            <label className="block text-sm font-medium mb-1">Treinos da Biblioteca vinculados</label>
+            <select
+              multiple
+              value={selectedTrainingIds}
+              onChange={(e) => setSelectedTrainingIds(Array.from(e.target.selectedOptions, (o) => o.value))}
+              className="w-full h-28 rounded-btn border border-slate-300 px-3 text-sm"
+            >
+              {trainings.map((t) => (
+                <option key={t.id} value={t.id}>
+                  {t.title}
+                </option>
+              ))}
+            </select>
+            <p className="text-xs text-neutralState mt-1">
+              Opcional — usado no relatório de Desempenho do Programa (Addendum v3.0, RF-32). Segure Ctrl/Cmd
+              para selecionar mais de um.
+            </p>
+          </div>
           {error && <p className="text-danger text-sm">{error}</p>}
           <div className="flex gap-3">
             <button type="submit" className="rounded-btn bg-brand-turquoise text-white px-4 py-2 text-sm font-medium">
@@ -933,6 +969,7 @@ export default function TreatmentPlanPage() {
                     professionals={professionals}
                     resources={resources}
                     familyAccesses={familyAccesses}
+                    trainings={trainings}
                   />
                 </div>
               ))}

@@ -13,7 +13,9 @@ from sqlalchemy.orm import Session
 from app.models.session import ClinicalSession, SessionTraining, Trial
 from app.models.training import Training, TrainingCategory
 from app.models.user import User
-from app.services import patient_service, report_service, white_label_service
+from app.services import patient_service, professional_performance_service, report_service, white_label_service
+
+EFFICIENCY_LABEL_PT = {"alta": "Alta", "media": "Média", "baixa": "Baixa"}
 
 
 def _fetch_export_rows(db, patient_id, **filters):
@@ -126,6 +128,77 @@ def export_pdf(
         TableStyle(
             [
                 ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor(accent_color)),
+                ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+                ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#CBD5E1")),
+                ("FONTSIZE", (0, 0), (-1, -1), 9),
+            ]
+        )
+    )
+    elements.append(table)
+    elements.append(Spacer(1, 24))
+    elements.append(Paragraph("Powered by Behavior Hub", styles["Normal"]))
+
+    doc.build(elements)
+    return buffer.getvalue()
+
+
+def export_professional_performance_pdf(
+    db: Session,
+    user: User,
+    professional_id: uuid.UUID,
+    *,
+    date_from: datetime.date | None,
+    date_to: datetime.date | None,
+) -> bytes:
+    """Addendum v3.0, RF-31 — relatório de desempenho do profissional/AT
+    exportável em PDF, mesmo padrão visual do export_pdf de paciente."""
+    data = professional_performance_service.get_professional_performance(
+        db, user, professional_id, date_from=date_from, date_to=date_to
+    )
+
+    buffer = io.BytesIO()
+    doc = SimpleDocTemplate(buffer, pagesize=A4, topMargin=20 * mm, bottomMargin=20 * mm)
+    styles = getSampleStyleSheet()
+    elements = []
+
+    elements.append(Paragraph("Behavior Hub — Desempenho do Profissional/AT", styles["Title"]))
+    elements.append(Spacer(1, 6))
+    elements.append(Paragraph(f"Profissional: {data['professional_name']}", styles["Normal"]))
+    period_label = (
+        f"{date_from.strftime('%d/%m/%Y')} a {date_to.strftime('%d/%m/%Y')}" if date_from and date_to else "Todo o histórico"
+    )
+    elements.append(Paragraph(f"Período: {period_label}", styles["Normal"]))
+    elements.append(
+        Paragraph(
+            f"Gerado em: {datetime.datetime.now(datetime.timezone.utc).strftime('%d/%m/%Y %H:%M UTC')}",
+            styles["Normal"],
+        )
+    )
+    elements.append(Spacer(1, 12))
+
+    efficiency_label = data["applier_efficiency_label"]
+    table_data = [
+        ["Indicador", "Valor"],
+        ["Atendimentos realizados", data["sessions_count"]],
+        [
+            "Consistência de registro",
+            f"{data['registration_consistency_pct']}%" if data["registration_consistency_pct"] is not None else "-",
+        ],
+        [
+            "Percentual médio de acerto",
+            f"{data['average_accuracy_pct']}%" if data["average_accuracy_pct"] is not None else "-",
+        ],
+        [
+            "Variabilidade de procedimento entre sessões",
+            f"{data['procedure_variability_pp']} p.p." if data["procedure_variability_pp"] is not None else "-",
+        ],
+        ["Eficiência do aplicador", EFFICIENCY_LABEL_PT.get(efficiency_label, "-") if efficiency_label else "-"],
+    ]
+    table = Table(table_data, hAlign="LEFT")
+    table.setStyle(
+        TableStyle(
+            [
+                ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#1D4ED8")),
                 ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
                 ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#CBD5E1")),
                 ("FONTSIZE", (0, 0), (-1, -1), 9),

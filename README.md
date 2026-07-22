@@ -243,6 +243,22 @@ Este repositório está sendo construído **por fases**, seguindo o roadmap da S
   nova ordem persistindo entre sessões. RF-27 (confirmação via WhatsApp) foi propositalmente
   deixado de fora desta fase: depende de um provedor de API do WhatsApp Business, e nenhuma
   credencial desse tipo está configurada neste projeto.
+- **Fase 7 (Módulo 3.6) — Addendum v3.0, RF-31 e RF-32 — Relatórios**: novo relatório "Desempenho
+  do Profissional/AT", acessível via "Ver desempenho" tanto no Painel de Supervisão (profissionais e
+  supervisores) quanto na página ABA (auxiliares terapêuticos, que não aparecem no Painel de
+  Supervisão) — mostra atendimentos realizados, consistência de registro (% de sessões com ao menos
+  uma tentativa), percentual médio de acerto e um selo de eficiência do aplicador (alta/média/baixa,
+  conforme a variabilidade de acerto entre sessões), com exportação em PDF; é um relatório individual,
+  diferente do painel agregado por equipe que já existia. Ao criar um objetivo no Plano de Tratamento,
+  agora é possível vincular treinos da Biblioteca de Treino diretamente no formulário (campo "Treinos
+  da Biblioteca vinculados") — esse vínculo já existia no backend desde a Fase 2, mas não tinha nenhuma
+  tela para preenchê-lo. O Painel de Gestão ganha duas seções novas: "Desempenho do Programa" agrega,
+  por treino vinculado, quantos pacientes distintos o usam, taxa de domínio e tempo médio até dominar
+  (só aparece para treinos usados por pelo menos 2 pacientes); e "Previsibilidade Financeira" mostra o
+  plano atual da própria clínica, data de renovação e um selo de risco de cancelamento derivado do
+  status da assinatura no Stripe — deliberadamente restrito à assinatura da própria clínica (sem
+  nenhum papel novo de operador da plataforma nem valores de receita inventados), conforme escolha
+  explícita do responsável pelo produto diante da ambiguidade do texto original do addendum.
 
 ## Stack (Seção 4 do PRD)
 

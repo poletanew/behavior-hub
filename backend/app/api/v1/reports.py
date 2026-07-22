@@ -7,13 +7,20 @@ from sqlalchemy.orm import Session
 from app.core.deps import get_current_user
 from app.db.session import get_db
 from app.models.user import User
+from app.schemas.professional_performance import ProfessionalPerformanceResponse
 from app.schemas.report import (
     ReportDataResponse,
     ReportSummaryGenerateRequest,
     ReportSummaryResponse,
     ReportSummaryUpdateRequest,
 )
-from app.services import patient_service, report_export_service, report_service, report_summary_service
+from app.services import (
+    patient_service,
+    professional_performance_service,
+    report_export_service,
+    report_service,
+    report_summary_service,
+)
 
 router = APIRouter(prefix="/reports", tags=["reports"])
 
@@ -126,4 +133,36 @@ def export_pdf(
         content=content,
         media_type="application/pdf",
         headers={"Content-Disposition": f'attachment; filename="report-{patient_id}.pdf"'},
+    )
+
+
+@router.get("/professionals/{professional_id}/performance", response_model=ProfessionalPerformanceResponse)
+def get_professional_performance(
+    professional_id: uuid.UUID,
+    date_from: datetime.date | None = None,
+    date_to: datetime.date | None = None,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """Addendum v3.0, RF-31 — relatório de desempenho do profissional/AT."""
+    return professional_performance_service.get_professional_performance(
+        db, user, professional_id, date_from=date_from, date_to=date_to
+    )
+
+
+@router.get("/professionals/{professional_id}/performance/export.pdf")
+def export_professional_performance_pdf(
+    professional_id: uuid.UUID,
+    date_from: datetime.date | None = None,
+    date_to: datetime.date | None = None,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    content = report_export_service.export_professional_performance_pdf(
+        db, user, professional_id, date_from=date_from, date_to=date_to
+    )
+    return Response(
+        content=content,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="desempenho-{professional_id}.pdf"'},
     )

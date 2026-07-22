@@ -958,6 +958,48 @@ tentativa futura de `upgrade` após um `downgrade` falha com "type already exist
   endpoint da família (gate por whitelist) e o endpoint da equipe (gate normal de paciente), evitando
   duplicar a query de junção com `User` para resolver o nome de quem enviou.
 
+## Nota sobre Relatórios — Desempenho do Profissional/AT, do Programa e Previsibilidade Financeira (Fase 7 Módulo 3.6 — Addendum v3.0, RF-31 e RF-32)
+
+- **RF-31 — `professional_performance_service.get_professional_performance`**: relatório individual
+  (diferente do Painel de Supervisão, que agrega por equipe), acessível tanto a `CLINIC_ADMIN` quanto
+  a `SUPERVISOR` (`_require_team_view`, mesma checagem já usada em `supervisor_dashboard_service`).
+  Como o Painel de Supervisão filtra `User.user_type.in_((PROFESSIONAL, SUPERVISOR))` e portanto nunca
+  lista ATs, o link "Ver desempenho" para AT foi colocado na própria página ABA, ao lado de cada AT na
+  lista já existente — mesma rota (`/professionals/{id}/performance`), duas portas de entrada.
+  Definições concretas para termos que o addendum deixa em aberto:
+  - **Consistência de registro** = % de sessões do profissional com pelo menos uma tentativa
+    registrada (`registration_consistency_pct`). Uma sessão criada mas sem nenhuma tentativa conta
+    contra o profissional — é o sinal mais direto de "sessão que aconteceu mas não foi documentada".
+  - **Eficiência do aplicador** = desvio-padrão populacional do % de acerto entre as sessões do
+    profissional (`procedure_variability_pp`, em pontos percentuais), classificado em
+    alta/média/baixa por dois limiares fixos (`HIGH_EFFICIENCY_MAX_VARIABILITY_PP = 10`,
+    `MEDIUM_EFFICIENCY_MAX_VARIABILITY_PP = 20`). A leitura é: quanto mais estável o desempenho de
+    sessão para sessão, mais "eficiente" (previsível) é a aplicação — não uma medida de quão alto é
+    o acerto em si (isso já é o indicador separado `average_accuracy_pct`).
+  - Exportação em PDF reaproveita o mesmo padrão (`SimpleDocTemplate`/`Table`/`TableStyle`) do export
+    de relatório de paciente já existente em `report_export_service.py`.
+- **RF-32 — `program_performance_service.get_program_performance`**: agrega objetivos por treino da
+  Training Library (via `ObjectiveTraining`, existente desde a Fase 2 mas sem nenhuma tela para
+  preenchê-lo — corrigido nesta fase com um campo multi-seleção "Treinos da Biblioteca vinculados" no
+  formulário de novo objetivo do Plano de Tratamento), restrito a `CLINIC_ADMIN`
+  (`_require_manager_view`, mesma checagem de `manager_dashboard_service`). Só entram na lista treinos
+  usados por pelo menos `MIN_PATIENTS_FOR_PROGRAM_STATS = 2` pacientes distintos — instrução explícita
+  do próprio addendum ("mínimo 2 pacientes"), aplicada como filtro rígido para nunca expor o
+  desempenho individual de um único paciente disfarçado de "programa". `average_days_to_mastery` é
+  calculado a partir do próprio Audit Log (primeira transição de status para `mastered` de cada
+  objetivo), sem precisar de nenhuma coluna nova de data.
+- **RF-32 — `manager_dashboard_service.get_financial_outlook`**: o addendum descreve "previsibilidade
+  financeira" em termos que pressupõem uma base de clientes agregada (projeção de receita recorrente,
+  estimativa de churn), mas o projeto só integra o Stripe no nível de cada clínica assinando o próprio
+  Behavior Hub (Seção 8.3) — não existe hoje nenhum dado de receita por paciente para agregar. Diante
+  dessa ambiguidade, o escopo foi confirmado explicitamente com o responsável pelo produto entre três
+  opções (visão por clínica da própria assinatura / novo papel de operador da plataforma agregando
+  todas as clínicas / só o agregado de Desempenho do Programa) — a opção escolhida foi a primeira:
+  uma extensão do Painel de Gestão já restrito a `CLINIC_ADMIN`, sem nenhum papel novo, mostrando
+  plano atual, data de renovação e um selo qualitativo de risco de cancelamento (`churn_risk_label`)
+  derivado unicamente de `Clinic.subscription_status` (`CHURN_RISK_BY_STATUS`) — nunca um valor de
+  receita em R$, já que nenhum dado desse tipo existe localmente (só os price IDs do Stripe).
+
 ## Estrutura
 
 - `app/models/` — entidades SQLAlchemy (Seção 18/27 do PRD).

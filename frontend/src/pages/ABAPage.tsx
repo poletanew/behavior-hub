@@ -1,4 +1,5 @@
 import { FormEvent, useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import { apiRequest, ApiError } from "../api/client";
 import { ABAAssignedPatient, ABATrialReviewEntry, ATSummary, Patient } from "../types";
 
@@ -80,10 +81,10 @@ export default function ABAPage() {
           ) : (
             <ul className="divide-y divide-slate-100">
               {ats.map((at) => (
-                <li key={at.id}>
+                <li key={at.id} className="flex items-center justify-between gap-2">
                   <button
                     onClick={() => setSelectedAtId(at.id)}
-                    className={`w-full text-left px-2 py-2 text-sm rounded-btn ${
+                    className={`flex-1 text-left px-2 py-2 text-sm rounded-btn ${
                       selectedAtId === at.id ? "bg-brand-turquoise/10" : "hover:bg-slate-50"
                     }`}
                   >
@@ -92,6 +93,12 @@ export default function ABAPage() {
                       {at.email} · {at.assigned_patient_count} paciente(s) atribuído(s)
                     </div>
                   </button>
+                  <Link
+                    to={`/professionals/${at.id}/performance`}
+                    className="text-brand-blue text-xs hover:underline shrink-0 pr-2"
+                  >
+                    Ver desempenho
+                  </Link>
                 </li>
               ))}
             </ul>

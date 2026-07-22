@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import { apiRequest } from "../api/client";
 import EmptyState from "../components/EmptyState";
 import { SupervisorDashboardTherapistRow } from "../types";
@@ -37,6 +38,7 @@ export default function SupervisorDashboardPage() {
                 <th className="px-4 py-3">Objetivos ativos</th>
                 <th className="px-4 py-3">% adesão ao plano</th>
                 <th className="px-4 py-3">Alertas</th>
+                <th className="px-4 py-3"></th>
               </tr>
             </thead>
             <tbody>
@@ -71,6 +73,14 @@ export default function SupervisorDashboardPage() {
                         </span>
                       )}
                     </div>
+                  </td>
+                  <td className="px-4 py-3">
+                    <Link
+                      to={`/professionals/${row.professional_id}/performance`}
+                      className="text-brand-blue text-xs hover:underline"
+                    >
+                      Ver desempenho
+                    </Link>
                   </td>
                 </tr>
               ))}

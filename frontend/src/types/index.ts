@@ -566,6 +566,36 @@ export interface ManagerDashboardData {
   occupancy_rate_pct: number | null;
 }
 
+export interface ProfessionalPerformance {
+  professional_id: string;
+  professional_name: string;
+  professional_role: string;
+  sessions_count: number;
+  registration_consistency_pct: number | null;
+  average_accuracy_pct: number | null;
+  procedure_variability_pp: number | null;
+  applier_efficiency_label: "alta" | "media" | "baixa" | null;
+}
+
+export interface ProgramPerformanceRow {
+  training_id: string;
+  training_title: string;
+  patients_count: number;
+  objectives_count: number;
+  mastery_rate_pct: number;
+  average_days_to_mastery: number | null;
+}
+
+export type ChurnRiskLabel = "baixo" | "alto" | "assinatura_encerrada" | "nao_aplicavel";
+
+export interface FinancialOutlook {
+  subscription_plan: PlanId;
+  subscription_status: string;
+  current_period_end: string | null;
+  days_until_renewal: number | null;
+  churn_risk_label: ChurnRiskLabel;
+}
+
 export type AssessmentProtocol = "vb_mapp" | "ablls_r";
 
 export interface ProtocolDomainDefinition {

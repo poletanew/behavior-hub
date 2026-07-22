@@ -29,6 +29,7 @@ import AuditLogPage from "./pages/AuditLogPage";
 import PatientImportPage from "./pages/PatientImportPage";
 import AgendaPage from "./pages/AgendaPage";
 import SecurityPage from "./pages/SecurityPage";
+import ProfessionalPerformancePage from "./pages/ProfessionalPerformancePage";
 import SupervisorDashboardPage from "./pages/SupervisorDashboardPage";
 import ManagerDashboardPage from "./pages/ManagerDashboardPage";
 import AssessmentsPage from "./pages/AssessmentsPage";
@@ -96,6 +97,7 @@ export default function App() {
         <Route path="/patients/import" element={<PatientImportPage />} />
         <Route path="/security" element={<SecurityPage />} />
         <Route path="/supervisor-dashboard" element={<SupervisorDashboardPage />} />
+        <Route path="/professionals/:professionalId/performance" element={<ProfessionalPerformancePage />} />
         <Route path="/manager-dashboard" element={<ManagerDashboardPage />} />
         <Route path="/plans" element={<PlansPage />} />
         <Route path="/white-label" element={<WhiteLabelSettingsPage />} />
