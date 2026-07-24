@@ -49,6 +49,15 @@ export interface Training {
   notes: string | null;
   suggested_age_range: string | null;
   visibility: string;
+  ai_generated: boolean;
+}
+
+export interface TrainingAIFillResponse {
+  objective: string;
+  discriminative_instruction: string;
+  expected_response: string;
+  prompt_hierarchy: string;
+  mastery_criteria: string;
 }
 
 export type TrainingLinkStatus = "prescribed" | "applied";

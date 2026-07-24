@@ -25,6 +25,7 @@ class TrainingCreateRequest(BaseModel):
     mastery_criteria: str | None = None
     notes: str | None = None
     suggested_age_range: str | None = None
+    ai_generated: bool = False
 
 
 class TrainingResponse(BaseModel):
@@ -39,9 +40,23 @@ class TrainingResponse(BaseModel):
     notes: str | None
     suggested_age_range: str | None
     visibility: TrainingVisibility
+    ai_generated: bool
 
     class Config:
         from_attributes = True
+
+
+class TrainingAIFillRequest(BaseModel):
+    category_id: uuid.UUID
+    title: str = Field(min_length=1, max_length=255)
+
+
+class TrainingAIFillResponse(BaseModel):
+    objective: str
+    discriminative_instruction: str
+    expected_response: str
+    prompt_hierarchy: str
+    mastery_criteria: str
 
 
 class TrainingPatientLinkCreateRequest(BaseModel):

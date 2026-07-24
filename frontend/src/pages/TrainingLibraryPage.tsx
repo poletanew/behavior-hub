@@ -1,7 +1,8 @@
 import { FormEvent, useEffect, useState } from "react";
-import { Link2, Plus } from "lucide-react";
+import { Link2, Plus, Sparkles } from "lucide-react";
 import { apiRequest, ApiError } from "../api/client";
-import { Patient, ResourceItem, ResourceLink, Training, TrainingCategory } from "../types";
+import AiDraftNote from "../components/AiDraftNote";
+import { Patient, ResourceItem, ResourceLink, Training, TrainingAIFillResponse, TrainingCategory } from "../types";
 
 function NewTrainingForm({
   categories,
@@ -21,6 +22,34 @@ function NewTrainingForm({
   const [masteryCriteria, setMasteryCriteria] = useState("");
   const [notes, setNotes] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [aiGenerated, setAiGenerated] = useState(false);
+  const [aiFilling, setAiFilling] = useState(false);
+  const [aiError, setAiError] = useState<string | null>(null);
+
+  async function handleAiFill() {
+    setAiFilling(true);
+    setAiError(null);
+    try {
+      const draft = await apiRequest<TrainingAIFillResponse>("/trainings/ai-fill", {
+        method: "POST",
+        body: { category_id: categoryId, title },
+      });
+      setObjective(draft.objective);
+      setDiscriminativeInstruction(draft.discriminative_instruction);
+      setExpectedResponse(draft.expected_response);
+      setPromptHierarchy(draft.prompt_hierarchy);
+      setMasteryCriteria(draft.mastery_criteria);
+      setAiGenerated(true);
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 503) {
+        setAiError("IA não configurada neste servidor ainda. Preencha manualmente por enquanto.");
+      } else {
+        setAiError("Não foi possível gerar com IA agora. Preencha manualmente.");
+      }
+    } finally {
+      setAiFilling(false);
+    }
+  }
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -37,6 +66,7 @@ function NewTrainingForm({
           prompt_hierarchy: promptHierarchy || null,
           mastery_criteria: masteryCriteria || null,
           notes: notes || null,
+          ai_generated: aiGenerated,
         },
       });
       onCreated();
@@ -72,6 +102,18 @@ function NewTrainingForm({
           className="w-full h-10 rounded-btn border border-slate-300 px-3"
         />
       </div>
+
+      <button
+        type="button"
+        disabled={!categoryId || !title.trim() || aiFilling}
+        onClick={handleAiFill}
+        className="rounded-btn bg-brand-purple text-white px-4 py-2 text-sm font-medium disabled:opacity-50 flex items-center gap-1.5"
+      >
+        <Sparkles size={15} /> {aiFilling ? "Gerando..." : "Preencher critérios com IA"}
+      </button>
+      {aiError && <p className="text-danger text-sm">{aiError}</p>}
+      {aiGenerated && <AiDraftNote />}
+
       <div>
         <label className="block text-sm font-medium mb-1">Objetivo</label>
         <textarea
@@ -322,6 +364,11 @@ export default function TrainingLibraryPage() {
                   )}
                 </div>
                 <div className="text-xs text-neutralState mt-1 line-clamp-2">{training.objective}</div>
+                {training.ai_generated && (
+                  <span className="mt-1.5 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold bg-brand-purple/10 text-brand-purple">
+                    <Sparkles size={10} /> Gerado por IA
+                  </span>
+                )}
               </button>
             );
           })}
@@ -331,7 +378,14 @@ export default function TrainingLibraryPage() {
         <div>
           {selected ? (
             <div className="bg-white rounded-card shadow-card p-6 sticky top-6 space-y-3 text-sm">
-              <h2 className="font-bold text-brand-navy text-lg">{selected.title}</h2>
+              <h2 className="font-bold text-brand-navy text-lg">
+                {selected.title}
+                {selected.ai_generated && (
+                  <span className="ml-2 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold bg-brand-purple/10 text-brand-purple align-middle">
+                    <Sparkles size={10} /> Gerado por IA
+                  </span>
+                )}
+              </h2>
               <p>
                 <span className="font-medium">Objetivo:</span> {selected.objective}
               </p>

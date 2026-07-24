@@ -7,6 +7,8 @@ from app.core.deps import get_current_user
 from app.db.session import get_db
 from app.models.user import User
 from app.schemas.training import (
+    TrainingAIFillRequest,
+    TrainingAIFillResponse,
     TrainingCategoryResponse,
     TrainingCreateRequest,
     TrainingPatientLinkCreateRequest,
@@ -39,6 +41,16 @@ def create_training(
     payload: TrainingCreateRequest, db: Session = Depends(get_db), user: User = Depends(get_current_user)
 ):
     return training_service.create_custom_training(db, user, payload)
+
+
+@router.post("/trainings/ai-fill", response_model=TrainingAIFillResponse)
+async def ai_fill_training(
+    payload: TrainingAIFillRequest, db: Session = Depends(get_db), user: User = Depends(get_current_user)
+):
+    """Seção 12.1 — "Preencher com IA" no Novo Treinamento: só título + categoria,
+    a IA sugere objetivo/instrução discriminativa/resposta esperada/hierarquia de
+    ajuda/critério de domínio como rascunho editável (revisão humana obrigatória)."""
+    return await training_service.generate_training_ai_draft(db, payload.category_id, payload.title)
 
 
 @router.delete("/trainings/{training_id}", status_code=status.HTTP_204_NO_CONTENT)

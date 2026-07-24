@@ -38,6 +38,10 @@ class Training(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     visibility: Mapped[TrainingVisibility] = mapped_column(
         default=TrainingVisibility.SYSTEM, nullable=False
     )
+    # Seção 12.1 — "Preencher com IA" no Novo Treinamento: rascunho gerado a
+    # partir só do título/categoria, sempre com revisão humana obrigatória
+    # antes de salvar (mesma regra do Plano de Tratamento e Recursos).
+    ai_generated: Mapped[bool] = mapped_column(default=False, nullable=False)
     # System trainings are protected from deletion (Seção 12.1). Custom trainings
     # belong to a clinic or an individual professional.
     clinic_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("clinics.id"), nullable=True, index=True)

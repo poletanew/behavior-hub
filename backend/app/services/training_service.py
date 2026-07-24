@@ -9,8 +9,17 @@ from app.models.enums import TrainingLinkStatus, TrainingVisibility
 from app.models.training import Training, TrainingCategory
 from app.models.training_patient_link import TrainingPatientLink
 from app.models.user import User
-from app.schemas.training import TrainingCreateRequest, TrainingPatientLinkResponse
-from app.services import patient_service
+from app.schemas.training import TrainingAIFillResponse, TrainingCreateRequest, TrainingPatientLinkResponse
+from app.services import ai_chat_service, patient_service
+
+TRAINING_AI_FILL_SYSTEM_PROMPT = (
+    "Você ajuda a estruturar um novo treino da Biblioteca de Treino do Behavior Hub, "
+    "sistema para terapia infantil (ABA, Psicologia, Fonoaudiologia, Terapia Ocupacional "
+    "e áreas afins). Responda APENAS com um objeto JSON válido, sem markdown, sem crases, "
+    "exatamente no formato: {\"objective\": string, \"discriminative_instruction\": string, "
+    "\"expected_response\": string, \"prompt_hierarchy\": string, \"mastery_criteria\": string}. "
+    "Use linguagem de sugestão clínica revisável, nunca diagnóstico ou causalidade definitiva."
+)
 
 
 def list_categories(db: DbSession) -> list[TrainingCategory]:
@@ -46,6 +55,25 @@ def list_trainings(
     return query.order_by(Training.title).all()
 
 
+async def generate_training_ai_draft(db: DbSession, category_id: uuid.UUID, title: str) -> TrainingAIFillResponse:
+    """Seção 12.1 — "Preencher com IA" no Novo Treinamento: a partir só do título
+    e da categoria, gera um rascunho editável dos demais campos. Revisão humana
+    obrigatória antes de salvar (mesma regra do Plano de Tratamento/Recursos)."""
+    category = db.get(TrainingCategory, category_id)
+    if category is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Category not found")
+
+    user_prompt = f"Categoria: {category.name}\nTítulo do treino: {title}\n\nGere a estrutura completa deste treino."
+    draft = await ai_chat_service.generate_json(TRAINING_AI_FILL_SYSTEM_PROMPT, user_prompt)
+    return TrainingAIFillResponse(
+        objective=draft.get("objective", ""),
+        discriminative_instruction=draft.get("discriminative_instruction", ""),
+        expected_response=draft.get("expected_response", ""),
+        prompt_hierarchy=draft.get("prompt_hierarchy", ""),
+        mastery_criteria=draft.get("mastery_criteria", ""),
+    )
+
+
 def get_training_or_404(db: DbSession, training_id: uuid.UUID) -> Training:
     training = db.get(Training, training_id)
     if training is None:
@@ -72,6 +100,7 @@ def create_custom_training(db: DbSession, user: User, payload: TrainingCreateReq
         visibility=TrainingVisibility.CLINIC_SHARED if user.clinic_id else TrainingVisibility.PRIVATE,
         clinic_id=user.clinic_id,
         owner_user_id=user.id if user.clinic_id is None else None,
+        ai_generated=payload.ai_generated,
     )
     db.add(training)
     db.commit()

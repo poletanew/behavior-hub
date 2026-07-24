@@ -56,6 +56,41 @@ def test_custom_training_creation_and_deletion(client, db_session):
     assert delete_response.status_code == 204
 
 
+def test_ai_fill_training_fails_gracefully_when_not_configured(client, db_session):
+    """Seção 12.1 — "Preencher com IA" no Novo Treinamento: sem ANTHROPIC_API_KEY
+    configurada, retorna erro claro em vez de simular uma resposta."""
+    category = create_training_category(db_session)
+    ctx = register_clinic(client)
+
+    response = client.post(
+        "/v1/trainings/ai-fill",
+        json={"category_id": str(category.id), "title": "Aguardar por 30 segundos"},
+        headers=ctx["headers"],
+    )
+    assert response.status_code == 503
+    assert "ANTHROPIC_API_KEY" in response.json()["detail"]
+
+
+def test_ai_generated_training_can_be_created(client, db_session):
+    """O rascunho da IA fica editável e o profissional decide se salva com o
+    flag ai_generated marcado (mesmo padrão de Objective/Resource)."""
+    category = create_training_category(db_session)
+    ctx = register_clinic(client)
+
+    response = client.post(
+        "/v1/trainings",
+        json={
+            "category_id": str(category.id),
+            "title": "Treino gerado com IA",
+            "objective": "Objetivo sugerido pela IA",
+            "ai_generated": True,
+        },
+        headers=ctx["headers"],
+    )
+    assert response.status_code == 201
+    assert response.json()["ai_generated"] is True
+
+
 def test_link_training_to_patient_shows_as_prescribed(client, db_session):
     """Addendum v2.1, RF-10 — vincular treino cria treino "prescrito" pro paciente."""
     category = create_training_category(db_session)
