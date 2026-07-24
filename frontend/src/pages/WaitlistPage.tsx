@@ -192,7 +192,7 @@ export default function WaitlistPage() {
                     <span className="text-neutralState text-sm"> — responsável: {entry.guardian_name}</span>
                   )}
                 </div>
-                <span className={`rounded px-2 py-0.5 text-xs font-medium ${STATUS_COLORS[entry.status]}`}>
+                <span className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${STATUS_COLORS[entry.status]}`}>
                   {STATUS_LABELS[entry.status]}
                 </span>
               </div>

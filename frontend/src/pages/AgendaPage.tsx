@@ -1,6 +1,7 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { apiDownload, apiRequest, ApiError } from "../api/client";
+import ConfirmModal from "../components/ConfirmModal";
 import { useAuth } from "../context/AuthContext";
 import { Appointment, AttendanceRate, CancellationReason, Patient, Room, User as UserType } from "../types";
 
@@ -74,6 +75,7 @@ export default function AgendaPage() {
   const [attendanceRate, setAttendanceRate] = useState<AttendanceRate | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [confirmingDeleteId, setConfirmingDeleteId] = useState<string | null>(null);
   const [dragError, setDragError] = useState<string | null>(null);
 
   const [showForm, setShowForm] = useState(false);
@@ -206,7 +208,6 @@ export default function AgendaPage() {
   }
 
   async function handleDelete(id: string) {
-    if (!confirm("Excluir este compromisso da agenda? Ele ficará em Dados Excluídos por 60 dias.")) return;
     await apiRequest(`/appointments/${id}`, { method: "DELETE" });
     load();
   }
@@ -478,7 +479,7 @@ export default function AgendaPage() {
                     <div>{appointment.patient_name}</div>
                     {isClinic && <div className="text-neutralState">{appointment.professional_name}</div>}
                     {appointment.room_name && <div className="text-neutralState">Sala: {appointment.room_name}</div>}
-                    <span className={`inline-block rounded px-1.5 py-0.5 text-[10px] ${STATUS_COLORS[appointment.status]}`}>
+                    <span className={`inline-block rounded-full px-2 py-0.5 text-[10px] ${STATUS_COLORS[appointment.status]}`}>
                       {STATUS_LABELS[appointment.status]}
                     </span>
                     {appointment.cancellation_reason && (
@@ -517,7 +518,7 @@ export default function AgendaPage() {
                       </div>
                     )}
                     <div>
-                      <button onClick={() => handleDelete(appointment.id)} className="text-neutralState hover:underline">
+                      <button onClick={() => setConfirmingDeleteId(appointment.id)} className="text-neutralState hover:underline">
                         Excluir
                       </button>
                     </div>
@@ -527,6 +528,20 @@ export default function AgendaPage() {
             </div>
           ))}
         </div>
+      )}
+
+      {confirmingDeleteId && (
+        <ConfirmModal
+          title="Excluir compromisso"
+          message="Excluir este compromisso da agenda? Ele ficará em Dados Excluídos por 60 dias."
+          confirmLabel="Excluir"
+          onClose={() => setConfirmingDeleteId(null)}
+          onConfirm={() => {
+            const id = confirmingDeleteId;
+            setConfirmingDeleteId(null);
+            handleDelete(id);
+          }}
+        />
       )}
 
       {actionTarget && (

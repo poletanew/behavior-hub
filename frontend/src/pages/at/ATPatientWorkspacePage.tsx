@@ -140,7 +140,7 @@ export default function ATPatientWorkspacePage() {
                   <div>
                     <span className="font-medium">{link.training_title}</span>{" "}
                     <span
-                      className={`ml-2 rounded px-1.5 py-0.5 text-[10px] font-medium ${
+                      className={`ml-2 rounded-full px-2 py-0.5 text-[10px] font-medium ${
                         link.status === "applied" ? "bg-success/10 text-success" : "bg-brand-blueLight/20 text-brand-blue"
                       }`}
                     >

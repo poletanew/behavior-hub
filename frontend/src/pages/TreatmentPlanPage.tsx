@@ -2,6 +2,8 @@ import { FormEvent, useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { apiRequest, apiUpload, ApiError } from "../api/client";
 import AiDraftNote from "../components/AiDraftNote";
+import ConfirmModal from "../components/ConfirmModal";
+import { Sparkles } from "lucide-react";
 import {
   ApplierType,
   DuplicateCandidate,
@@ -92,6 +94,8 @@ function ObjectiveCard({
   const [applierUserId, setApplierUserId] = useState("");
   const [applierError, setApplierError] = useState<string | null>(null);
 
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
+
   const [genContext, setGenContext] = useState<GeneralizationContext>("clinica");
   const [genTestedAt, setGenTestedAt] = useState(() => new Date().toISOString().slice(0, 10));
   const [genResult, setGenResult] = useState("");
@@ -147,7 +151,6 @@ function ObjectiveCard({
   }
 
   async function handleDelete() {
-    if (!confirm("Excluir este objetivo? O histórico será mantido.")) return;
     await apiRequest(`/objectives/${objective.id}`, { method: "DELETE" });
     onChanged();
   }
@@ -216,7 +219,7 @@ function ObjectiveCard({
           <div className="font-medium text-brand-navy">
             {objective.title}
             {objective.ai_generated && (
-              <span className="ml-2 rounded px-1.5 py-0.5 text-[10px] font-medium bg-brand-turquoise/10 text-brand-turquoise align-middle">
+              <span className="ml-2 rounded-full px-2 py-0.5 text-[10px] font-medium bg-brand-turquoise/10 text-brand-turquoise align-middle">
                 Gerado por IA
               </span>
             )}
@@ -271,10 +274,23 @@ function ObjectiveCard({
                 </option>
               ))}
             </select>
-            <button onClick={handleDelete} className="h-8 text-xs text-danger px-2">
+            <button onClick={() => setConfirmingDelete(true)} className="h-8 text-xs text-danger px-2">
               Excluir
             </button>
           </div>
+
+          {confirmingDelete && (
+            <ConfirmModal
+              title="Excluir objetivo"
+              message="Excluir este objetivo? O histórico será mantido."
+              confirmLabel="Excluir"
+              onClose={() => setConfirmingDelete(false)}
+              onConfirm={() => {
+                setConfirmingDelete(false);
+                handleDelete();
+              }}
+            />
+          )}
 
           <div className="pt-3 border-t border-slate-100 mt-2">
             <div className="font-medium text-xs uppercase text-neutralState mb-2">Comentários</div>
@@ -875,9 +891,9 @@ export default function TreatmentPlanPage() {
                   type="button"
                   disabled={!aiAttachmentId || aiFilling}
                   onClick={handleAiFill}
-                  className="h-9 rounded-btn bg-white border border-slate-300 px-3 text-xs font-medium disabled:opacity-50"
+                  className="h-9 rounded-btn bg-brand-purple text-white px-3 text-xs font-medium disabled:opacity-50 flex items-center gap-1.5"
                 >
-                  {aiFilling ? "Lendo documento..." : "Preencher com IA"}
+                  <Sparkles size={13} /> {aiFilling ? "Lendo documento..." : "Preencher com IA"}
                 </button>
               </div>
               {aiError && <p className="text-danger text-xs mt-1">{aiError}</p>}

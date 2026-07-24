@@ -181,7 +181,7 @@ export default function PatientDetailPage() {
           <div className="space-y-2">
             {alerts.map((alert) => (
               <div key={alert.id} className="flex items-start gap-3 text-sm">
-                <span className={`shrink-0 rounded px-2 py-0.5 text-xs font-medium ${ALERT_COLORS[alert.alert_type]}`}>
+                <span className={`shrink-0 rounded-full px-2.5 py-0.5 text-xs font-medium ${ALERT_COLORS[alert.alert_type]}`}>
                   {ALERT_LABELS[alert.alert_type] ?? alert.alert_type}
                 </span>
                 <div>
@@ -208,7 +208,7 @@ export default function PatientDetailPage() {
                 <div key={suggestion.id} className="flex items-start justify-between gap-3 text-sm">
                   <div className="flex items-start gap-3">
                     <span
-                      className={`shrink-0 rounded px-2 py-0.5 text-xs font-medium ${SUGGESTION_COLORS[suggestion.suggestion_type]}`}
+                      className={`shrink-0 rounded-full px-2.5 py-0.5 text-xs font-medium ${SUGGESTION_COLORS[suggestion.suggestion_type]}`}
                     >
                       {SUGGESTION_LABELS[suggestion.suggestion_type] ?? suggestion.suggestion_type}
                     </span>
@@ -329,7 +329,7 @@ export default function PatientDetailPage() {
                           />
                           {training.title}
                           {link && (
-                            <span className="rounded px-1.5 py-0.5 text-[10px] font-medium bg-brand-blueLight/20 text-brand-blue">
+                            <span className="rounded-full px-2 py-0.5 text-[10px] font-medium bg-brand-blueLight/20 text-brand-blue">
                               {link.status === "applied" ? "Aplicado" : "Prescrito"}
                             </span>
                           )}

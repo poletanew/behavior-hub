@@ -1,7 +1,9 @@
 import { FormEvent, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
+import { Plus, Search, Trash2 } from "lucide-react";
 import { apiRequest, ApiError } from "../api/client";
 import EmptyState from "../components/EmptyState";
+import ConfirmModal from "../components/ConfirmModal";
 import { Patient, SchoolShift } from "../types";
 import { calculateAge, formatPhoneInput, initials, schoolShiftLabel } from "../utils/patient";
 
@@ -14,6 +16,7 @@ const SCHOOL_SHIFT_OPTIONS: { value: SchoolShift; label: string }[] = [
 
 function PatientCard({ patient, onDelete }: { patient: Patient; onDelete: (id: string) => void }) {
   const [showContact, setShowContact] = useState(false);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
   const shiftLabel = schoolShiftLabel(patient.school_shift);
   const hasContactInfo = Boolean(patient.phone || patient.address);
 
@@ -30,19 +33,24 @@ function PatientCard({ patient, onDelete }: { patient: Patient; onDelete: (id: s
           <div className="text-xs text-neutralState mt-0.5">{calculateAge(patient.birth_date)} anos</div>
         </div>
         <span
-          className={`shrink-0 rounded px-2 py-0.5 text-xs font-medium ${
+          className={`shrink-0 rounded-full px-2.5 py-0.5 text-xs font-bold ${
             patient.status === "active" ? "bg-success/10 text-success" : "bg-slate-200 text-neutralState"
           }`}
         >
           {patient.status === "active" ? "Ativo" : "Inativo"}
         </span>
+        <Trash2
+          size={15}
+          className="shrink-0 cursor-pointer text-neutralState hover:text-danger"
+          onClick={() => setConfirmingDelete(true)}
+        />
       </div>
 
       <p className="text-sm text-neutralState line-clamp-2">{patient.diagnosis || "Sem diagnóstico registrado"}</p>
 
       {patient.school_name && (
         <p className="text-xs text-neutralState">
-          {patient.school_name}
+          🏫 {patient.school_name}
           {shiftLabel ? ` · ${shiftLabel}` : ""}
         </p>
       )}
@@ -65,11 +73,18 @@ function PatientCard({ patient, onDelete }: { patient: Patient; onDelete: (id: s
         </div>
       )}
 
-      <div className="flex justify-end mt-auto pt-2 border-t border-slate-100">
-        <button onClick={() => onDelete(patient.id)} className="text-danger text-xs hover:underline">
-          Excluir
-        </button>
-      </div>
+      {confirmingDelete && (
+        <ConfirmModal
+          title="Excluir paciente"
+          message="Este paciente e todos os dados relacionados serão movidos para Dados Excluídos por 60 dias. Deseja continuar?"
+          confirmLabel="Excluir"
+          onClose={() => setConfirmingDelete(false)}
+          onConfirm={() => {
+            setConfirmingDelete(false);
+            onDelete(patient.id);
+          }}
+        />
+      )}
     </div>
   );
 }
@@ -142,9 +157,6 @@ export default function PatientsPage() {
   }
 
   async function handleDelete(patientId: string) {
-    if (!confirm("Este paciente e todos os dados relacionados serão movidos para Dados Excluídos por 60 dias. Deseja continuar?")) {
-      return;
-    }
     await apiRequest(`/patients/${patientId}`, { method: "DELETE" });
     loadPatients();
   }
@@ -157,9 +169,9 @@ export default function PatientsPage() {
         <h1 className="text-2xl font-bold text-brand-navy">Pacientes</h1>
         <button
           onClick={() => setShowForm((v) => !v)}
-          className="rounded-btn bg-brand-turquoise text-white px-4 py-2 text-sm font-medium"
+          className="rounded-btn bg-brand-turquoise text-white px-4 py-2 text-sm font-medium flex items-center gap-1.5"
         >
-          + Adicionar paciente
+          <Plus size={15} /> Adicionar paciente
         </button>
       </div>
 
@@ -257,12 +269,15 @@ export default function PatientsPage() {
         </form>
       )}
 
-      <input
-        placeholder="Buscar por nome..."
-        value={search}
-        onChange={(e) => setSearch(e.target.value)}
-        className="w-full max-w-sm h-10 rounded-btn border border-slate-300 px-3 mb-4"
-      />
+      <div className="relative w-full max-w-sm mb-4">
+        <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-neutralState" />
+        <input
+          placeholder="Buscar por nome..."
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          className="w-full h-10 rounded-btn border border-slate-300 pl-9 pr-3"
+        />
+      </div>
 
       {loading ? (
         <p className="text-neutralState">Carregando...</p>

@@ -1,4 +1,5 @@
 import { FormEvent, useEffect, useState } from "react";
+import { Link2, Plus } from "lucide-react";
 import { apiRequest, ApiError } from "../api/client";
 import { Patient, ResourceItem, ResourceLink, Training, TrainingCategory } from "../types";
 
@@ -173,9 +174,9 @@ function LinkToPatientPanel({ training }: { training: Training }) {
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="text-xs font-medium text-brand-blue underline"
+        className="text-xs font-medium text-brand-blue underline flex items-center gap-1"
       >
-        {open ? "Fechar" : "Vincular a um paciente"}
+        <Link2 size={12} /> {open ? "Fechar" : "Vincular a um paciente"}
       </button>
       {open && (
         <div className="mt-2 space-y-2">
@@ -262,9 +263,9 @@ export default function TrainingLibraryPage() {
         <h1 className="text-2xl font-bold text-brand-navy">Biblioteca de Treino</h1>
         <button
           onClick={() => setShowNewTraining((v) => !v)}
-          className="rounded-btn bg-brand-turquoise text-white px-4 py-2 text-sm font-medium"
+          className="rounded-btn bg-brand-turquoise text-white px-4 py-2 text-sm font-medium flex items-center gap-1.5"
         >
-          + Novo Treinamento
+          <Plus size={15} /> Novo Treinamento
         </button>
       </div>
 
@@ -302,18 +303,28 @@ export default function TrainingLibraryPage() {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-4">
-          {trainings.map((training) => (
-            <button
-              key={training.id}
-              onClick={() => selectTraining(training)}
-              className={`text-left bg-white rounded-card shadow-card p-4 hover:ring-2 hover:ring-brand-turquoise transition ${
-                selected?.id === training.id ? "ring-2 ring-brand-turquoise" : ""
-              }`}
-            >
-              <div className="font-semibold text-brand-navy">{training.title}</div>
-              <div className="text-xs text-neutralState mt-1 line-clamp-2">{training.objective}</div>
-            </button>
-          ))}
+          {trainings.map((training) => {
+            const categoryName = categories.find((c) => c.id === training.category_id)?.name;
+            return (
+              <button
+                key={training.id}
+                onClick={() => selectTraining(training)}
+                className={`text-left bg-white rounded-card shadow-card p-4 hover:ring-2 hover:ring-brand-turquoise transition ${
+                  selected?.id === training.id ? "ring-2 ring-brand-turquoise" : ""
+                }`}
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <div className="font-semibold text-brand-navy">{training.title}</div>
+                  {categoryName && (
+                    <span className="shrink-0 rounded-full px-2.5 py-0.5 text-[11px] font-bold bg-info/10 text-info">
+                      {categoryName}
+                    </span>
+                  )}
+                </div>
+                <div className="text-xs text-neutralState mt-1 line-clamp-2">{training.objective}</div>
+              </button>
+            );
+          })}
           {trainings.length === 0 && <p className="text-neutralState col-span-2">Nenhum treino encontrado.</p>}
         </div>
 

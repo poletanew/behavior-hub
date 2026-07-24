@@ -82,7 +82,7 @@ export default function TimelinePage() {
             const content = (
               <div className="flex items-start gap-3 px-4 py-3">
                 <span
-                  className={`shrink-0 rounded px-2 py-0.5 text-xs font-medium ${EVENT_COLORS[entry.event_type] ?? "bg-slate-200 text-neutralState"}`}
+                  className={`shrink-0 rounded-full px-2.5 py-0.5 text-xs font-medium ${EVENT_COLORS[entry.event_type] ?? "bg-slate-200 text-neutralState"}`}
                 >
                   {EVENT_LABELS[entry.event_type] ?? entry.event_type}
                 </span>

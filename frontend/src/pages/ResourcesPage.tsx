@@ -2,6 +2,8 @@ import { FormEvent, useEffect, useState } from "react";
 import { apiRequest, apiUpload, ApiError } from "../api/client";
 import EmptyState from "../components/EmptyState";
 import AiDraftNote from "../components/AiDraftNote";
+import ConfirmModal from "../components/ConfirmModal";
+import { Plus, Sparkles } from "lucide-react";
 import { AIResourceKind, ResourceAIDraft, ResourceItem, ResourceVisibility, ResourceWithUrl } from "../types";
 
 const TYPE_ICONS: Record<string, string> = { pdf: "📄", image: "🖼️", text: "📝" };
@@ -36,6 +38,7 @@ export default function ResourcesPage() {
   const [aiDraft, setAiDraft] = useState<ResourceAIDraft | null>(null);
   const [aiVisibility, setAiVisibility] = useState<ResourceVisibility>("private");
   const [aiPublishing, setAiPublishing] = useState(false);
+  const [confirmingDeleteId, setConfirmingDeleteId] = useState<string | null>(null);
 
   function load() {
     const params = new URLSearchParams();
@@ -133,7 +136,6 @@ export default function ResourcesPage() {
   }
 
   async function handleDelete(id: string) {
-    if (!confirm("Remover este recurso? Ele ficará em Dados Excluídos por 60 dias.")) return;
     await apiRequest(`/resources/${id}`, { method: "DELETE" });
     load();
   }
@@ -149,12 +151,15 @@ export default function ResourcesPage() {
               setAiDraft(null);
               setAiError(null);
             }}
-            className="rounded-btn bg-white border border-brand-turquoise text-brand-turquoise px-4 py-2 text-sm font-medium"
+            className="rounded-btn bg-brand-purple text-white px-4 py-2 text-sm font-medium flex items-center gap-1.5"
           >
-            ✨ Criar recurso com IA
+            <Sparkles size={15} /> Criar recurso com IA
           </button>
-          <button onClick={() => setShowForm((v) => !v)} className="rounded-btn bg-brand-turquoise text-white px-4 py-2 text-sm font-medium">
-            + Adicionar recurso
+          <button
+            onClick={() => setShowForm((v) => !v)}
+            className="rounded-btn bg-brand-turquoise text-white px-4 py-2 text-sm font-medium flex items-center gap-1.5"
+          >
+            <Plus size={15} /> Adicionar recurso
           </button>
         </div>
       </div>
@@ -202,9 +207,9 @@ export default function ResourcesPage() {
                 <button
                   type="submit"
                   disabled={aiGenerating}
-                  className="rounded-btn bg-brand-turquoise text-white px-4 py-2 text-sm font-medium disabled:opacity-50"
+                  className="rounded-btn bg-brand-purple text-white px-4 py-2 text-sm font-medium disabled:opacity-50 flex items-center gap-1.5"
                 >
-                  {aiGenerating ? "Gerando..." : "Gerar rascunho"}
+                  <Sparkles size={15} /> {aiGenerating ? "Gerando..." : "Gerar rascunho"}
                 </button>
                 <button
                   type="button"
@@ -338,7 +343,7 @@ export default function ResourcesPage() {
               <div className="font-medium text-brand-navy">
                 {resource.title}
                 {resource.ai_generated && (
-                  <span className="ml-2 rounded px-1.5 py-0.5 text-[10px] font-medium bg-brand-turquoise/10 text-brand-turquoise align-middle">
+                  <span className="ml-2 rounded-full px-2 py-0.5 text-[10px] font-medium bg-brand-turquoise/10 text-brand-turquoise align-middle">
                     Gerado por IA
                   </span>
                 )}
@@ -348,13 +353,27 @@ export default function ResourcesPage() {
                 <button onClick={() => openResource(resource.id)} className="text-brand-blue underline">
                   Abrir
                 </button>
-                <button onClick={() => handleDelete(resource.id)} className="text-danger underline">
+                <button onClick={() => setConfirmingDeleteId(resource.id)} className="text-danger underline">
                   Excluir
                 </button>
               </div>
             </div>
           ))}
         </div>
+      )}
+
+      {confirmingDeleteId && (
+        <ConfirmModal
+          title="Remover recurso"
+          message="Remover este recurso? Ele ficará em Dados Excluídos por 60 dias."
+          confirmLabel="Remover"
+          onClose={() => setConfirmingDeleteId(null)}
+          onConfirm={() => {
+            const id = confirmingDeleteId;
+            setConfirmingDeleteId(null);
+            handleDelete(id);
+          }}
+        />
       )}
 
       {viewing && (
