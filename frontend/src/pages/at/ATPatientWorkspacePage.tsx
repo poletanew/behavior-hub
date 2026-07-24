@@ -42,7 +42,7 @@ function TrialRegistrationCard({ sessionTrainingId, trainingTitle }: { sessionTr
   if (!progress) return null;
 
   return (
-    <div className="bg-white rounded-card shadow-sm p-6 mb-6">
+    <div className="bg-white rounded-card shadow-card p-6 mb-6">
       <h3 className="font-semibold text-brand-navy mb-3">Treino: {trainingTitle}</h3>
       <ul className="space-y-2 mb-4">
         {progress.trials.map((trial) => (
@@ -131,7 +131,7 @@ export default function ATPatientWorkspacePage() {
       ) : links.length === 0 ? (
         <EmptyState icon="🎯" message="Nenhum treino prescrito para este paciente ainda." />
       ) : (
-        <div className="bg-white rounded-card shadow-sm divide-y divide-slate-100 mb-6">
+        <div className="bg-white rounded-card shadow-card divide-y divide-slate-100 mb-6">
           {links.map((link) => {
             const sessionTraining = activeSession?.trainings.find((t) => t.training_id === link.training_id);
             return (

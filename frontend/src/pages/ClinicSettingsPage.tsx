@@ -247,7 +247,7 @@ export default function ClinicSettingsPage() {
       {loading || !settings ? (
         <p className="text-neutralState">Carregando...</p>
       ) : (
-        <div className="bg-white rounded-card shadow-sm divide-y divide-slate-100 max-w-2xl">
+        <div className="bg-white rounded-card shadow-card divide-y divide-slate-100 max-w-2xl">
           {TOGGLES.map((toggle) => (
             <div key={toggle.key} className="flex items-start justify-between gap-4 px-6 py-4">
               <div>
@@ -287,7 +287,7 @@ export default function ClinicSettingsPage() {
       {thresholdMessage && <p className="text-success text-sm mb-4">{thresholdMessage}</p>}
 
       {settings && (
-        <div className="bg-white rounded-card shadow-sm divide-y divide-slate-100 max-w-2xl">
+        <div className="bg-white rounded-card shadow-card divide-y divide-slate-100 max-w-2xl">
           {THRESHOLD_FIELDS.map((field) => (
             <div key={field.key} className="flex items-center justify-between gap-4 px-6 py-4">
               <div>
@@ -325,7 +325,7 @@ export default function ClinicSettingsPage() {
       {bulkImportError && <p className="text-danger text-sm mb-4">{bulkImportError}</p>}
 
       {settings && (
-        <div className="bg-white rounded-card shadow-sm max-w-2xl">
+        <div className="bg-white rounded-card shadow-card max-w-2xl">
           <div className="flex items-start justify-between gap-4 px-6 py-4">
             <div>
               <div className="font-medium text-sm">Mostrar "Importar Pacientes" no menu</div>
@@ -355,7 +355,7 @@ export default function ClinicSettingsPage() {
         não pode ter dois atendimentos sobrepostos (Addendum v3.0, RF-26).
       </p>
       {roomError && <p className="text-danger text-sm mb-4">{roomError}</p>}
-      <div className="bg-white rounded-card shadow-sm max-w-2xl divide-y divide-slate-100">
+      <div className="bg-white rounded-card shadow-card max-w-2xl divide-y divide-slate-100">
         {rooms.map((room) => (
           <div key={room.id} className="flex items-center justify-between gap-4 px-6 py-3">
             <span className="text-sm font-medium">{room.name}</span>

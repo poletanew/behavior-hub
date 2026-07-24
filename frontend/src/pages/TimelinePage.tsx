@@ -76,7 +76,7 @@ export default function TimelinePage() {
       ) : entries.length === 0 ? (
         <EmptyState icon="🕒" message="Nenhum evento registrado ainda para este paciente." />
       ) : (
-        <div className="bg-white rounded-card shadow-sm divide-y divide-slate-100">
+        <div className="bg-white rounded-card shadow-card divide-y divide-slate-100">
           {entries.map((entry) => {
             const link = patientId ? sourceLink(patientId, entry) : null;
             const content = (

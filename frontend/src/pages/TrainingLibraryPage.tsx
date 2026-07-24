@@ -45,7 +45,7 @@ function NewTrainingForm({
   }
 
   return (
-    <form onSubmit={handleSubmit} className="bg-white rounded-card shadow-sm p-6 mb-6 space-y-4 max-w-xl">
+    <form onSubmit={handleSubmit} className="bg-white rounded-card shadow-card p-6 mb-6 space-y-4 max-w-xl">
       <div>
         <label className="block text-sm font-medium mb-1">Categoria</label>
         <select
@@ -306,7 +306,7 @@ export default function TrainingLibraryPage() {
             <button
               key={training.id}
               onClick={() => selectTraining(training)}
-              className={`text-left bg-white rounded-card shadow-sm p-4 hover:ring-2 hover:ring-brand-turquoise transition ${
+              className={`text-left bg-white rounded-card shadow-card p-4 hover:ring-2 hover:ring-brand-turquoise transition ${
                 selected?.id === training.id ? "ring-2 ring-brand-turquoise" : ""
               }`}
             >
@@ -319,7 +319,7 @@ export default function TrainingLibraryPage() {
 
         <div>
           {selected ? (
-            <div className="bg-white rounded-card shadow-sm p-6 sticky top-6 space-y-3 text-sm">
+            <div className="bg-white rounded-card shadow-card p-6 sticky top-6 space-y-3 text-sm">
               <h2 className="font-bold text-brand-navy text-lg">{selected.title}</h2>
               <p>
                 <span className="font-medium">Objetivo:</span> {selected.objective}
@@ -397,7 +397,7 @@ export default function TrainingLibraryPage() {
               <LinkToPatientPanel training={selected} />
             </div>
           ) : (
-            <div className="bg-white rounded-card shadow-sm p-6 text-neutralState text-sm">
+            <div className="bg-white rounded-card shadow-card p-6 text-neutralState text-sm">
               Selecione um treino para ver os detalhes.
             </div>
           )}

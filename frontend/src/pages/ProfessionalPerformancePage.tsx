@@ -72,7 +72,7 @@ export default function ProfessionalPerformancePage() {
         realizadas, consistência de registro, percentual médio de acerto e eficiência do aplicador.
       </p>
 
-      <div className="bg-white rounded-card shadow-sm p-4 mb-6 flex flex-wrap gap-4 items-end">
+      <div className="bg-white rounded-card shadow-card p-4 mb-6 flex flex-wrap gap-4 items-end">
         <div>
           <label className="block text-xs font-medium mb-1">De</label>
           <input
@@ -94,24 +94,24 @@ export default function ProfessionalPerformancePage() {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="bg-white rounded-card shadow-sm p-4">
+        <div className="bg-white rounded-card shadow-card p-4">
           <div className="text-xs text-neutralState uppercase font-semibold mb-1">Atendimentos realizados</div>
           <div className="text-2xl font-bold text-brand-navy">{data.sessions_count}</div>
         </div>
-        <div className="bg-white rounded-card shadow-sm p-4">
+        <div className="bg-white rounded-card shadow-card p-4">
           <div className="text-xs text-neutralState uppercase font-semibold mb-1">Consistência de registro</div>
           <div className="text-2xl font-bold text-brand-navy">
             {data.registration_consistency_pct === null ? "—" : `${data.registration_consistency_pct}%`}
           </div>
           <div className="text-xs text-neutralState mt-1">Sessões com ao menos uma tentativa registrada</div>
         </div>
-        <div className="bg-white rounded-card shadow-sm p-4">
+        <div className="bg-white rounded-card shadow-card p-4">
           <div className="text-xs text-neutralState uppercase font-semibold mb-1">Percentual médio de acerto</div>
           <div className="text-2xl font-bold text-brand-navy">
             {data.average_accuracy_pct === null ? "—" : `${data.average_accuracy_pct}%`}
           </div>
         </div>
-        <div className="bg-white rounded-card shadow-sm p-4">
+        <div className="bg-white rounded-card shadow-card p-4">
           <div className="text-xs text-neutralState uppercase font-semibold mb-1">Eficiência do aplicador</div>
           <div className="flex items-center gap-2">
             {data.applier_efficiency_label ? (

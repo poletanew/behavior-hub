@@ -1,6 +1,7 @@
 import { FormEvent, useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { apiRequest, apiUpload, ApiError } from "../api/client";
+import AiDraftNote from "../components/AiDraftNote";
 import {
   ApplierType,
   DuplicateCandidate,
@@ -209,7 +210,7 @@ function ObjectiveCard({
   const activeFamilyAccesses = familyAccesses.filter((a) => !a.revoked_at);
 
   return (
-    <div className="bg-white rounded-card shadow-sm p-4 mb-3">
+    <div className="bg-white rounded-card shadow-card p-4 mb-3">
       <div className="flex items-start justify-between gap-2">
         <div>
           <div className="font-medium text-brand-navy">
@@ -802,7 +803,7 @@ export default function TreatmentPlanPage() {
       </div>
 
       {showForm && (
-        <form onSubmit={handleSubmit} className="bg-white rounded-card shadow-sm p-6 mb-6 space-y-4 max-w-xl">
+        <form onSubmit={handleSubmit} className="bg-white rounded-card shadow-card p-6 mb-6 space-y-4 max-w-xl">
           {duplicateCandidates && duplicateCandidates.length > 0 && (
             <div className="bg-warning/10 border border-warning rounded-card p-4 text-sm">
               <p className="font-medium mb-2">
@@ -880,11 +881,7 @@ export default function TreatmentPlanPage() {
                 </button>
               </div>
               {aiError && <p className="text-danger text-xs mt-1">{aiError}</p>}
-              {aiGenerated && (
-                <p className="text-xs text-brand-turquoise font-medium mt-2">
-                  Gerado por IA — revise os campos abaixo antes de salvar.
-                </p>
-              )}
+              {aiGenerated && <AiDraftNote />}
               {aiExtractionNote && <p className="text-xs text-warning mt-1">{aiExtractionNote}</p>}
             </div>
           )}
@@ -949,7 +946,7 @@ export default function TreatmentPlanPage() {
       {patient && (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
           {areasToShow.map((areaKey) => (
-            <div key={areaKey} className="bg-white rounded-card shadow-sm p-4">
+            <div key={areaKey} className="bg-white rounded-card shadow-card p-4">
               <h2 className="font-semibold text-brand-navy mb-2">{AREA_LABELS[areaKey]}</h2>
               {(objectivesByArea[areaKey] || []).map((objective) => (
                 <div key={objective.id}>

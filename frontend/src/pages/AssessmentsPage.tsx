@@ -3,6 +3,7 @@ import { Link, useParams } from "react-router-dom";
 import { Bar, BarChart, CartesianGrid, Legend, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { apiRequest } from "../api/client";
 import EmptyState from "../components/EmptyState";
+import AiDraftNote from "../components/AiDraftNote";
 import {
   Assessment,
   AssessmentComparison,
@@ -23,7 +24,7 @@ const COMPARE_CHART_COLORS = ["#3B82F6", "#14B8A6", "#F59E0B", "#8B5CF6"];
 
 function DomainChart({ assessment }: { assessment: Assessment }) {
   return (
-    <div className="bg-white rounded-card shadow-sm p-6 mb-6">
+    <div className="bg-white rounded-card shadow-card p-6 mb-6">
       <h2 className="font-semibold text-brand-navy mb-3">
         Gráfico de domínios — {new Date(assessment.applied_date).toLocaleDateString("pt-BR")}
       </h2>
@@ -229,7 +230,7 @@ export default function AssessmentsPage() {
       </div>
 
       {showForm && activeProtocolDef && (
-        <form onSubmit={handleCreate} className="bg-white rounded-card shadow-sm p-6 mb-6 space-y-4">
+        <form onSubmit={handleCreate} className="bg-white rounded-card shadow-card p-6 mb-6 space-y-4">
           {priorAssessmentsOfProtocol.length > 0 && (
             <div className="bg-brand-grayLight rounded-btn p-3 flex items-center justify-between">
               <p className="text-xs text-neutralState">
@@ -308,7 +309,7 @@ export default function AssessmentsPage() {
       {assessmentsOfProtocol.length === 0 ? (
         <EmptyState icon="🧩" message={`Nenhuma avaliação ${PROTOCOL_LABELS[protocol]} registrada ainda.`} />
       ) : (
-        <div className="bg-white rounded-card shadow-sm divide-y divide-slate-100 mb-6">
+        <div className="bg-white rounded-card shadow-card divide-y divide-slate-100 mb-6">
           {assessmentsOfProtocol.map((a) => (
             <div key={a.id} className="flex items-center gap-3 px-4 py-3 text-sm hover:bg-slate-50">
               <input
@@ -349,15 +350,11 @@ export default function AssessmentsPage() {
       {chartAssessment && <DomainChart assessment={chartAssessment} />}
 
       {draftAssessment && (
-        <div className="bg-white rounded-card shadow-sm p-6 mb-6">
-          <div className="flex items-center justify-between mb-1">
-            <h2 className="font-semibold text-brand-navy">
-              Rascunho de Plano de Tratamento — {new Date(draftAssessment.applied_date).toLocaleDateString("pt-BR")}
-            </h2>
-            <span className="text-[10px] uppercase font-semibold px-2 py-1 rounded-full bg-brand-turquoise/10 text-brand-turquoise">
-              Gerado por IA — revise antes de ativar
-            </span>
-          </div>
+        <div className="bg-white rounded-card shadow-card p-6 mb-6">
+          <h2 className="font-semibold text-brand-navy mb-1">
+            Rascunho de Plano de Tratamento — {new Date(draftAssessment.applied_date).toLocaleDateString("pt-BR")}
+          </h2>
+          <AiDraftNote />
           <p className="text-xs text-neutralState mb-4">
             Objetivos sugeridos a partir dos domínios de menor desempenho desta avaliação. Edite os
             campos livremente antes de ativar — nada é adicionado ao plano de tratamento do paciente
@@ -420,7 +417,7 @@ export default function AssessmentsPage() {
       )}
 
       {folderAssessment && (
-        <div className="bg-white rounded-card shadow-sm p-6 mb-6">
+        <div className="bg-white rounded-card shadow-card p-6 mb-6">
           <div className="flex items-center justify-between mb-1">
             <h2 className="font-semibold text-brand-navy">
               Pasta de treinos sugerida — {new Date(folderAssessment.applied_date).toLocaleDateString("pt-BR")}
@@ -497,7 +494,7 @@ export default function AssessmentsPage() {
       )}
 
       {comparison && (
-        <div className="bg-white rounded-card shadow-sm p-6">
+        <div className="bg-white rounded-card shadow-card p-6">
           <div className="flex items-center justify-between mb-3">
             <h2 className="font-semibold text-brand-navy">
               Comparação de {comparison.applied_dates.length} avaliações:{" "}

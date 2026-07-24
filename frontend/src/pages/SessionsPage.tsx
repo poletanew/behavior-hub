@@ -93,7 +93,7 @@ export default function SessionsPage() {
       </div>
 
       {showForm && (
-        <form onSubmit={handleCreateSession} className="bg-white rounded-card shadow-sm p-6 mb-6 space-y-4">
+        <form onSubmit={handleCreateSession} className="bg-white rounded-card shadow-card p-6 mb-6 space-y-4">
           {prefillAppointmentId && (
             <div className="bg-brand-grayLight border border-brand-blueLight rounded-btn p-3 text-sm">
               Concluindo o atendimento agendado na Agenda. Ao salvar, o compromisso será marcado como realizado.
@@ -184,7 +184,7 @@ export default function SessionsPage() {
       ) : sessions.length === 0 ? (
         <EmptyState icon="🗒️" message="Nenhuma sessão registrada ainda." />
       ) : (
-        <div className="bg-white rounded-card shadow-sm divide-y divide-slate-100">
+        <div className="bg-white rounded-card shadow-card divide-y divide-slate-100">
           {sessions.map((session) => {
             const patient = patients.find((p) => p.id === session.patient_id);
             return (

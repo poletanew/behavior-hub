@@ -165,7 +165,7 @@ export default function ReportsPage() {
         </div>
       </div>
 
-      <div className="flex flex-wrap gap-3 mb-6 bg-white rounded-card shadow-sm p-4">
+      <div className="flex flex-wrap gap-3 mb-6 bg-white rounded-card shadow-card p-4">
         <div>
           <label className="block text-xs font-medium mb-1">De</label>
           <input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} className="h-9 rounded-btn border border-slate-300 px-2 text-sm" />
@@ -198,7 +198,7 @@ export default function ReportsPage() {
         </div>
       </div>
 
-      <div className="bg-white rounded-card shadow-sm p-6 mb-6">
+      <div className="bg-white rounded-card shadow-card p-6 mb-6">
         <div className="flex items-center justify-between mb-3">
           <h2 className="font-semibold text-brand-navy">Resumo</h2>
           <span className="text-[10px] uppercase font-semibold px-2 py-1 rounded-full bg-warning/10 text-warning">
@@ -234,7 +234,7 @@ export default function ReportsPage() {
         )}
       </div>
 
-      <div className="bg-white rounded-card shadow-sm p-6 mb-6">
+      <div className="bg-white rounded-card shadow-card p-6 mb-6">
         <h3 className="font-semibold text-brand-navy mb-1">Heatmap de habilidades</h3>
         <p className="text-xs text-neutralState mb-4">
           Intensidade de treino por área nos últimos 30 dias (Seção 29.3) — sempre considera os últimos 30 dias
@@ -268,7 +268,7 @@ export default function ReportsPage() {
         <EmptyState icon="📊" message="Nenhuma tentativa registrada para os filtros selecionados." />
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <div className="bg-white rounded-card shadow-sm p-6">
+          <div className="bg-white rounded-card shadow-card p-6">
             <h3 className="font-semibold text-brand-navy">Curva de Aprendizagem</h3>
             <p className="text-xs text-neutralState mb-2">Evolução do percentual de acerto</p>
             {data.line.map((series) => (
@@ -288,7 +288,7 @@ export default function ReportsPage() {
             ))}
           </div>
 
-          <div className="bg-white rounded-card shadow-sm p-6">
+          <div className="bg-white rounded-card shadow-card p-6">
             <h3 className="font-semibold text-brand-navy mb-2">Comparação entre treinos</h3>
             <ResponsiveContainer width="100%" height={220}>
               <BarChart data={data.bar}>
@@ -301,7 +301,7 @@ export default function ReportsPage() {
             </ResponsiveContainer>
           </div>
 
-          <div className="bg-white rounded-card shadow-sm p-6">
+          <div className="bg-white rounded-card shadow-card p-6">
             <h3 className="font-semibold text-brand-navy mb-2">Distribuição de níveis de ajuda por sessão</h3>
             <ResponsiveContainer width="100%" height={220}>
               <BarChart data={stackedBarData}>
@@ -317,7 +317,7 @@ export default function ReportsPage() {
             </ResponsiveContainer>
           </div>
 
-          <div className="bg-white rounded-card shadow-sm p-6">
+          <div className="bg-white rounded-card shadow-card p-6">
             <h3 className="font-semibold text-brand-navy mb-2">Distribuição de resultados</h3>
             <ResponsiveContainer width="100%" height={220}>
               <PieChart>
@@ -332,7 +332,7 @@ export default function ReportsPage() {
             </ResponsiveContainer>
           </div>
 
-          <div className="bg-white rounded-card shadow-sm p-6">
+          <div className="bg-white rounded-card shadow-card p-6">
             <h3 className="font-semibold text-brand-navy mb-2">Visão resumida por área (radar)</h3>
             {data.radar.some((r) => r.insufficient_data) && (
               <p className="text-xs text-warning mb-2">
@@ -349,7 +349,7 @@ export default function ReportsPage() {
             </ResponsiveContainer>
           </div>
 
-          <div className="bg-white rounded-card shadow-sm p-6">
+          <div className="bg-white rounded-card shadow-card p-6">
             <h3 className="font-semibold text-brand-navy mb-2">Avanço acumulado</h3>
             <ResponsiveContainer width="100%" height={220}>
               <LineChart data={data.cumulative}>
@@ -369,7 +369,7 @@ export default function ReportsPage() {
       {(data.behavior_frequency.length > 0 || data.reinforcer_usage.length > 0) && (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
           {data.behavior_frequency.length > 0 && (
-            <div className="bg-white rounded-card shadow-sm p-6">
+            <div className="bg-white rounded-card shadow-card p-6">
               <h3 className="font-semibold text-brand-navy mb-2">Comportamentos interferentes</h3>
               <p className="text-xs text-neutralState mb-2">
                 Frequência e duração ao longo do tempo (Addendum v3.0, RF-34) — idealmente mostrando
@@ -398,7 +398,7 @@ export default function ReportsPage() {
           )}
 
           {data.reinforcer_usage.length > 0 && (
-            <div className="bg-white rounded-card shadow-sm p-6">
+            <div className="bg-white rounded-card shadow-card p-6">
               <h3 className="font-semibold text-brand-navy mb-2">Reforçadores mais usados</h3>
               <p className="text-xs text-neutralState mb-2">
                 Frequência de uso de cada reforçador cadastrado no período (Addendum v3.0, RF-34).

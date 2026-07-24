@@ -1,6 +1,7 @@
 import { FormEvent, useEffect, useState } from "react";
 import { apiRequest, apiUpload, ApiError } from "../api/client";
 import EmptyState from "../components/EmptyState";
+import AiDraftNote from "../components/AiDraftNote";
 import { AIResourceKind, ResourceAIDraft, ResourceItem, ResourceVisibility, ResourceWithUrl } from "../types";
 
 const TYPE_ICONS: Record<string, string> = { pdf: "📄", image: "🖼️", text: "📝" };
@@ -159,7 +160,7 @@ export default function ResourcesPage() {
       </div>
 
       {showAiForm && (
-        <div className="bg-white rounded-card shadow-sm p-6 mb-6 max-w-lg">
+        <div className="bg-white rounded-card shadow-card p-6 mb-6 max-w-lg">
           {!aiDraft ? (
             <form onSubmit={handleGenerateAiDraft} className="space-y-4">
               <div>
@@ -216,9 +217,7 @@ export default function ResourcesPage() {
             </form>
           ) : (
             <div className="space-y-4">
-              <span className="inline-block text-[10px] uppercase font-semibold px-2 py-1 rounded-full bg-brand-turquoise/10 text-brand-turquoise">
-                Gerado por IA — revise antes de publicar
-              </span>
+              <AiDraftNote />
               <div>
                 <label className="block text-sm font-medium mb-1">Título</label>
                 <input
@@ -277,7 +276,7 @@ export default function ResourcesPage() {
       )}
 
       {showForm && (
-        <form onSubmit={handleUpload} className="bg-white rounded-card shadow-sm p-6 mb-6 space-y-4 max-w-lg">
+        <form onSubmit={handleUpload} className="bg-white rounded-card shadow-card p-6 mb-6 space-y-4 max-w-lg">
           <div>
             <label className="block text-sm font-medium mb-1">Título</label>
             <input required value={title} onChange={(e) => setTitle(e.target.value)} className="w-full h-10 rounded-btn border border-slate-300 px-3" />
@@ -334,7 +333,7 @@ export default function ResourcesPage() {
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {resources.map((resource) => (
-            <div key={resource.id} className="bg-white rounded-card shadow-sm p-4">
+            <div key={resource.id} className="bg-white rounded-card shadow-card p-4">
               <div className="text-3xl mb-2">{TYPE_ICONS[resource.resource_type]}</div>
               <div className="font-medium text-brand-navy">
                 {resource.title}

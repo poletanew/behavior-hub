@@ -14,7 +14,7 @@ const ANSWER_TYPE_LABELS: Record<ChecklistAnswerType, string> = {
 function ResponseDetailCard({ response }: { response: ChecklistResponseDetail }) {
   const scaleItems = response.items.filter((i) => i.answer_type === "scale");
   return (
-    <div className="bg-white rounded-card shadow-sm p-6 mb-6">
+    <div className="bg-white rounded-card shadow-card p-6 mb-6">
       <h3 className="font-semibold text-brand-navy mb-1">{response.template_title}</h3>
       <p className="text-xs text-neutralState mb-4">{new Date(response.applied_at).toLocaleString("pt-BR")}</p>
 
@@ -157,7 +157,7 @@ export default function ChecklistsPage() {
       </p>
 
       {showBuilder && (
-        <form onSubmit={handleCreateTemplate} className="bg-white rounded-card shadow-sm p-6 mb-6 space-y-4">
+        <form onSubmit={handleCreateTemplate} className="bg-white rounded-card shadow-card p-6 mb-6 space-y-4">
           <div>
             <label className="block text-sm font-medium mb-1">Título do checklist</label>
             <input
@@ -203,7 +203,7 @@ export default function ChecklistsPage() {
       )}
 
       {showApply && (
-        <form onSubmit={handleApply} className="bg-white rounded-card shadow-sm p-6 mb-6 space-y-4">
+        <form onSubmit={handleApply} className="bg-white rounded-card shadow-card p-6 mb-6 space-y-4">
           <div>
             <label className="block text-sm font-medium mb-1">Checklist</label>
             <select

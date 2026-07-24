@@ -33,7 +33,7 @@ export default function ATPatientsPage() {
             <Link
               key={patient.id}
               to={`/at/patients/${patient.id}`}
-              className="bg-white rounded-card shadow-sm p-5 hover:ring-2 hover:ring-brand-turquoise transition"
+              className="bg-white rounded-card shadow-card p-5 hover:ring-2 hover:ring-brand-turquoise transition"
             >
               <div className="font-semibold text-brand-navy">{patient.name}</div>
               <div className="text-xs text-neutralState mt-1">{calculateAge(patient.birth_date)} anos</div>

@@ -41,7 +41,7 @@ export default function DeletedDataPage() {
       ) : items.length === 0 ? (
         <EmptyState icon="🗂️" message="Nenhum registro em Dados Excluídos." />
       ) : (
-        <div className="bg-white rounded-card shadow-sm overflow-hidden">
+        <div className="bg-white rounded-card shadow-card overflow-hidden">
           <table className="w-full text-sm">
             <thead className="bg-brand-navy text-white">
               <tr>

@@ -40,7 +40,7 @@ function ChangeNameForm() {
   }
 
   return (
-    <div className="bg-white rounded-card shadow-sm p-6 max-w-xl space-y-3">
+    <div className="bg-white rounded-card shadow-card p-6 max-w-xl space-y-3">
       <h2 className="font-semibold text-brand-navy">Nome de usuário</h2>
       {message && <p className="text-success text-sm animate-pop-in">{message}</p>}
       {error && <p className="text-danger text-sm">{error}</p>}
@@ -103,7 +103,7 @@ function ChangePasswordForm() {
   }
 
   return (
-    <div className="bg-white rounded-card shadow-sm p-6 max-w-xl space-y-3">
+    <div className="bg-white rounded-card shadow-card p-6 max-w-xl space-y-3">
       <h2 className="font-semibold text-brand-navy">Senha</h2>
       <p className="text-xs text-neutralState">
         Trocar a senha encerra imediatamente as demais sessões ativas desta conta.
@@ -223,7 +223,7 @@ export default function SecurityPage() {
       {message && <p className="text-success text-sm mb-4 animate-pop-in">{message}</p>}
       {error && <p className="text-danger text-sm mb-4">{error}</p>}
 
-      <div className="bg-white rounded-card shadow-sm p-6 max-w-xl space-y-4">
+      <div className="bg-white rounded-card shadow-card p-6 max-w-xl space-y-4">
         {!status ? (
           <p className="text-neutralState">Carregando...</p>
         ) : status.is_2fa_enabled ? (

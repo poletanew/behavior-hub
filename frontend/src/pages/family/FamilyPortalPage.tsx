@@ -78,7 +78,7 @@ export default function FamilyPortalPage() {
   if (accesses.length === 0) {
     return (
       <div className="p-8">
-        <div className="bg-white rounded-card shadow-sm p-8 text-center text-neutralState max-w-lg mx-auto">
+        <div className="bg-white rounded-card shadow-card p-8 text-center text-neutralState max-w-lg mx-auto">
           Você ainda não tem acesso liberado a nenhum paciente no Portal da Família. Fale com a equipe
           responsável pelo atendimento.
         </div>
@@ -121,7 +121,7 @@ export default function FamilyPortalPage() {
       )}
 
       {tabs.length === 0 ? (
-        <div className="bg-white rounded-card shadow-sm p-8 text-center text-neutralState">
+        <div className="bg-white rounded-card shadow-card p-8 text-center text-neutralState">
           Nenhuma categoria de dados foi liberada para este paciente ainda.
         </div>
       ) : (
@@ -165,7 +165,7 @@ function EvolutionTab({ patientId }: { patientId: string }) {
 
   return (
     <div className="space-y-6">
-      <div className="bg-white rounded-card shadow-sm p-6">
+      <div className="bg-white rounded-card shadow-card p-6">
         <h2 className="font-semibold text-brand-navy mb-3">Evolução por treino</h2>
         {data.line.length === 0 && <p className="text-sm text-neutralState">Sem dados suficientes ainda.</p>}
         {data.line.map((series) => (
@@ -177,7 +177,7 @@ function EvolutionTab({ patientId }: { patientId: string }) {
           </div>
         ))}
       </div>
-      <div className="bg-white rounded-card shadow-sm p-6">
+      <div className="bg-white rounded-card shadow-card p-6">
         <h2 className="font-semibold text-brand-navy mb-3">Visão geral por área</h2>
         {data.radar.map((r) => (
           <div key={r.area} className="flex justify-between text-sm py-1">
@@ -198,7 +198,7 @@ function AppointmentsTab({ patientId }: { patientId: string }) {
   }, [patientId]);
 
   return (
-    <div className="bg-white rounded-card shadow-sm divide-y divide-slate-100">
+    <div className="bg-white rounded-card shadow-card divide-y divide-slate-100">
       {appointments.length === 0 && <p className="p-6 text-center text-neutralState">Nenhum agendamento futuro.</p>}
       {appointments.map((a) => (
         <div key={a.id} className="px-4 py-3 flex justify-between text-sm">
@@ -220,12 +220,12 @@ function GuidanceTab({ patientId }: { patientId: string }) {
   return (
     <div className="space-y-4">
       {guidance.length === 0 && (
-        <div className="bg-white rounded-card shadow-sm p-6 text-center text-neutralState">
+        <div className="bg-white rounded-card shadow-card p-6 text-center text-neutralState">
           Nenhuma orientação publicada ainda.
         </div>
       )}
       {guidance.map((g) => (
-        <div key={g.id} className="bg-white rounded-card shadow-sm p-6">
+        <div key={g.id} className="bg-white rounded-card shadow-card p-6">
           <div className="text-xs text-neutralState mb-2">
             {g.period_start} a {g.period_end}
           </div>
@@ -246,7 +246,7 @@ function MaterialsTab({ patientId }: { patientId: string }) {
   }, [patientId]);
 
   return (
-    <div className="bg-white rounded-card shadow-sm divide-y divide-slate-100">
+    <div className="bg-white rounded-card shadow-card divide-y divide-slate-100">
       {materials.length === 0 && <p className="p-6 text-center text-neutralState">Nenhum material recomendado ainda.</p>}
       {materials.map((m) => (
         <div key={m.id} className="px-4 py-3 text-sm">
@@ -290,12 +290,12 @@ function ProgramsTab({ patientId }: { patientId: string }) {
         Objetivos em que você foi marcado como aplicador. Registre aqui quando aplicar em casa.
       </p>
       {objectives.length === 0 && (
-        <div className="bg-white rounded-card shadow-sm p-6 text-center text-neutralState">
+        <div className="bg-white rounded-card shadow-card p-6 text-center text-neutralState">
           Você ainda não foi marcado como aplicador de nenhum objetivo.
         </div>
       )}
       {objectives.map((o) => (
-        <div key={o.objective_id} className="bg-white rounded-card shadow-sm p-6">
+        <div key={o.objective_id} className="bg-white rounded-card shadow-card p-6">
           <div className="flex items-start justify-between gap-2 mb-2">
             <div className="font-medium text-brand-navy">{o.title}</div>
             {o.applied_today && (
@@ -345,7 +345,7 @@ function MessagesTab({ patientId }: { patientId: string }) {
 
   return (
     <div className="space-y-6">
-      <div className="bg-white rounded-card shadow-sm p-6 flex flex-col h-[28rem]">
+      <div className="bg-white rounded-card shadow-card p-6 flex flex-col h-[28rem]">
         <div className="flex-1 overflow-y-auto space-y-3 mb-4">
           {messages.length === 0 && <p className="text-center text-neutralState">Nenhuma mensagem ainda.</p>}
           {messages.map((m) => (
@@ -396,7 +396,7 @@ function AudioMessagesPanel({ patientId }: { patientId: string }) {
   }
 
   return (
-    <div className="bg-white rounded-card shadow-sm p-6">
+    <div className="bg-white rounded-card shadow-card p-6">
       <h2 className="font-semibold text-brand-navy mb-1">Notas de voz</h2>
       <p className="text-xs text-neutralState mb-4">
         Fale e o texto é transcrito automaticamente no seu navegador antes de enviar — nenhum áudio é gravado.
@@ -454,7 +454,7 @@ function RoutineTab({ patientId }: { patientId: string }) {
 
   return (
     <div className="space-y-4">
-      <div className="bg-white rounded-card shadow-sm p-6">
+      <div className="bg-white rounded-card shadow-card p-6">
         <h2 className="font-semibold text-brand-navy mb-1">Registrar rotina</h2>
         <p className="text-sm text-neutralState mb-4">
           Sono, alimentação, humor ou qualquer evento importante antes do próximo atendimento.
@@ -476,12 +476,12 @@ function RoutineTab({ patientId }: { patientId: string }) {
       </div>
 
       {logs.length === 0 ? (
-        <div className="bg-white rounded-card shadow-sm p-8 text-center text-neutralState">
+        <div className="bg-white rounded-card shadow-card p-8 text-center text-neutralState">
           Nenhum registro de rotina enviado ainda.
         </div>
       ) : (
         logs.map((log) => (
-          <div key={log.id} className="bg-white rounded-card shadow-sm p-6">
+          <div key={log.id} className="bg-white rounded-card shadow-card p-6">
             <div className="text-xs text-neutralState mb-2">
               {log.submitted_by_name} — {formatDateTime(log.created_at)}
             </div>

@@ -67,7 +67,7 @@ export default function InvitationsPage() {
     <div>
       <h1 className="text-2xl font-bold text-brand-navy mb-6">Profissionais — Convites</h1>
 
-      <form onSubmit={handleCreate} className="bg-white rounded-card shadow-sm p-6 mb-6 flex gap-3 items-end max-w-lg">
+      <form onSubmit={handleCreate} className="bg-white rounded-card shadow-card p-6 mb-6 flex gap-3 items-end max-w-lg">
         <div className="flex-1">
           <label className="block text-sm font-medium mb-1">E-mail do profissional</label>
           <input
@@ -118,7 +118,7 @@ export default function InvitationsPage() {
         </div>
       )}
 
-      <div className="bg-white rounded-card shadow-sm overflow-hidden">
+      <div className="bg-white rounded-card shadow-card overflow-hidden">
         <table className="w-full text-sm">
           <thead className="bg-brand-navy text-white">
             <tr>

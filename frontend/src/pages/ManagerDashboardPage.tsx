@@ -51,7 +51,7 @@ export default function ManagerDashboardPage() {
         realizadas, horas clínicas e ocupação — todos derivados dos mesmos dados operacionais.
       </p>
 
-      <div className="flex flex-wrap items-end gap-3 mb-6 bg-white rounded-card shadow-sm p-4">
+      <div className="flex flex-wrap items-end gap-3 mb-6 bg-white rounded-card shadow-card p-4">
         <div>
           <label className="block text-xs font-medium mb-1">De</label>
           <input
@@ -79,23 +79,23 @@ export default function ManagerDashboardPage() {
         <p className="text-neutralState">Carregando...</p>
       ) : (
         <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
-          <div className="bg-white rounded-card shadow-sm p-5">
+          <div className="bg-white rounded-card shadow-card p-5">
             <div className="text-xs text-neutralState uppercase font-medium mb-1">Pacientes ativos</div>
             <div className="text-2xl font-bold text-brand-navy">{data.active_patients_count}</div>
           </div>
-          <div className="bg-white rounded-card shadow-sm p-5">
+          <div className="bg-white rounded-card shadow-card p-5">
             <div className="text-xs text-neutralState uppercase font-medium mb-1">Profissionais ativos</div>
             <div className="text-2xl font-bold text-brand-navy">{data.active_professionals_count}</div>
           </div>
-          <div className="bg-white rounded-card shadow-sm p-5">
+          <div className="bg-white rounded-card shadow-card p-5">
             <div className="text-xs text-neutralState uppercase font-medium mb-1">Sessões realizadas</div>
             <div className="text-2xl font-bold text-brand-navy">{data.sessions_count}</div>
           </div>
-          <div className="bg-white rounded-card shadow-sm p-5">
+          <div className="bg-white rounded-card shadow-card p-5">
             <div className="text-xs text-neutralState uppercase font-medium mb-1">Horas clínicas</div>
             <div className="text-2xl font-bold text-brand-navy">{data.clinical_hours}h</div>
           </div>
-          <div className="bg-white rounded-card shadow-sm p-5">
+          <div className="bg-white rounded-card shadow-card p-5">
             <div className="text-xs text-neutralState uppercase font-medium mb-1">Ocupação</div>
             <div className="text-2xl font-bold text-brand-navy">
               {data.occupancy_rate_pct === null ? "—" : `${data.occupancy_rate_pct}%`}
@@ -112,11 +112,11 @@ export default function ManagerDashboardPage() {
       {!programRows ? (
         <p className="text-neutralState">Carregando...</p>
       ) : programRows.length === 0 ? (
-        <div className="bg-white rounded-card shadow-sm p-6 text-center text-neutralState">
+        <div className="bg-white rounded-card shadow-card p-6 text-center text-neutralState">
           Nenhum treino atingiu o mínimo de 2 pacientes ainda.
         </div>
       ) : (
-        <div className="bg-white rounded-card shadow-sm overflow-x-auto">
+        <div className="bg-white rounded-card shadow-card overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-slate-100 text-left text-xs text-neutralState uppercase">
@@ -152,7 +152,7 @@ export default function ManagerDashboardPage() {
       {!financialOutlook ? (
         <p className="text-neutralState">Carregando...</p>
       ) : (
-        <div className="bg-white rounded-card shadow-sm p-5 max-w-md flex items-center justify-between gap-4">
+        <div className="bg-white rounded-card shadow-card p-5 max-w-md flex items-center justify-between gap-4">
           <div>
             <div className="text-sm">
               Plano atual: <span className="font-semibold">{PLAN_LABELS[financialOutlook.subscription_plan]}</span>

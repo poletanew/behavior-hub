@@ -18,7 +18,7 @@ function PatientCard({ patient, onDelete }: { patient: Patient; onDelete: (id: s
   const hasContactInfo = Boolean(patient.phone || patient.address);
 
   return (
-    <div className="bg-white rounded-card shadow-sm p-5 flex flex-col gap-3">
+    <div className="bg-white rounded-card shadow-card p-5 flex flex-col gap-3">
       <div className="flex items-start gap-3">
         <div className="w-11 h-11 shrink-0 rounded-full bg-brand-turquoise/15 text-brand-turquoise font-bold flex items-center justify-center">
           {initials(patient.name)}
@@ -164,7 +164,7 @@ export default function PatientsPage() {
       </div>
 
       {showForm && (
-        <form onSubmit={handleCreate} className="bg-white rounded-card shadow-sm p-6 mb-6 space-y-4 max-w-lg">
+        <form onSubmit={handleCreate} className="bg-white rounded-card shadow-card p-6 mb-6 space-y-4 max-w-lg">
           <div>
             <label className="block text-sm font-medium mb-1">Nome</label>
             <input

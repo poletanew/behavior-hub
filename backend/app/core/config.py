@@ -44,6 +44,13 @@ class Settings(BaseSettings):
 
     CELERY_TASK_ALWAYS_EAGER: bool = False
 
+    # Botão flutuante "Fale com a IA do Behavior Hub" e demais recursos de IA
+    # (Seção 12.1/14.5) — a chave nunca é exposta ao frontend; sem ela
+    # configurada, o endpoint retorna um erro claro em vez de simular uma
+    # resposta.
+    ANTHROPIC_API_KEY: str | None = None
+    ANTHROPIC_MODEL: str = "claude-sonnet-4-5"
+
 
 @lru_cache
 def get_settings() -> Settings:

@@ -261,7 +261,7 @@ export default function AgendaPage() {
       </p>
 
       {showForm && (
-        <form onSubmit={handleCreate} className="bg-white rounded-card shadow-sm p-6 mb-6 space-y-4 max-w-2xl">
+        <form onSubmit={handleCreate} className="bg-white rounded-card shadow-card p-6 mb-6 space-y-4 max-w-2xl">
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium mb-1">Paciente</label>
@@ -360,7 +360,7 @@ export default function AgendaPage() {
         </form>
       )}
 
-      <div className="bg-white rounded-card shadow-sm p-4 mb-6 flex flex-wrap gap-4 items-end">
+      <div className="bg-white rounded-card shadow-card p-4 mb-6 flex flex-wrap gap-4 items-end">
         <div className="flex gap-2 items-center">
           <button
             onClick={() => setReferenceDate((d) => addDays(d, -7))}
@@ -434,7 +434,7 @@ export default function AgendaPage() {
           {weekDays.map((day, idx) => (
             <div
               key={day.toISOString()}
-              className="bg-white rounded-card shadow-sm overflow-hidden"
+              className="bg-white rounded-card shadow-card overflow-hidden"
               onDragOver={(e) => e.preventDefault()}
               onDrop={(e) => {
                 e.preventDefault();

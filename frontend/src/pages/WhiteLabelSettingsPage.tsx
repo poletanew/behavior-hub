@@ -64,7 +64,7 @@ export default function WhiteLabelSettingsPage() {
         </div>
       )}
 
-      <form onSubmit={handleSave} className="bg-white rounded-card shadow-sm p-6 max-w-lg space-y-4">
+      <form onSubmit={handleSave} className="bg-white rounded-card shadow-card p-6 max-w-lg space-y-4">
         <div>
           <label className="block text-sm font-medium mb-1">Nome exibido</label>
           <input

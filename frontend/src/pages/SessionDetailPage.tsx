@@ -83,7 +83,7 @@ function SessionMediaCard({ sessionId, session }: { sessionId: string; session: 
   }
 
   return (
-    <div className="bg-white rounded-card shadow-sm p-6 mb-6">
+    <div className="bg-white rounded-card shadow-card p-6 mb-6">
       <h3 className="font-semibold text-brand-navy mb-3">Foto/Vídeo</h3>
       {mediaUrl && (
         <div className="mb-4">
@@ -174,7 +174,7 @@ function BehaviorEventsCard({ sessionId, patientId }: { sessionId: string; patie
   }
 
   return (
-    <div className="bg-white rounded-card shadow-sm p-6 mb-6">
+    <div className="bg-white rounded-card shadow-card p-6 mb-6">
       <div className="flex items-center justify-between mb-3">
         <h3 className="font-semibold text-brand-navy">Comportamento-alvo (modelo ABC)</h3>
         <button
@@ -320,7 +320,7 @@ function SessionReinforcersCard({ sessionId, patientId }: { sessionId: string; p
   }
 
   return (
-    <div className="bg-white rounded-card shadow-sm p-6 mb-6">
+    <div className="bg-white rounded-card shadow-card p-6 mb-6">
       <h3 className="font-semibold text-brand-navy mb-3">Reforçadores usados nesta sessão</h3>
       <ul className="space-y-2 mb-3">
         {used.map((u) => (
@@ -451,7 +451,7 @@ function TrainingTrialsCard({
   if (!progress) return null;
 
   return (
-    <div className="bg-white rounded-card shadow-sm p-6 mb-6">
+    <div className="bg-white rounded-card shadow-card p-6 mb-6">
       <div className="flex items-center justify-between mb-4">
         <h3 className="font-semibold text-brand-navy">Treino: {trainingTitle}</h3>
         {pendingCount > 0 && (
@@ -614,7 +614,7 @@ export default function SessionDetailPage() {
         </div>
       )}
 
-      <div className="bg-white rounded-card shadow-sm p-6 mb-6">
+      <div className="bg-white rounded-card shadow-card p-6 mb-6">
         <div className="flex items-start justify-between">
           <div>
             <h1 className="text-2xl font-bold text-brand-navy">

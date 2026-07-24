@@ -88,7 +88,7 @@ export default function FamilyAccessAdminPage() {
         nunca por omissão).
       </p>
 
-      <form onSubmit={handleInvite} className="bg-white rounded-card shadow-sm p-6 mb-6 flex gap-3 items-end max-w-lg">
+      <form onSubmit={handleInvite} className="bg-white rounded-card shadow-card p-6 mb-6 flex gap-3 items-end max-w-lg">
         <div className="flex-1">
           <label className="block text-sm font-medium mb-1">E-mail do responsável</label>
           <input
@@ -112,7 +112,7 @@ export default function FamilyAccessAdminPage() {
 
       <div className="space-y-4 mb-8">
         {accesses.map((access) => (
-          <div key={access.id} className="bg-white rounded-card shadow-sm p-6">
+          <div key={access.id} className="bg-white rounded-card shadow-card p-6">
             <div className="flex items-center justify-between mb-3">
               <div>
                 <div className="font-semibold text-brand-navy">{access.family_user_name}</div>
@@ -142,13 +142,13 @@ export default function FamilyAccessAdminPage() {
           </div>
         ))}
         {accesses.length === 0 && (
-          <div className="bg-white rounded-card shadow-sm p-6 text-center text-neutralState">
+          <div className="bg-white rounded-card shadow-card p-6 text-center text-neutralState">
             Nenhum responsável convidado ainda.
           </div>
         )}
       </div>
 
-      <div className="bg-white rounded-card shadow-sm p-6">
+      <div className="bg-white rounded-card shadow-card p-6">
         <h2 className="font-semibold text-brand-navy mb-3">Mensagens com a família</h2>
         <div className="space-y-2 mb-4 max-h-64 overflow-y-auto">
           {messages.map((m) => (
@@ -172,7 +172,7 @@ export default function FamilyAccessAdminPage() {
         </form>
       </div>
 
-      <div className="bg-white rounded-card shadow-sm p-6 mt-6">
+      <div className="bg-white rounded-card shadow-card p-6 mt-6">
         <h2 className="font-semibold text-brand-navy mb-1">Registros de rotina</h2>
         <p className="text-xs text-neutralState mb-3">
           Sono, alimentação, humor ou eventos enviados pela família — visível antes do próximo atendimento.
@@ -190,7 +190,7 @@ export default function FamilyAccessAdminPage() {
         </div>
       </div>
 
-      <div className="bg-white rounded-card shadow-sm p-6 mt-6">
+      <div className="bg-white rounded-card shadow-card p-6 mt-6">
         <h2 className="font-semibold text-brand-navy mb-1">Notas de voz</h2>
         <p className="text-xs text-neutralState mb-3">Transcritas no navegador do responsável, sem áudio gravado.</p>
         <div className="space-y-2 max-h-64 overflow-y-auto">

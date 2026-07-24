@@ -146,6 +146,44 @@ export interface DashboardData {
   recent_sessions: ClinicalSession[];
 }
 
+export interface WorkspaceKpis {
+  sessions_count: number;
+  programs_count: number;
+  avg_trials_per_session: number;
+  avg_accuracy_pct: number;
+}
+
+export interface AreaPerformancePoint {
+  area: string;
+  accuracy_pct: number;
+}
+
+export interface TrainingRankingPoint {
+  training_id: string;
+  title: string;
+  accuracy_pct: number;
+}
+
+export interface ResultDistribution {
+  correct: number;
+  incorrect: number;
+  partial: number;
+  no_response: number;
+}
+
+export interface WeeklySessionsPoint {
+  week_label: string;
+  sessions_count: number;
+}
+
+export interface WorkspaceDashboardResponse {
+  kpis: WorkspaceKpis;
+  area_performance: AreaPerformancePoint[];
+  training_ranking: TrainingRankingPoint[];
+  distribution: ResultDistribution;
+  weekly_sessions: WeeklySessionsPoint[];
+}
+
 export type TreatmentArea =
   | "psicologia"
   | "aba"

@@ -70,7 +70,7 @@ export default function PatientImportPage() {
         "nome", "data de nascimento", "responsável", "diagnóstico").
       </p>
 
-      <div className="bg-white rounded-card shadow-sm p-6 mb-6 max-w-xl flex flex-wrap gap-3 items-end">
+      <div className="bg-white rounded-card shadow-card p-6 mb-6 max-w-xl flex flex-wrap gap-3 items-end">
         <div className="flex-1 min-w-[200px]">
           <label className="block text-sm font-medium mb-1">Arquivo CSV</label>
           <input
@@ -114,7 +114,7 @@ export default function PatientImportPage() {
                   Confirmar importação
                 </button>
               </div>
-              <div className="bg-white rounded-card shadow-sm overflow-hidden max-w-3xl">
+              <div className="bg-white rounded-card shadow-card overflow-hidden max-w-3xl">
                 <table className="w-full text-sm">
                   <thead className="bg-brand-navy text-white">
                     <tr>
@@ -148,7 +148,7 @@ export default function PatientImportPage() {
       )}
 
       {result && (
-        <div className="bg-white rounded-card shadow-sm p-6 max-w-xl">
+        <div className="bg-white rounded-card shadow-card p-6 max-w-xl">
           <h2 className="font-semibold text-brand-navy mb-2">Importação concluída</h2>
           <p className="text-sm mb-3">{result.imported_count} paciente(s) importado(s) com sucesso.</p>
           {result.rejected.length > 0 && (

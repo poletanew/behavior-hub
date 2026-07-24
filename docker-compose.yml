@@ -85,6 +85,10 @@ services:
       STRIPE_PRICE_ID_BASIC: ${STRIPE_PRICE_ID_BASIC:-}
       STRIPE_PRICE_ID_PREMIUM: ${STRIPE_PRICE_ID_PREMIUM:-}
       STRIPE_PRICE_ID_ENTERPRISE: ${STRIPE_PRICE_ID_ENTERPRISE:-}
+      # Botão flutuante "Fale com a IA do Behavior Hub" (Seção 12.1/14.5) —
+      # deixe em branco enquanto não houver chave; o endpoint /ai/chat
+      # retorna erro claro nesse caso, nunca simula uma resposta.
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
     ports:
       - "8000:8000"
     volumes:

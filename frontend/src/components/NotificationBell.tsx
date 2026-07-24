@@ -62,7 +62,7 @@ export default function NotificationBell() {
     <div className="relative" ref={containerRef}>
       <button
         onClick={() => setOpen((v) => !v)}
-        className="relative w-9 h-9 rounded-full bg-white shadow-sm hover:bg-slate-50 flex items-center justify-center"
+        className="relative w-9 h-9 rounded-full bg-white shadow-card hover:bg-slate-50 flex items-center justify-center"
         aria-label="Notificações"
       >
         🔔

@@ -78,7 +78,7 @@ export default function AnamnesisPage() {
 
       {message && <p className="text-success text-sm mb-4 animate-pop-in">{message}</p>}
 
-      <form onSubmit={handleSubmit} className="bg-white rounded-card shadow-sm p-6 space-y-4">
+      <form onSubmit={handleSubmit} className="bg-white rounded-card shadow-card p-6 space-y-4">
         {(Object.keys(FIELD_LABELS) as (keyof typeof FIELD_LABELS)[]).map((field) => (
           <div key={field}>
             <label className="block text-sm font-medium mb-1">{FIELD_LABELS[field]}</label>

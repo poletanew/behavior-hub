@@ -142,7 +142,7 @@ export default function PlansPage() {
       {error && <p className="text-danger text-sm mb-4">{error}</p>}
 
       {status && (
-        <div className="bg-white rounded-card shadow-sm p-4 mb-6 max-w-xl text-sm">
+        <div className="bg-white rounded-card shadow-card p-4 mb-6 max-w-xl text-sm">
           <p>
             Plano atual: <span className="font-semibold text-brand-navy capitalize">{status.subscription_plan ?? "free"}</span>
             {" — "}
@@ -163,7 +163,7 @@ export default function PlansPage() {
         </div>
       )}
 
-      <div className="bg-white rounded-card shadow-sm overflow-x-auto">
+      <div className="bg-white rounded-card shadow-card overflow-x-auto">
         <table className="w-full text-sm min-w-[720px]">
           <thead>
             <tr className="bg-brand-navy text-white">

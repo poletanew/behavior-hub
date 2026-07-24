@@ -148,7 +148,7 @@ export default function AuditLogPage() {
 
       {viewMode === "action" ? (
         <>
-          <div className="bg-white rounded-card shadow-sm p-4 mb-6 flex flex-wrap gap-4 items-end">
+          <div className="bg-white rounded-card shadow-card p-4 mb-6 flex flex-wrap gap-4 items-end">
             <div>
               <label className="block text-xs font-medium mb-1">Tipo de entidade</label>
               <select
@@ -190,7 +190,7 @@ export default function AuditLogPage() {
           ) : entries.length === 0 && !error ? (
             <EmptyState icon="🔍" message="Nenhum registro de auditoria encontrado." />
           ) : !error ? (
-            <div className="bg-white rounded-card shadow-sm overflow-hidden">
+            <div className="bg-white rounded-card shadow-card overflow-hidden">
               <table className="w-full text-sm">
                 <thead className="bg-brand-navy text-white">
                   <tr>
@@ -218,7 +218,7 @@ export default function AuditLogPage() {
         </>
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <div className="bg-white rounded-card shadow-sm p-4">
+          <div className="bg-white rounded-card shadow-card p-4">
             <input
               placeholder="Buscar paciente por nome..."
               value={patientSearch}
@@ -244,7 +244,7 @@ export default function AuditLogPage() {
             </ul>
           </div>
 
-          <div className="lg:col-span-2 bg-white rounded-card shadow-sm p-4">
+          <div className="lg:col-span-2 bg-white rounded-card shadow-card p-4">
             {!selectedPatientId ? (
               <p className="text-neutralState text-sm">Selecione um paciente à esquerda para ver sua auditoria.</p>
             ) : patientTrailError ? (

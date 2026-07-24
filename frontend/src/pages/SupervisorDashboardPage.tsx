@@ -26,7 +26,7 @@ export default function SupervisorDashboardPage() {
       {rows.length === 0 ? (
         <EmptyState icon="👥" message="Nenhum profissional ativo na equipe." />
       ) : (
-        <div className="bg-white rounded-card shadow-sm overflow-x-auto">
+        <div className="bg-white rounded-card shadow-card overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-slate-100 text-left text-xs text-neutralState uppercase">

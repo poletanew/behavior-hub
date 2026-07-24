@@ -118,7 +118,7 @@ export default function WaitlistPage() {
       </div>
 
       {showForm && (
-        <form onSubmit={handleCreate} className="bg-white rounded-card shadow-sm p-6 mb-6 space-y-4 max-w-lg">
+        <form onSubmit={handleCreate} className="bg-white rounded-card shadow-card p-6 mb-6 space-y-4 max-w-lg">
           <div>
             <label className="block text-sm font-medium mb-1">Nome</label>
             <input
@@ -184,7 +184,7 @@ export default function WaitlistPage() {
       ) : (
         <div className="space-y-3">
           {[...waiting, ...others].map((entry) => (
-            <div key={entry.id} className="bg-white rounded-card shadow-sm p-4">
+            <div key={entry.id} className="bg-white rounded-card shadow-card p-4">
               <div className="flex items-center justify-between">
                 <div>
                   <span className="font-semibold text-brand-navy">{entry.name}</span>

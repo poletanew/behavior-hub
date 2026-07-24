@@ -20,10 +20,14 @@ export default {
         warning: "#F59E0B",
         danger: "#EF4444",
         neutralState: "#64748B",
+        borderMuted: "#E2E8F0",
       },
       borderRadius: {
-        card: "12px",
-        btn: "8px",
+        card: "14px",
+        btn: "9px",
+      },
+      boxShadow: {
+        card: "0 1px 3px rgba(15,37,87,0.06)",
       },
     },
   },

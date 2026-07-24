@@ -74,7 +74,7 @@ export default function ABAPage() {
       </p>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-        <div className="bg-white rounded-card shadow-sm p-6">
+        <div className="bg-white rounded-card shadow-card p-6">
           <h2 className="font-semibold text-brand-navy mb-3">Auxiliares Terapêuticos</h2>
           {ats.length === 0 ? (
             <p className="text-neutralState text-sm">Nenhum AT convidado ainda.</p>
@@ -105,7 +105,7 @@ export default function ABAPage() {
           )}
         </div>
 
-        <div className="bg-white rounded-card shadow-sm p-6">
+        <div className="bg-white rounded-card shadow-card p-6">
           <h2 className="font-semibold text-brand-navy mb-3">Atribuir paciente ao AT selecionado</h2>
           {!selectedAtId ? (
             <p className="text-neutralState text-sm">Selecione um AT à esquerda.</p>
@@ -142,7 +142,7 @@ export default function ABAPage() {
         </div>
       </div>
 
-      <div className="bg-white rounded-card shadow-sm p-6">
+      <div className="bg-white rounded-card shadow-card p-6">
         <h2 className="font-semibold text-brand-navy mb-1">Tentativas recentes registradas por ATs</h2>
         <p className="text-xs text-neutralState mb-4">
           Visão de acompanhamento/revisão — não bloqueia nem altera os indicadores clínicos.

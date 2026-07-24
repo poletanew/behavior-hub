@@ -39,6 +39,9 @@ import PlansPage from "./pages/PlansPage";
 import FamilyAccessAdminPage from "./pages/FamilyAccessAdminPage";
 import WhiteLabelSettingsPage from "./pages/WhiteLabelSettingsPage";
 import WaitlistPage from "./pages/WaitlistPage";
+import TreatmentPlansIndexPage from "./pages/TreatmentPlansIndexPage";
+import AssessmentsIndexPage from "./pages/AssessmentsIndexPage";
+import ReportsIndexPage from "./pages/ReportsIndexPage";
 
 export default function App() {
   return (
@@ -78,9 +81,12 @@ export default function App() {
         <Route path="/dashboard" element={<DashboardPage />} />
         <Route path="/patients" element={<PatientsPage />} />
         <Route path="/patients/:patientId" element={<PatientDetailPage />} />
+        <Route path="/treatment-plans" element={<TreatmentPlansIndexPage />} />
         <Route path="/patients/:patientId/treatment-plan" element={<TreatmentPlanPage />} />
+        <Route path="/reports" element={<ReportsIndexPage />} />
         <Route path="/patients/:patientId/reports" element={<ReportsPage />} />
         <Route path="/patients/:patientId/timeline" element={<TimelinePage />} />
+        <Route path="/assessments" element={<AssessmentsIndexPage />} />
         <Route path="/patients/:patientId/assessments" element={<AssessmentsPage />} />
         <Route path="/patients/:patientId/anamnesis" element={<AnamnesisPage />} />
         <Route path="/patients/:patientId/checklists" element={<ChecklistsPage />} />

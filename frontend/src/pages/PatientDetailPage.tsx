@@ -137,7 +137,7 @@ export default function PatientDetailPage() {
         ← Voltar para Pacientes
       </Link>
 
-      <div className="bg-white rounded-card shadow-sm p-6 mb-6">
+      <div className="bg-white rounded-card shadow-card p-6 mb-6">
         <h1 className="text-2xl font-bold text-brand-navy">{patient.name}</h1>
         <p className="text-neutralState text-sm mt-1">Nascimento: {patient.birth_date}</p>
         {patient.guardian_name && <p className="text-sm mt-1">Responsável: {patient.guardian_name}</p>}
@@ -176,7 +176,7 @@ export default function PatientDetailPage() {
       </div>
 
       {alerts.length > 0 && (
-        <div className="bg-white rounded-card shadow-sm p-4 mb-6">
+        <div className="bg-white rounded-card shadow-card p-4 mb-6">
           <h2 className="font-semibold text-brand-navy mb-3">Alertas clínicos</h2>
           <div className="space-y-2">
             {alerts.map((alert) => (
@@ -195,7 +195,7 @@ export default function PatientDetailPage() {
       )}
 
       {suggestions.filter((s) => s.status === "pending").length > 0 && (
-        <div className="bg-white rounded-card shadow-sm p-4 mb-6">
+        <div className="bg-white rounded-card shadow-card p-4 mb-6">
           <h2 className="font-semibold text-brand-navy mb-1">Sugestões clínicas</h2>
           <p className="text-xs text-neutralState mb-3">
             Recomendações geradas por regra (Seção 29.1) — revise e aprove ou descarte; nenhuma ação é
@@ -250,7 +250,7 @@ export default function PatientDetailPage() {
       </div>
 
       {showNewSession && (
-        <form onSubmit={handleCreateSession} className="bg-white rounded-card shadow-sm p-6 mb-6 space-y-4">
+        <form onSubmit={handleCreateSession} className="bg-white rounded-card shadow-card p-6 mb-6 space-y-4">
           <div>
             <label className="block text-sm font-medium mb-1">Paciente</label>
             <div className="w-full h-10 rounded-btn border border-slate-200 bg-slate-50 px-3 flex items-center text-neutralState">
@@ -359,7 +359,7 @@ export default function PatientDetailPage() {
       {sessions.length === 0 ? (
         <EmptyState icon="🗒️" message="Nenhuma sessão registrada ainda." />
       ) : (
-        <div className="bg-white rounded-card shadow-sm divide-y divide-slate-100">
+        <div className="bg-white rounded-card shadow-card divide-y divide-slate-100">
           {sessions.map((session) => (
             <Link
               key={session.id}
