@@ -392,6 +392,15 @@ const RESULT_LABELS: Record<string, string> = {
   no_response: "Não respondida",
 };
 
+// Botões grandes em grade, otimizados para toque com o polegar — padrão
+// "uma mão só" de apps de coleta ABA de mercado, em vez de um <select>.
+const RESULT_BUTTON_STYLES: Record<string, string> = {
+  correct: "bg-success text-white border-success",
+  incorrect: "bg-danger text-white border-danger",
+  partial: "bg-warning text-white border-warning",
+  no_response: "bg-slate-400 text-white border-slate-400",
+};
+
 const PROMPT_LABELS: Record<string, string> = {
   independent: "Independente",
   gestural: "Ajuda gestual",
@@ -493,32 +502,41 @@ function TrainingTrialsCard({
         )}
       </ul>
 
+      <div className="mb-3">
+        <label className="block text-xs font-medium mb-1">Nível de ajuda</label>
+        <select
+          value={promptLevel}
+          onChange={(e) => setPromptLevel(e.target.value)}
+          className="h-9 rounded-btn border border-slate-300 px-2 text-sm w-full max-w-xs"
+        >
+          {Object.entries(PROMPT_LABELS).map(([value, label]) => (
+            <option key={value} value={value}>
+              {label}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      <div className="mb-3">
+        <label className="block text-xs font-medium mb-1">Resultado</label>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 max-w-lg">
+          {Object.entries(RESULT_LABELS).map(([value, label]) => (
+            <button
+              key={value}
+              type="button"
+              onClick={() => setResult(value)}
+              className={`min-h-[56px] rounded-card border-2 text-sm font-bold transition-opacity ${
+                result === value ? RESULT_BUTTON_STYLES[value] : "bg-white text-brand-graphite border-slate-200"
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      </div>
+
       <div className="flex flex-wrap items-end gap-3 mb-3">
-        <div>
-          <label className="block text-xs font-medium mb-1">Resultado</label>
-          <select value={result} onChange={(e) => setResult(e.target.value)} className="h-9 rounded-btn border border-slate-300 px-2 text-sm">
-            {Object.entries(RESULT_LABELS).map(([value, label]) => (
-              <option key={value} value={value}>
-                {label}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div>
-          <label className="block text-xs font-medium mb-1">Nível de ajuda</label>
-          <select
-            value={promptLevel}
-            onChange={(e) => setPromptLevel(e.target.value)}
-            className="h-9 rounded-btn border border-slate-300 px-2 text-sm"
-          >
-            {Object.entries(PROMPT_LABELS).map(([value, label]) => (
-              <option key={value} value={value}>
-                {label}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div className="flex-1 min-w-[160px]">
+        <div className="flex-1 min-w-[200px]">
           <label className="block text-xs font-medium mb-1">Observação (opcional)</label>
           <div className="flex gap-2">
             <input

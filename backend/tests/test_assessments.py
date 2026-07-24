@@ -6,7 +6,7 @@ def test_list_protocol_definitions(client):
     response = client.get("/v1/assessment-protocols", headers=ctx["headers"])
     assert response.status_code == 200
     protocols = {p["protocol"] for p in response.json()}
-    assert protocols == {"vb_mapp", "ablls_r"}
+    assert protocols == {"vb_mapp", "socially_savvy"}
     vb_mapp = next(p for p in response.json() if p["protocol"] == "vb_mapp")
     assert vb_mapp["requires_license"] is True
     assert sum(d["max_value"] for d in vb_mapp["domains"]) == 170
@@ -55,33 +55,45 @@ def test_create_assessment_rejects_unknown_domain_code(client):
     assert response.status_code == 400
 
 
-def test_create_assessment_requires_max_value_when_no_default(client):
-    """ABLLS-R não tem max_value padrão (Seção 30.1.1) — o profissional deve informar."""
+def test_create_assessment_uses_socially_savvy_default_max_value(client):
+    """Socially Savvy Checklist tem estrutura fixa (Seção 30.1.1): cada domínio
+    tem nº de itens conhecido x pontuação máxima 3 por item, então já vem com
+    max_value padrão — diferente do VB-MAPP, mas ambos têm default aqui."""
     ctx = register_clinic(client)
     patient = create_patient(client, ctx["headers"])
 
-    missing = client.post(
+    response = client.post(
         f"/v1/patients/{patient['id']}/assessments",
         json={
-            "protocol": "ablls_r",
+            "protocol": "socially_savvy",
             "applied_date": "2026-01-15",
-            "domain_scores": [{"domain_code": "a", "raw_value": 10}],
+            "domain_scores": [{"domain_code": "social_emocional", "raw_value": 9}],
         },
         headers=ctx["headers"],
     )
-    assert missing.status_code == 400
+    assert response.status_code == 201, response.text
+    domain = response.json()["raw_scores"][0]
+    assert domain["max_value"] == 18
+    assert domain["normalized_pct"] == 50.0
 
-    provided = client.post(
+
+def test_create_assessment_explicit_max_value_overrides_default(client):
+    """O profissional sempre pode ajustar o max_value sugerido (Seção 30.3) —
+    o valor explícito prevalece sobre o default do protocolo."""
+    ctx = register_clinic(client)
+    patient = create_patient(client, ctx["headers"])
+
+    response = client.post(
         f"/v1/patients/{patient['id']}/assessments",
         json={
-            "protocol": "ablls_r",
+            "protocol": "vb_mapp",
             "applied_date": "2026-01-15",
-            "domain_scores": [{"domain_code": "a", "raw_value": 10, "max_value": 20}],
+            "domain_scores": [{"domain_code": "mando", "raw_value": 10, "max_value": 20}],
         },
         headers=ctx["headers"],
     )
-    assert provided.status_code == 201, provided.text
-    assert provided.json()["raw_scores"][0]["normalized_pct"] == 50.0
+    assert response.status_code == 201, response.text
+    assert response.json()["raw_scores"][0]["normalized_pct"] == 50.0
 
 
 def test_create_assessment_rejects_raw_value_exceeding_max(client):

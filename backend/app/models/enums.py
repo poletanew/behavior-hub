@@ -221,11 +221,11 @@ class SuggestionStatus(str, enum.Enum):
 
 
 class AssessmentProtocol(str, enum.Enum):
-    """Seção 30.1 — protocolos-piloto (V3): VB-MAPP e ABLLS-R. Demais
-    protocolos (AFLS, PEAK, ESDM, etc.) entram em ondas futuras."""
+    """Seção 30.1 — protocolos-piloto (V3): VB-MAPP e Socially Savvy Checklist.
+    Demais protocolos (AFLS, PEAK, ESDM, etc.) entram em ondas futuras."""
 
     VB_MAPP = "vb_mapp"
-    ABLLS_R = "ablls_r"
+    SOCIALLY_SAVVY = "socially_savvy"
 
 
 class WaitlistStatus(str, enum.Enum):

@@ -342,13 +342,12 @@ exigência de licenciamento formal ficam marcados como 'requer licença' e não 
 sistema, apenas referenciados para registro de pontuação").
 
 Os `max_value` do **VB-MAPP** (16 domínios somando exatamente 170 pontos) são valores oficialmente
-publicados e amplamente documentados na literatura da área — usados aqui só como sugestão no
-formulário, sempre editável, já que a responsabilidade pela aplicação/pontuação é do profissional
-habilitado. O **ABLLS-R** não tem `max_value` padrão nenhum: o número de tarefas por domínio varia
-por edição/adaptação do instrumento, e preencher um valor sem certeza equivaleria a inventar dado —
-o profissional informa o `max_value` real do seu manual ao registrar cada avaliação (validado por
-`_build_raw_scores` em `assessment_service.py`, que rejeita quando falta e quando `raw_value` excede
-o `max_value`).
+publicados e amplamente documentados na literatura da área. O **Socially Savvy Checklist** tem 7
+domínios com nº de itens fixo por domínio (9 a 24) e escala 0–3 por item (+ opção "NA"), então o
+`max_value` padrão de cada domínio é nº de itens × 3. Em ambos os protocolos o valor é só uma
+sugestão no formulário, sempre editável, já que a responsabilidade pela aplicação/pontuação é do
+profissional habilitado (validado por `_build_raw_scores` em `assessment_service.py`, que rejeita
+quando falta e quando `raw_value` excede o `max_value`).
 
 `Assessment.raw_scores` é uma lista JSON (não colunas fixas), pelo mesmo motivo do `ProtocolDefinition`
 — protocolos diferentes têm domínios e escalas diferentes, e um schema rígido não escalaria. Um par
@@ -649,8 +648,8 @@ regra puramente aritmética: domínios com `normalized_pct` abaixo da média des
 (se todos empatarem, todos entram no rascunho, garantindo pelo menos um item). Cada item vira um
 objetivo sugerido — título, descrição, critério e estratégias em texto-modelo, sempre editável.
 
-**Decisão de escopo deliberada: todo objetivo sugerido vai para a área ABA.** VB-MAPP e ABLLS-R
-(Seção 30) são instrumentos de Análise do Comportamento Aplicada; o PRD não define um mapeamento
+**Decisão de escopo deliberada: todo objetivo sugerido vai para a área ABA.** VB-MAPP e Socially
+Savvy Checklist (Seção 30) são instrumentos de Análise do Comportamento Aplicada; o PRD não define um mapeamento
 domínio→área da grade multidisciplinar (Seção 13.1) para os domínios desses protocolos (ex.:
 "Leitura", "Motricidade Fina", "Vestir-se"), e inventar esse mapeamento seria decidir um julgamento
 clínico que o documento não especifica. Mapear tudo para ABA — a área nativa desses protocolos —

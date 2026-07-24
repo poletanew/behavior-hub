@@ -76,8 +76,8 @@ def _generate_plan_draft(protocol: AssessmentProtocol, raw_scores: list[dict]) -
     sem chamada a nenhuma API de IA externa (mesmo princípio de
     treatment_plan_service._draft_objective_fields_from_text).
 
-    Decisão de escopo: VB-MAPP e ABLLS-R são instrumentos de Análise do
-    Comportamento Aplicada (Seção 30) — o PRD não define um mapeamento
+    Decisão de escopo: VB-MAPP e Socially Savvy Checklist são instrumentos de
+    Análise do Comportamento Aplicada (Seção 30) — o PRD não define um mapeamento
     domínio→área da grade multidisciplinar (Seção 13.1), então mapear cada
     domínio para uma especialidade diferente seria inventar um julgamento
     clínico que o documento não especifica. Todos os objetivos sugeridos vão

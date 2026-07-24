@@ -16,7 +16,7 @@ import {
 
 const PROTOCOL_LABELS: Record<AssessmentProtocol, string> = {
   vb_mapp: "VB-MAPP",
-  ablls_r: "ABLLS-R",
+  socially_savvy: "Socially Savvy Checklist",
 };
 
 const MAX_ASSESSMENTS_TO_COMPARE = 4;
@@ -206,7 +206,7 @@ export default function AssessmentsPage() {
         </button>
       </div>
       <p className="text-sm text-neutralState mb-6">
-        Seção 30 do PRD — protocolos-piloto VB-MAPP e ABLLS-R. O Behavior Hub apoia o registro e a
+        Seção 30 do PRD — protocolos-piloto VB-MAPP e Socially Savvy Checklist. O Behavior Hub apoia o registro e a
         visualização das pontuações; a aplicação e a interpretação clínica permanecem sob
         responsabilidade do profissional habilitado.
       </p>

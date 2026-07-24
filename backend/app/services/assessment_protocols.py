@@ -2,22 +2,21 @@
 mapeia domain_code -> domain_label e um max_value sugerido, sem alterar o
 schema do banco (raw_scores continua sendo um JSON genérico).
 
-Escopo deliberado: VB-MAPP e ABLLS-R são instrumentos comerciais licenciados
-(Seção 30.3 — "protocolos com exigência de licenciamento formal ficam
-marcados como 'requer licença' e não são distribuídos pelo sistema, apenas
-referenciados para registro de pontuação"). Por isso só reproduzimos aqui os
-NOMES dos domínios/áreas — terminologia padrão da análise do comportamento já
-citada no próprio PRD (ex.: "mando", "tato") — nunca os itens/tarefas de
-avaliação em si, que pertencem ao manual oficial de cada instrumento.
+Escopo deliberado: VB-MAPP e Socially Savvy Checklist são instrumentos
+comerciais licenciados (Seção 30.3 — "protocolos com exigência de
+licenciamento formal ficam marcados como 'requer licença' e não são
+distribuídos pelo sistema, apenas referenciados para registro de
+pontuação"). Por isso só reproduzimos aqui os NOMES dos domínios/áreas e a
+CONTAGEM de itens por domínio — nunca os itens/tarefas de avaliação em si,
+que pertencem ao manual oficial de cada instrumento.
 
 Os `max_value` do VB-MAPP são os oficialmente publicados (16 áreas somando
 170 pontos, conforme a Seção 30.1.1 do PRD) e servem apenas de valor sugerido
 no formulário — o profissional aplicando o instrumento sempre pode ajustar,
 já que a responsabilidade pela aplicação e pontuação é dele (Seção 30.3). Já
-o ABLLS-R não tem um "max_value" padrão por domínio aqui: o número de tarefas
-por área varia por edição/adaptação do instrumento, e preencher um valor sem
-certeza equivaleria a inventar dado — o profissional informa o max_value real
-do seu manual ao registrar cada aplicação."""
+o Socially Savvy Checklist pontua cada item de 0 a 3 (mais opção "NA"); o
+`max_value` de cada domínio aqui é apenas nº de itens × 3 (a pontuação
+máxima possível), não o texto de nenhum item."""
 
 from app.models.enums import AssessmentProtocol
 
@@ -60,35 +59,25 @@ PROTOCOL_DEFINITIONS: dict[AssessmentProtocol, dict] = {
             {"domain_code": "escrita", "domain_label": "Escrita", "max_value": 10},
         ],
     },
-    AssessmentProtocol.ABLLS_R: {
-        "label": "ABLLS-R",
+    AssessmentProtocol.SOCIALLY_SAVVY: {
+        "label": "Socially Savvy Checklist",
         "requires_license": True,
         "domains": [
-            {"domain_code": "a", "domain_label": "Cooperação e Eficácia do Reforçador", "max_value": None},
-            {"domain_code": "b", "domain_label": "Desempenho Visual", "max_value": None},
-            {"domain_code": "c", "domain_label": "Linguagem Receptiva", "max_value": None},
-            {"domain_code": "d", "domain_label": "Imitação Motora", "max_value": None},
-            {"domain_code": "e", "domain_label": "Imitação Vocal", "max_value": None},
-            {"domain_code": "f", "domain_label": "Pedidos (Mando)", "max_value": None},
-            {"domain_code": "g", "domain_label": "Nomeação (Tato)", "max_value": None},
-            {"domain_code": "h", "domain_label": "Intraverbal", "max_value": None},
-            {"domain_code": "i", "domain_label": "Vocalização Espontânea", "max_value": None},
-            {"domain_code": "j", "domain_label": "Sintaxe e Gramática", "max_value": None},
-            {"domain_code": "k", "domain_label": "Brincar e Lazer", "max_value": None},
-            {"domain_code": "l", "domain_label": "Interação Social", "max_value": None},
-            {"domain_code": "m", "domain_label": "Instrução em Grupo", "max_value": None},
-            {"domain_code": "n", "domain_label": "Rotinas de Sala de Aula", "max_value": None},
-            {"domain_code": "o", "domain_label": "Generalização de Respostas", "max_value": None},
-            {"domain_code": "p", "domain_label": "Leitura", "max_value": None},
-            {"domain_code": "q", "domain_label": "Matemática", "max_value": None},
-            {"domain_code": "r", "domain_label": "Escrita", "max_value": None},
-            {"domain_code": "s", "domain_label": "Soletração", "max_value": None},
-            {"domain_code": "t", "domain_label": "Vestir-se", "max_value": None},
-            {"domain_code": "u", "domain_label": "Alimentação", "max_value": None},
-            {"domain_code": "v", "domain_label": "Higiene Pessoal", "max_value": None},
-            {"domain_code": "w", "domain_label": "Uso do Banheiro", "max_value": None},
-            {"domain_code": "x", "domain_label": "Motricidade Grossa", "max_value": None},
-            {"domain_code": "y", "domain_label": "Motricidade Fina", "max_value": None},
+            {"domain_code": "atencao_compartilhada", "domain_label": "Atenção Compartilhada", "max_value": 27},
+            {"domain_code": "brincadeira_social", "domain_label": "Brincadeira Social", "max_value": 72},
+            {"domain_code": "autorregulacao", "domain_label": "Autorregulação", "max_value": 54},
+            {"domain_code": "social_emocional", "domain_label": "Social/Emocional", "max_value": 18},
+            {"domain_code": "linguagem_social", "domain_label": "Linguagem Social", "max_value": 72},
+            {
+                "domain_code": "comportamento_grupo_sala_aula",
+                "domain_label": "Comportamento de Grupo/Sala de Aula",
+                "max_value": 69,
+            },
+            {
+                "domain_code": "linguagem_social_nao_verbal",
+                "domain_label": "Linguagem Social Não-Verbal",
+                "max_value": 18,
+            },
         ],
     },
 }

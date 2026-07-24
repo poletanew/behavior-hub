@@ -663,7 +663,7 @@ export interface FinancialOutlook {
   churn_risk_label: ChurnRiskLabel;
 }
 
-export type AssessmentProtocol = "vb_mapp" | "ablls_r";
+export type AssessmentProtocol = "vb_mapp" | "socially_savvy";
 
 export interface ProtocolDomainDefinition {
   domain_code: string;
