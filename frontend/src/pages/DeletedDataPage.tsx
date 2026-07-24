@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { RotateCcw } from "lucide-react";
 import { apiRequest } from "../api/client";
 import EmptyState from "../components/EmptyState";
 import { DeletedItem } from "../types";
@@ -60,8 +61,11 @@ export default function DeletedDataPage() {
                   <td className="px-4 py-3">{new Date(item.deleted_at).toLocaleDateString("pt-BR")}</td>
                   <td className="px-4 py-3">{item.days_remaining}</td>
                   <td className="px-4 py-3 text-right">
-                    <button onClick={() => handleRestore(item)} className="text-brand-blue hover:underline">
-                      Restaurar
+                    <button
+                      onClick={() => handleRestore(item)}
+                      className="text-brand-blue hover:underline inline-flex items-center gap-1"
+                    >
+                      <RotateCcw size={13} /> Restaurar
                     </button>
                   </td>
                 </tr>

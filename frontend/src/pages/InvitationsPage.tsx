@@ -1,4 +1,5 @@
 import { FormEvent, useEffect, useState } from "react";
+import { UserPlus } from "lucide-react";
 import { apiRequest, ApiError } from "../api/client";
 import { SPECIALTIES, specialtyLabel } from "../utils/specialty";
 
@@ -20,6 +21,20 @@ const ROLE_LABELS: Record<string, string> = {
   professional: "Profissional",
   supervisor: "Supervisor",
   at: "Auxiliar Terapêutico (AT)",
+};
+
+const STATUS_LABELS: Record<string, string> = {
+  pending: "Convite pendente",
+  accepted: "Ativo",
+  revoked: "Revogado",
+  expired: "Expirado",
+};
+
+const STATUS_COLORS: Record<string, string> = {
+  pending: "bg-warning/10 text-warning",
+  accepted: "bg-success/10 text-success",
+  revoked: "bg-slate-200 text-neutralState",
+  expired: "bg-slate-200 text-neutralState",
 };
 
 export default function InvitationsPage() {
@@ -107,8 +122,11 @@ export default function InvitationsPage() {
             </select>
           </div>
         )}
-        <button type="submit" className="h-10 rounded-btn bg-brand-turquoise text-white px-4 text-sm font-medium">
-          Gerar convite
+        <button
+          type="submit"
+          className="h-10 rounded-btn bg-brand-turquoise text-white px-4 text-sm font-medium flex items-center gap-1.5"
+        >
+          <UserPlus size={15} /> Gerar convite
         </button>
       </form>
       {error && <p className="text-danger text-sm mb-4">{error}</p>}
@@ -136,7 +154,11 @@ export default function InvitationsPage() {
                 <td className="px-4 py-3">{inv.email}</td>
                 <td className="px-4 py-3">{ROLE_LABELS[inv.role] ?? inv.role}</td>
                 <td className="px-4 py-3">{specialtyLabel(inv.specialty) ?? "—"}</td>
-                <td className="px-4 py-3 capitalize">{inv.status}</td>
+                <td className="px-4 py-3">
+                  <span className={`rounded-full px-2.5 py-0.5 text-xs font-bold ${STATUS_COLORS[inv.status] ?? "bg-slate-200 text-neutralState"}`}>
+                    {STATUS_LABELS[inv.status] ?? inv.status}
+                  </span>
+                </td>
                 <td className="px-4 py-3">{new Date(inv.expires_at).toLocaleDateString("pt-BR")}</td>
                 <td className="px-4 py-3 text-right">
                   {inv.status === "pending" && (
